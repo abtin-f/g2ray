@@ -51,6 +51,15 @@ sealed interface Route {
     data class Media(val chatId: Long, val messageId: Long) : Route
     data class SettingsPage(val page: com.abtin.tglass.features.settings.Page) : Route
     data object Calls : Route
+
+    // ---- Groups & channels ----
+    /** Member picker of the New Group flow. */
+    data object NewGroup : Route
+    /** Name + photo step of the New Group flow. */
+    data class NewGroupInfo(val userIds: List<Long>) : Route
+    data object NewChannel : Route
+    data class EditChat(val chatId: Long) : Route
+    data class AddMembers(val chatId: Long) : Route
 }
 
 /** Routes presented modally (slide up) instead of pushed (slide from right). */
@@ -106,6 +115,12 @@ class Navigator(initial: Route, private val scope: CoroutineScope) {
 
     fun replaceTop(route: Route) {
         stack[stack.lastIndex] = Entry(route, ids++, 0f)
+    }
+
+    /** Closes everything above the root (e.g. a finished New Group flow) and shows [route] on top of it. */
+    fun popToRootAndPush(route: Route) {
+        while (stack.size > 1) stack.removeAt(stack.lastIndex)
+        push(route)
     }
 
     internal fun dragTo(fraction: Float) {

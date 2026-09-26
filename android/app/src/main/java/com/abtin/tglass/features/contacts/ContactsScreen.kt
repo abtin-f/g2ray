@@ -138,9 +138,9 @@ fun NewMessageScreen() {
         Box(Modifier.fillMaxSize().background(c.background)) {
             LazyColumn(Modifier.fillMaxSize().layerBackdrop(backdrop), contentPadding = PaddingValues(top = top + 62.dp, bottom = 30.dp)) {
                 item { SearchField(query, { query = it }, Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) }
-                item { ActionRow(TgIcons.CtCreateGroup, "New Group") { toast.show("New group") } }
+                item { ActionRow(TgIcons.CtCreateGroup, "New Group") { nav.push(Route.NewGroup) } }
                 item { ActionRow(TgIcons.CtAddMember, "New Contact") { toast.show("New contact") } }
-                item { ActionRow(TgIcons.CtCreateChannel, "New Channel") { toast.show("New channel") } }
+                item { ActionRow(TgIcons.CtCreateChannel, "New Channel") { nav.push(Route.NewChannel) } }
                 var letter = ' '
                 contacts.forEach { u ->
                     val l = u.name.firstOrNull()?.uppercaseChar() ?: '#' 

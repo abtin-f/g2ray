@@ -12,6 +12,7 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import com.abtin.tglass.BuildConfig
 import com.abtin.tglass.data.CallRecord
 import com.abtin.tglass.data.ChatInfo
+import com.abtin.tglass.data.ChatRights
 import com.abtin.tglass.data.GifItem
 import com.abtin.tglass.data.GlobalResults
 import com.abtin.tglass.data.StickerItem
@@ -1050,6 +1051,7 @@ class TdRepository(context: Context) : TelegramRepository {
         var username: String? = null
         var joined = true
         var canPost = false
+        var rights: ChatRights? = null
         val type = when (val t = st.type) {
             is ChatTypePrivate -> {
                 peer = t.userId
@@ -1063,7 +1065,11 @@ class TdRepository(context: Context) : TelegramRepository {
                 }
             }
             is ChatTypeSecret -> { peer = t.userId; UiChatType.Private }
-            is ChatTypeBasicGroup -> { members = basicGroups[t.basicGroupId]?.memberCount ?: 0; UiChatType.Group }
+            is ChatTypeBasicGroup -> {
+                members = basicGroups[t.basicGroupId]?.memberCount ?: 0
+                rights = rightsOf(basicGroups[t.basicGroupId]?.status)
+                UiChatType.Group
+            }
             is ChatTypeSupergroup -> {
                 val sg = supergroups[t.supergroupId]
                 members = sg?.memberCount ?: 0
@@ -1071,6 +1077,7 @@ class TdRepository(context: Context) : TelegramRepository {
                 username = sg?.usernames?.activeUsernames?.firstOrNull()
                 joined = sg?.status.let { it !is ChatMemberStatusLeft && it !is ChatMemberStatusBanned }
                 canPost = sg?.status.let { it is ChatMemberStatusCreator || it is ChatMemberStatusAdministrator }
+                rights = rightsOf(sg?.status)
                 if (t.isChannel) UiChatType.Channel else UiChatType.Group
             }
             else -> UiChatType.Private
@@ -1099,6 +1106,7 @@ class TdRepository(context: Context) : TelegramRepository {
             folderIds = st.positions.values.mapNotNull { p -> (p.list as? ChatListFolder)?.chatFolderId?.takeIf { p.order != 0L } }.toSet(),
             joined = joined,
             canPost = canPost,
+            rights = rights,
         )
     }
 
@@ -1501,6 +1509,177 @@ class TdRepository(context: Context) : TelegramRepository {
     private fun <T> TdlResult<T>.orReport(): TdlResult<T> {
         if (this is TdlResult.Failure) _errors.tryEmit(humanize(message))
         return this
+    }
+
+    // =====================================================================================
+    // ---- Groups & channels ----
+    // =====================================================================================
+
+    /** The user's management rights from their member status in a basic group / supergroup / channel. */
+    private fun rightsOf(status: ChatMemberStatus?): ChatRights? = when (status) {
+        is ChatMemberStatusCreator -> ChatRights.Owner
+        is ChatMemberStatusAdministrator -> ChatRights(
+            owner = false,
+            changeInfo = status.rights.canChangeInfo,
+            inviteUsers = status.rights.canInviteUsers,
+            banMembers = status.rights.canRestrictMembers,
+        )
+        else -> null
+    }
+
+    private fun groupError(error: String): String = when {
+        "USER_PRIVACY_RESTRICTED" in error -> "This user's privacy settings don't allow adding them to groups."
+        "USER_NOT_MUTUAL_CONTACT" in error -> "This user can only be added by a mutual contact."
+        "USERS_TOO_MUCH" in error -> "The group has reached its member limit."
+        "USER_CHANNELS_TOO_MUCH" in error -> "One of the users is in too many groups and channels."
+        "CHANNELS_TOO_MUCH" in error -> "You are in too many groups and channels. Leave some before creating new ones."
+        "CHAT_ADMIN_REQUIRED" in error || "RIGHT_FORBIDDEN" in error -> "You don't have the rights to do this."
+        "CHAT_TITLE_EMPTY" in error -> "Please enter a name."
+        "PHOTO_CROP_SIZE_SMALL" in error -> "This photo is too small."
+        else -> humanize(error)
+    }
+
+    private fun failedToAddText(failed: Int): String? = when {
+        failed <= 0 -> null
+        failed == 1 -> "1 user couldn't be added because of their privacy settings."
+        else -> "$failed users couldn't be added because of their privacy settings."
+    }
+
+    override fun muteFor(chatId: Long, seconds: Int) {
+        val st = chatStates[chatId] ?: return
+        val n = st.notifications
+        val settings = ChatNotificationSettings(
+            false, seconds.coerceAtLeast(0),
+            n.useDefaultSound, n.soundId,
+            n.useDefaultShowPreview, n.showPreview,
+            n.useDefaultMuteStories, n.muteStories,
+            n.useDefaultStorySound, n.storySoundId,
+            n.useDefaultShowStoryPoster, n.showStoryPoster,
+            n.useDefaultDisablePinnedMessageNotifications, n.disablePinnedMessageNotifications,
+            n.useDefaultDisableMentionNotifications, n.disableMentionNotifications,
+        )
+        scope.launch { client.setChatNotificationSettings(chatId, settings).orReport() }
+    }
+
+    override fun createGroup(title: String, userIds: List<Long>, photoPath: String?, onDone: (chatId: Long?, error: String?) -> Unit) {
+        scope.launch {
+            when (val r = client.createNewBasicGroupChat(userIds.toLongArray(), title.trim(), 0)) {
+                is TdlResult.Success -> {
+                    val chatId = r.result.chatId
+                    if (photoPath != null) {
+                        val p = client.setChatPhoto(chatId, InputChatPhotoStatic(InputFileLocal(photoPath)))
+                        if (p is TdlResult.Failure) _errors.tryEmit(groupError(p.message))
+                    }
+                    failedToAddText(r.result.failedToAddMembers.failedToAddMembers.size)?.let { _errors.tryEmit(it) }
+                    onDone(chatId, null)
+                }
+                is TdlResult.Failure -> onDone(null, groupError(r.message))
+            }
+        }
+    }
+
+    override fun createChannel(title: String, description: String, photoPath: String?, onDone: (chatId: Long?, error: String?) -> Unit) {
+        scope.launch {
+            val r = client.createNewSupergroupChat(
+                title = title.trim(),
+                isForum = false,
+                isChannel = true,
+                description = description.trim(),
+                location = null,
+                messageAutoDeleteTime = 0,
+                forImport = false,
+            )
+            when (r) {
+                is TdlResult.Success -> {
+                    val chatId = r.result.id
+                    if (photoPath != null) {
+                        val p = client.setChatPhoto(chatId, InputChatPhotoStatic(InputFileLocal(photoPath)))
+                        if (p is TdlResult.Failure) _errors.tryEmit(groupError(p.message))
+                    }
+                    onDone(chatId, null)
+                }
+                is TdlResult.Failure -> onDone(null, groupError(r.message))
+            }
+        }
+    }
+
+    override fun editChat(chatId: Long, title: String, description: String, onDone: (String?) -> Unit) {
+        val newTitle = title.trim()
+        val newAbout = description.trim()
+        val oldTitle = chatStates[chatId]?.title
+        val oldAbout = chatInfos[chatId]?.about ?: ""
+        scope.launch {
+            var error: String? = null
+            if (newTitle.isNotEmpty() && newTitle != oldTitle) {
+                val r = client.setChatTitle(chatId, newTitle)
+                if (r is TdlResult.Failure && "NOT_MODIFIED" !in r.message) error = groupError(r.message)
+            }
+            if (error == null && newAbout != oldAbout) {
+                val r = client.setChatDescription(chatId, newAbout)
+                if (r is TdlResult.Failure && "NOT_MODIFIED" !in r.message) error = groupError(r.message)
+            }
+            loadChatInfo(chatId)
+            onDone(error)
+        }
+    }
+
+    override fun updateChatPhoto(chatId: Long, path: String?, onDone: (String?) -> Unit) {
+        scope.launch {
+            val r = client.setChatPhoto(chatId, path?.let { InputChatPhotoStatic(InputFileLocal(it)) })
+            onDone(if (r is TdlResult.Failure) groupError(r.message) else null)
+        }
+    }
+
+    override fun addMembers(chatId: Long, userIds: List<Long>, onDone: (String?) -> Unit) {
+        val st = chatStates[chatId] ?: return onDone("Chat not found")
+        if (userIds.isEmpty()) return onDone(null)
+        scope.launch {
+            var failed = 0
+            var error: String? = null
+            if (st.type is ChatTypeBasicGroup) {
+                // addChatMembers is supergroup/channel only; basic groups take one user at a time.
+                for (id in userIds) {
+                    when (val r = client.addChatMember(chatId, id, 100)) {
+                        is TdlResult.Success -> failed += r.result.failedToAddMembers.size
+                        is TdlResult.Failure -> if (userIds.size == 1) error = groupError(r.message) else failed++
+                    }
+                }
+            } else {
+                // At most 20 users per request.
+                for (chunk in userIds.chunked(20)) {
+                    when (val r = client.addChatMembers(chatId, chunk.toLongArray())) {
+                        is TdlResult.Success -> failed += r.result.failedToAddMembers.size
+                        is TdlResult.Failure -> { error = groupError(r.message); break }
+                    }
+                }
+            }
+            loadChatInfo(chatId)
+            onDone(error ?: failedToAddText(failed))
+        }
+    }
+
+    override fun removeMember(chatId: Long, userId: Long, onDone: (String?) -> Unit) {
+        scope.launch {
+            val r = client.banChatMember(chatId, MessageSenderUser(userId), 0, false)
+            if (r is TdlResult.Success) {
+                chatInfos[chatId]?.let { info ->
+                    chatInfos[chatId] = info.copy(members = info.members.filter { it.userId != userId }, memberCount = (info.memberCount - 1).coerceAtLeast(0))
+                }
+                loadChatInfo(chatId)
+                onDone(null)
+            } else if (r is TdlResult.Failure) {
+                onDone(groupError(r.message))
+            }
+        }
+    }
+
+    override fun deleteChatForAll(chatId: Long, onDone: (String?) -> Unit) {
+        scope.launch {
+            when (val r = client.deleteChat(chatId)) {
+                is TdlResult.Success -> onDone(null)
+                is TdlResult.Failure -> onDone(groupError(r.message))
+            }
+        }
     }
 }
 

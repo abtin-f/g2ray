@@ -102,6 +102,20 @@ fun ProfileScreen(chatId: Long) {
         if (below == Route.Chat(chat.id)) nav.pop() else nav.replaceTop(Route.Chat(chat.id))
     }
     val isGroup = chat.type == ChatType.Group
+    val isChannel = chat.type == ChatType.Channel
+    val rights = chat.rights
+    val canInvite = rights?.inviteUsers == true
+    fun leaveOrDelete() {
+        val noun = if (isChannel) "Channel" else "Group"
+        sheet.show(SheetRequest(actions = listOfNotNull(
+            SheetAction("Leave $noun", destructive = true) { repo.deleteChat(chat.id); nav.resetTo(Route.Main) },
+            if (rights?.owner == true) SheetAction("Delete $noun for everyone", destructive = true) {
+                repo.deleteChatForAll(chat.id) { err ->
+                    if (err != null) toast.show(err) else nav.resetTo(Route.Main)
+                }
+            } else null,
+        )))
+    }
     val tabs = (if (isGroup) listOf("Members") else emptyList()) + listOf("Media", "Files", "Links", "Voice", "GIFs")
     androidx.compose.runtime.LaunchedEffect(chatId) { repo.loadChatInfo(chatId) }
     val info = repo.chatInfo(chatId)
@@ -134,7 +148,7 @@ fun ProfileScreen(chatId: Long) {
                         badge = { if (chat.verified) VerifiedBadge(22.dp) },
                     ) {
                         HeroAction(TgIcons.PiMessage, "Message") { nav.pop() }
-                        HeroAction(if (chat.muted) TgIcons.PiUnmute else TgIcons.PiMute, if (chat.muted) "Unmute" else "Mute") { repo.toggleMute(chat.id) }
+                        HeroAction(if (chat.muted) TgIcons.PiUnmute else TgIcons.PiMute, if (chat.muted) "Unmute" else "Mute") { com.abtin.tglass.features.groups.toggleMuteWithOptions(sheet, repo, chat.id) }
                         when (chat.type) {
                             ChatType.Private, ChatType.Saved -> {
                                 HeroAction(TgIcons.PiCall, "Call") { user?.let { nav.push(Route.ActiveCall(it.id, false)) } }
@@ -142,15 +156,13 @@ fun ProfileScreen(chatId: Long) {
                             }
                             else -> {
                                 HeroAction(TgIcons.PiSearch, "Search") { searchInChat() }
-                                HeroAction(TgIcons.PiLeave, "Leave") {
-                                    sheet.show(SheetRequest(actions = listOf(SheetAction(if (chat.type == ChatType.Channel) "Leave Channel" else "Leave Group", destructive = true) {
-                                        repo.deleteChat(chat.id); nav.resetTo(Route.Main)
-                                    })))
-                                }
+                                HeroAction(TgIcons.PiLeave, "Leave") { leaveOrDelete() }
                             }
                         }
                         HeroAction(TgIcons.PiMore, "More") {
-                            sheet.show(SheetRequest(actions = listOf(
+                            sheet.show(SheetRequest(actions = listOfNotNull(
+                                if (rights?.changeInfo == true) SheetAction(if (isChannel) "Edit Channel" else "Edit Group") { nav.push(Route.EditChat(chat.id)) } else null,
+                                if (canInvite && (isGroup || isChannel)) SheetAction(if (isChannel) "Add Subscribers" else "Add Members") { nav.push(Route.AddMembers(chat.id)) } else null,
                                 SheetAction("Search Messages") { searchInChat() },
                                 SheetAction("Share Contact") { toast.show("Link copied") },
                                 SheetAction("Clear History", destructive = true) { repo.deleteMessages(chat.id, repo.messages(chat.id).map { it.id }.toSet()) },
@@ -169,7 +181,9 @@ fun ProfileScreen(chatId: Long) {
                             (about ?: chat.description)?.let { InfoRow("info", it) }
                             (info?.link ?: chat.username)?.let { l -> InfoRow("link", if (l.startsWith("http")) l.removePrefix("https://") else "t.me/$l", accent = true) }
                         }
-                        Cell("Notifications", chevron = false, trailing = { IOSSwitch(!chat.muted, { repo.toggleMute(chat.id) }) }, divider = false)
+                        Cell("Notifications", chevron = false, trailing = {
+                            IOSSwitch(!chat.muted, { on -> if (on) repo.muteFor(chat.id, 0) else com.abtin.tglass.features.groups.showMuteOptions(sheet, repo, chat.id) })
+                        }, divider = false)
                     }
                     Spacer(Modifier.height(20.dp))
                 }
@@ -190,16 +204,24 @@ fun ProfileScreen(chatId: Long) {
                     val members = info?.members.orEmpty().mapNotNull { m -> repo.user(m.userId)?.let { it to m.role } }
                     item {
                         Section(footer = info?.memberCount?.takeIf { it > members.size }?.let { "$it members" }) {
-                            Cell("Add Members", icon = TgIcons.PiAddMember, iconColor = c.accent, titleColor = c.accent, chevron = false, divider = members.isNotEmpty(), onClick = { toast.show("Invite link copied") })
+                            Cell("Add Members", icon = TgIcons.PiAddMember, iconColor = c.accent, titleColor = c.accent, chevron = false, divider = members.isNotEmpty(), onClick = {
+                                if (canInvite) nav.push(Route.AddMembers(chat.id)) else toast.show("Invite link copied")
+                            })
                             members.forEachIndexed { i, (u, role) ->
-                                Cell(
-                                    u.name,
-                                    subtitle = u.status,
-                                    leading = { Avatar(u.name, u.id, 40.dp) },
-                                    chevron = false,
+                                // Owners remove anyone; admins with the ban right remove regular members.
+                                val removable = rights?.banMembers == true && u.id != repo.me.id && role != "owner" && (role != "admin" || rights?.owner == true)
+                                com.abtin.tglass.features.groups.MemberCell(
+                                    u,
+                                    role = role,
                                     divider = i != members.lastIndex,
-                                    value = role,
                                     onClick = { nav.push(Route.UserProfile(u.id)) },
+                                    onLongClick = if (!removable) null else ({
+                                        sheet.show(SheetRequest(title = u.name, actions = listOf(
+                                            SheetAction("Remove from Group", destructive = true) {
+                                                repo.removeMember(chat.id, u.id) { err -> toast.show(err ?: "${u.name} removed") }
+                                            },
+                                        )))
+                                    }),
                                 )
                             }
                         }
@@ -246,7 +268,11 @@ fun ProfileScreen(chatId: Long) {
                 }
                 item { Spacer(Modifier.height(24.dp)) }
             }
-            GlassTopBar(title = null, fade = c.groupedBackground, center = { CollapsedTitle(chat.title, chat.id, collapse, saved = chat.type == ChatType.Saved) }, right = { GlassTextButton("Edit", { toast.show("Edit profile") }) })
+            GlassTopBar(title = null, fade = c.groupedBackground, center = { CollapsedTitle(chat.title, chat.id, collapse, saved = chat.type == ChatType.Saved) }, right = {
+                GlassTextButton("Edit", {
+                    if (rights?.changeInfo == true && (isGroup || isChannel)) nav.push(Route.EditChat(chat.id)) else toast.show("Edit profile")
+                })
+            })
         }
     }
 }

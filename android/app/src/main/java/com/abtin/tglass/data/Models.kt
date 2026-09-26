@@ -149,7 +149,25 @@ data class Chat(
     val joined: Boolean = true,
     /** Channels: whether the user may post (owner/admin). */
     val canPost: Boolean = false,
+    /** Groups/channels: what the user may manage (owner or admin); null for regular members. */
+    val rights: ChatRights? = null,
 )
+
+/** Management rights of the current user in a group or channel. */
+@Immutable
+data class ChatRights(
+    val owner: Boolean = false,
+    /** Edit title, description and photo. */
+    val changeInfo: Boolean = false,
+    /** Add members / subscribers. */
+    val inviteUsers: Boolean = false,
+    /** Remove members. */
+    val banMembers: Boolean = false,
+) {
+    companion object {
+        val Owner = ChatRights(owner = true, changeInfo = true, inviteUsers = true, banMembers = true)
+    }
+}
 
 @Immutable
 data class CallRecord(
