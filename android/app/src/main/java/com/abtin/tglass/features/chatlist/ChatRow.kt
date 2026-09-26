@@ -193,9 +193,35 @@ private fun ChatPreviewText(chat: Chat, repo: TelegramRepository) {
         chat.type == ChatType.Group && last.content !is MessageContent.Service -> {
             val sender = if (last.outgoing) "You" else repo.user(last.senderId)?.firstName ?: ""
             T(sender, style, c.text, maxLines = 1)
-            T(last.preview, style, c.secondaryText, maxLines = 1)
+            PreviewLine(last, style, 1)
         }
-        else -> T(last.preview, style, c.secondaryText, maxLines = 2)
+        else -> PreviewLine(last, style, 2)
+    }
+}
+
+/** Last-message preview with Telegram's inline media thumbnail / voice glyph. */
+@Composable
+private fun PreviewLine(m: com.abtin.tglass.data.Message, style: androidx.compose.ui.text.TextStyle, lines: Int) {
+    val c = TgTheme.colors
+    when (val content = m.content) {
+        is MessageContent.Photo -> Row(verticalAlignment = Alignment.CenterVertically) {
+            val (a, b) = com.abtin.tglass.ui.components.avatarColors(content.seed.toLong())
+            Box(
+                Modifier
+                    .size(20.dp)
+                    .clip(com.kyant.shapes.RoundedRectangle(4.dp))
+                    .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(a, b))),
+                contentAlignment = Alignment.Center,
+            ) { T(content.emoji, style.copy(fontSize = 11.sp, lineHeight = 12.sp)) }
+            Spacer(Modifier.width(5.dp))
+            T(content.caption ?: "Photo", style, c.secondaryText, maxLines = 1)
+        }
+        is MessageContent.Voice -> Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(TgIcons.IcVoiceSmall, c.secondaryText, 18.dp)
+            Spacer(Modifier.width(3.dp))
+            T("Voice message", style, c.secondaryText, maxLines = 1)
+        }
+        else -> T(m.preview, style, c.secondaryText, maxLines = lines)
     }
 }
 

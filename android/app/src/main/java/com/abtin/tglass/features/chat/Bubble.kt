@@ -41,7 +41,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.Layout
@@ -82,8 +85,10 @@ import kotlin.math.roundToInt
 val TailWidth = 6.dp
 
 /**
- * iOS message bubble: continuous corners, smaller radius on the grouped side, and a curved tail on the
- * last bubble of a group (spec §13). The tail column is always reserved so grouped bubbles align.
+ * Telegram-iOS message bubble (port of `ChatMessageBubbleImages.messageBubbleImage`):
+ * rounded body, and for the last bubble of a group the tail = body ∪ corner rect ∪ half-ellipse lobe
+ * minus a cut-out ellipse — which gives the characteristic notch before the tail tip.
+ * The tail column ([TailWidth] = 6) is always reserved so grouped bubbles align.
  */
 class BubbleShape(
     private val outgoing: Boolean,
@@ -96,47 +101,59 @@ class BubbleShape(
     override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline = with(density) {
         val w = size.width
         val h = size.height
+        val u = 1.dp.toPx() // Telegram geometry is in points
         val tw = TailWidth.toPx()
         val bR = w - tw
         val maxR = minOf(h, bR) / 2f
         val big = radius.toPx().coerceAtMost(maxR)
         val small = smallRadius.toPx().coerceAtMost(maxR)
-        val tl = big
-        val bl = big
-        val tr = if (groupedTop) small else big
-        val br = if (groupedBottom && !tail) small else big
+        // Radii for the tail side ("right" for outgoing) and the far side.
+        val nearTop = if (groupedTop) small else big
+        val nearBottom = if (tail) big else if (groupedBottom) small else big
         fun x(v: Float) = if (outgoing) v else w - v
-        val p = Path()
-        var cx = x(tl)
-        var cy = 0f
-        p.moveTo(cx, cy)
-        fun line(nx: Float, ny: Float) { p.lineTo(nx, ny); cx = nx; cy = ny }
-        fun corner(kx: Float, ky: Float, ex: Float, ey: Float) {
-            val k = 0.55f
-            p.cubicTo(cx + (kx - cx) * k, cy + (ky - cy) * k, ex + (kx - ex) * k, ey + (ky - ey) * k, ex, ey)
-            cx = ex; cy = ey
+        fun cr(r: Float) = CornerRadius(r, r)
+        val bodyLeft = if (outgoing) 0f else tw
+        val bodyRight = if (outgoing) bR else w
+        val body = Path().apply {
+            addRoundRect(
+                RoundRect(
+                    left = bodyLeft, top = 0f, right = bodyRight, bottom = h,
+                    topLeftCornerRadius = cr(if (outgoing) big else nearTop),
+                    topRightCornerRadius = cr(if (outgoing) nearTop else big),
+                    bottomRightCornerRadius = cr(if (outgoing) nearBottom else big),
+                    bottomLeftCornerRadius = cr(if (outgoing) big else nearBottom),
+                )
+            )
         }
-        line(x(bR - tr), 0f)
-        corner(x(bR), 0f, x(bR), tr)
-        if (tail) {
-            val tailTop = (h - 17.dp.toPx()).coerceAtLeast(tr)
-            line(x(bR), tailTop)
-            p.cubicTo(x(bR), h - 6.dp.toPx(), x(bR + 1.5.dp.toPx()), h - 1.dp.toPx(), x(w), h)
-            cx = x(w); cy = h
-            p.cubicTo(x(w - 3.dp.toPx()), h + 0.3.dp.toPx(), x(bR - 4.dp.toPx()), h - 0.4.dp.toPx(), x(bR - 9.dp.toPx()), h - 0.8.dp.toPx())
-            cx = x(bR - 9.dp.toPx()); cy = h - 0.8.dp.toPx()
-            p.quadraticTo(x(bR - 12.dp.toPx()), h, x(bR - 16.dp.toPx()), h)
-            cx = x(bR - 16.dp.toPx()); cy = h
-        } else {
-            line(x(bR), h - br)
-            corner(x(bR), h, x(bR - br), h)
+        if (!tail) return Outline.Generic(body)
+        // Reference square is 33pt with its bottom-right at (bR, h).
+        val ox = bR - 33f * u
+        val oy = h - 33f * u
+        fun px(v: Float) = x(ox + v * u)
+        fun py(v: Float) = oy + v * u
+        val corner = Path().apply {
+            val l = px(16.5f); val r = px(33f)
+            addRect(Rect(minOf(l, r), py(16f), maxOf(l, r), py(24.5f)))
         }
-        line(x(bl), h)
-        corner(x(0f), h, x(0f), h - bl)
-        line(x(0f), tl)
-        corner(x(0f), 0f, x(tl), 0f)
-        p.close()
-        Outline.Generic(p)
+        val lobe = Path().apply {
+            if (radius.toPx() >= 14f * u) {
+                moveTo(px(24f), py(24.5f))
+                quadraticTo(px(24f), py(33f), px(37.5f), py(33f))
+                quadraticTo(px(51f), py(33f), px(51f), py(24.5f))
+                close()
+            } else {
+                val l = px(22f); val r = px(51f)
+                addRect(Rect(minOf(l, r), py(24.5f), maxOf(l, r), py(33f)))
+            }
+        }
+        val cut = Path().apply {
+            val l = px(33f); val r = px(56f)
+            addOval(Rect(minOf(l, r), py(14f), maxOf(l, r), py(35f)))
+        }
+        val tailArea = Path().apply { op(corner, lobe, PathOperation.Union) }
+        val carved = Path().apply { op(tailArea, cut, PathOperation.Difference) }
+        val result = Path().apply { op(body, carved, PathOperation.Union) }
+        Outline.Generic(result)
     }
 }
 

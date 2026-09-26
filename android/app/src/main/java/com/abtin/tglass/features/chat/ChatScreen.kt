@@ -112,6 +112,7 @@ import com.abtin.tglass.ui.components.MenuAction
 import com.abtin.tglass.ui.components.SheetAction
 import com.abtin.tglass.ui.components.SheetRequest
 import com.abtin.tglass.ui.components.T
+import com.abtin.tglass.ui.components.TypingText
 import com.abtin.tglass.ui.components.BackButton
 import com.abtin.tglass.ui.components.IosIcons
 import com.abtin.tglass.ui.components.TgIcons
@@ -365,7 +366,8 @@ fun ChatScreen(chatId: Long) {
                             GlassBox(onClick = { nav.push(Route.Profile(chatId)) }, modifier = Modifier.height(48.dp)) {
                                 Column(Modifier.padding(horizontal = 18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                     T(chat.title, TgTheme.type.headline.copy(fontSize = TgTheme.type.headline.fontSize * 0.95f), c.text, maxLines = 1)
-                                    if (subtitle != null) T(subtitle, TgTheme.type.caption1.copy(fontSize = TgTheme.type.caption1.fontSize * 1.05f), if (active) c.accent else c.secondaryText, maxLines = 1)
+                                    if (chat.typing != null) TypingText(chat.typing, TgTheme.type.caption1.copy(fontSize = TgTheme.type.caption1.fontSize * 1.05f), c.accent)
+                                    else if (subtitle != null) T(subtitle, TgTheme.type.caption1.copy(fontSize = TgTheme.type.caption1.fontSize * 1.05f), if (active) c.accent else c.secondaryText, maxLines = 1)
                                 }
                             }
                         }
