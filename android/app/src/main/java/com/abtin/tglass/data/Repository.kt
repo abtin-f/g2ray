@@ -181,6 +181,24 @@ interface TelegramRepository {
     fun setPrivacy(key: PrivacyKey, value: PrivacyValue) {}
 
     fun logOut() {}
+
+    // ---- Stories ----
+
+    /** People shown in the stories strip, in Telegram's order (unseen first). The current user is not included. */
+    val storyUsers: List<User>
+        get() = users.values.filter { it.hasStory && it.id != me.id }.sortedBy { it.storySeen }
+
+    /** Active stories of one user, oldest first. Live stories may still be placeholders (`loaded == false`) until [loadStories]. */
+    fun storiesOf(userId: Long): List<Story> = stories.filter { it.userId == userId }
+
+    /** Fetches the full stories (media, caption) of [userId]; [storiesOf] updates when they arrive. */
+    fun loadStories(userId: Long) {}
+
+    /** The viewer started showing [story]: marks it as viewed. */
+    fun openStory(story: Story) = markStorySeen(story.userId)
+
+    /** The viewer stopped showing [story]. */
+    fun closeStory(story: Story) {}
 }
 
 class DemoRepository(private val scope: CoroutineScope) : TelegramRepository {

@@ -162,8 +162,30 @@ data class CallRecord(
     val durationSec: Int,
 )
 
+/**
+ * One story. Demo stories are drawn from [emoji] + [colors]; live ones carry the real media:
+ * [image] is the photo (or the video's cover) and [video] the video file, both downloaded through the repository.
+ * [date] is in epoch milliseconds. [loaded] is false while only the story id is known (full story not fetched yet).
+ */
 @Immutable
-data class Story(val userId: Long, val emoji: String, val colors: List<Long>, val caption: String, val date: Long)
+data class Story(
+    val userId: Long,
+    val emoji: String = "",
+    val colors: List<Long> = emptyList(),
+    val caption: String = "",
+    val date: Long = 0,
+    /** Telegram story id (0 in the demo). */
+    val id: Int = 0,
+    /** Chat that posted the story (for private chats the same as [userId]). */
+    val chatId: Long = userId,
+    val image: ImageRef? = null,
+    val video: ImageRef? = null,
+    /** Video length in seconds (0 for photos). */
+    val durationSec: Double = 0.0,
+    /** Whether the user has already viewed this story. */
+    val seen: Boolean = false,
+    val loaded: Boolean = true,
+)
 
 @Immutable
 data class Session(val device: String, val app: String, val location: String, val lastActive: String, val current: Boolean = false, val id: Long = 0)

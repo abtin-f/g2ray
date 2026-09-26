@@ -158,7 +158,6 @@ class TdRepository(context: Context) : TelegramRepository {
     override val users: Map<Long, UiUser> get() = userMap
     override val chats: List<UiChat> get() = sortedChats
     override val calls: List<CallRecord> get() = callList
-    override val stories: List<UiStory> get() = emptyList()
     override val sessions: List<UiSession> get() = sessionList
     override val folders: List<String> get() = listOf("All Chats") + folderInfos.map { it.name.text.text }
     override val contacts: List<UiUser> get() = contactIds.mapNotNull { userMap[it] }.sortedBy { it.name.lowercase() }
@@ -454,8 +453,6 @@ class TdRepository(context: Context) : TelegramRepository {
         return userId
     }
 
-    override fun markStorySeen(userId: Long) {}
-
     override fun terminateSession(session: UiSession) {
         scope.launch {
             client.terminateSession(session.id).orReport()
@@ -676,6 +673,7 @@ class TdRepository(context: Context) : TelegramRepository {
             loadSessions()
             loadCalls()
         }
+        loadActiveStoryLists()
     }
 
     private fun reset() {
@@ -688,6 +686,7 @@ class TdRepository(context: Context) : TelegramRepository {
         chatInfos.clear(); sharedMediaStore.clear(); messageCache.clear(); requestedMessages.clear(); pinnedStore.clear()
         packs.clear(); recents.clear(); gifs.clear(); stickersLoaded = false
         myId = 0
+        resetStories()
     }
 
     private suspend fun loadContacts() {
@@ -904,6 +903,9 @@ class TdRepository(context: Context) : TelegramRepository {
                 messageStore[u.chatId]?.removeAll { it.id in ids }
             }
             is UpdateFile -> onFile(u.file)
+            is UpdateChatActiveStories -> onActiveStories(u.activeStories)
+            is UpdateStory -> onStory(u.story)
+            is UpdateStoryDeleted -> onStoryDeleted(u.storyPosterChatId, u.storyId)
             else -> Unit
         }
     }
@@ -999,7 +1001,7 @@ class TdRepository(context: Context) : TelegramRepository {
 
     private fun onUser(u: User) {
         rawUsers[u.id] = u
-        userMap[u.id] = mapUser(u)
+        userMap[u.id] = withStoryFlags(mapUser(u))
         val photo = u.profilePhoto
         if (photo != null) avatars[u.id] = imageOf(photo.small, photo.minithumbnail) else if (chatStates[u.id]?.photo == null) avatars.remove(u.id)
         chatStates[u.id]?.let { publish(it) }
@@ -1501,6 +1503,152 @@ class TdRepository(context: Context) : TelegramRepository {
     private fun <T> TdlResult<T>.orReport(): TdlResult<T> {
         if (this is TdlResult.Failure) _errors.tryEmit(humanize(message))
         return this
+    }
+
+    // =====================================================================================
+    // ---- Stories ----
+    // =====================================================================================
+
+    /** Active stories per poster chat (for users the chat id equals the user id), from updateChatActiveStories. */
+    private val activeStories by lazy { mutableStateMapOf<Long, ChatActiveStories>() }
+    /** Full stories fetched with getStory (or pushed by updateStory), keyed by [storyKey]. */
+    private val storyCache by lazy { mutableStateMapOf<String, UiStory>() }
+    private val storyRequests by lazy { HashSet<String>() }
+
+    private fun storyKey(chatId: Long, storyId: Int) = "$chatId:$storyId"
+
+    private fun isStorySeen(a: ChatActiveStories): Boolean = a.stories.all { it.storyId <= a.maxReadStoryId }
+
+    override val storyUsers: List<UiUser>
+        get() = activeStories.values
+            .filter { it.list is StoryListMain && it.stories.isNotEmpty() && it.chatId != myId && userMap.containsKey(it.chatId) }
+            .sortedWith(compareBy<ChatActiveStories>({ isStorySeen(it) }, { -it.order }, { -it.chatId }))
+            .mapNotNull { userMap[it.chatId] }
+
+    override val stories: List<UiStory> get() = storyUsers.flatMap { storiesOf(it.id) }
+
+    override fun storiesOf(userId: Long): List<UiStory> {
+        val a = activeStories[userId] ?: return emptyList()
+        return a.stories.sortedBy { it.storyId }.map { info ->
+            val seen = info.storyId <= a.maxReadStoryId
+            storyCache[storyKey(a.chatId, info.storyId)]?.copy(seen = seen)
+                ?: UiStory(userId = userId, date = info.date * 1000L, id = info.storyId, chatId = a.chatId, seen = seen, loaded = false)
+        }
+    }
+
+    override fun loadStories(userId: Long) {
+        val a = activeStories[userId] ?: return
+        a.stories.forEach { fetchStory(a.chatId, it.storyId) }
+    }
+
+    /** Viewing a story in TDLib (openStory) also marks it as read; TDLib then sends updateChatActiveStories. */
+    override fun openStory(story: UiStory) {
+        if (story.id == 0) return
+        scope.launch {
+            val key = storyKey(story.chatId, story.id)
+            if (storyCache[key]?.loaded != true) {
+                val r = client.getStory(story.chatId, story.id, false)
+                if (r is TdlResult.Success) storyCache[key] = mapStory(r.result)
+            }
+            client.openStory(story.chatId, story.id)
+        }
+    }
+
+    override fun closeStory(story: UiStory) {
+        if (story.id == 0) return
+        scope.launch { client.closeStory(story.chatId, story.id) }
+    }
+
+    /** Seen state comes from TDLib (maxReadStoryId), see [openStory]. */
+    override fun markStorySeen(userId: Long) {}
+
+    private fun fetchStory(chatId: Long, storyId: Int) {
+        val key = storyKey(chatId, storyId)
+        if (storyCache.containsKey(key) || !storyRequests.add(key)) return
+        scope.launch {
+            val r = client.getStory(chatId, storyId, false)
+            // Not available (expired, deleted, no access): a loaded story without media, shown as "can't be shown".
+            storyCache[key] = if (r is TdlResult.Success) mapStory(r.result) else UiStory(userId = chatId, id = storyId, chatId = chatId, date = System.currentTimeMillis(), loaded = true)
+        }
+    }
+
+    private fun loadActiveStoryLists() {
+        scope.launch {
+            // Fails with 404 once everything is loaded; the stories themselves arrive as updateChatActiveStories.
+            repeat(20) { if (client.loadActiveStories(StoryListMain()) !is TdlResult.Success) return@launch }
+        }
+    }
+
+    private fun onActiveStories(a: ChatActiveStories) {
+        if (a.stories.isEmpty()) activeStories.remove(a.chatId) else activeStories[a.chatId] = a
+        // Forget full stories that are no longer active.
+        val ids = a.stories.map { it.storyId }.toHashSet()
+        storyCache.values.filter { it.chatId == a.chatId && it.id !in ids }.forEach {
+            val key = storyKey(it.chatId, it.id)
+            storyCache.remove(key)
+            storyRequests.remove(key)
+        }
+        userMap[a.chatId]?.let { u -> userMap[a.chatId] = withStoryFlags(u) }
+    }
+
+    private fun onStory(s: Story) {
+        val key = storyKey(s.posterChatId, s.id)
+        val active = activeStories[s.posterChatId]?.stories?.any { it.storyId == s.id } == true
+        if (active || storyCache.containsKey(key)) storyCache[key] = mapStory(s)
+    }
+
+    private fun onStoryDeleted(chatId: Long, storyId: Int) {
+        storyCache.remove(storyKey(chatId, storyId))
+    }
+
+    /** hasStory / storySeen of a user from the active stories we know about. */
+    private fun withStoryFlags(u: UiUser): UiUser {
+        val a = activeStories[u.id]
+        val has = a != null && a.stories.isNotEmpty()
+        val seen = a != null && isStorySeen(a)
+        return if (u.hasStory == has && u.storySeen == seen) u else u.copy(hasStory = has, storySeen = seen)
+    }
+
+    private fun mapStory(s: Story): UiStory {
+        var image: ImageRef? = null
+        var video: ImageRef? = null
+        var duration = 0.0
+        when (val c = s.content) {
+            is StoryContentPhoto -> {
+                val mini = c.photo.minithumbnail
+                val size = c.photo.sizes.maxByOrNull { it.width * it.height }
+                image = if (size != null) imageOf(size.photo, mini, size.width, size.height)
+                else mini?.let { ImageRef(0, null, it.data, it.width, it.height) }
+            }
+            is StoryContentVideo -> {
+                val v = c.video
+                val thumb = v.thumbnail?.takeIf { it.format is ThumbnailFormatJpeg }
+                image = if (thumb != null) imageOf(thumb.file, v.minithumbnail, thumb.width, thumb.height)
+                else v.minithumbnail?.let { ImageRef(0, null, it.data, it.width, it.height) }
+                video = imageOf(v.video, v.minithumbnail, v.width, v.height)
+                duration = v.duration
+            }
+            else -> Unit
+        }
+        val a = activeStories[s.posterChatId]
+        return UiStory(
+            userId = s.posterChatId,
+            caption = s.caption.text,
+            date = s.date * 1000L,
+            id = s.id,
+            chatId = s.posterChatId,
+            image = image,
+            video = video,
+            durationSec = duration,
+            seen = a != null && s.id <= a.maxReadStoryId,
+            loaded = true,
+        )
+    }
+
+    private fun resetStories() {
+        activeStories.clear()
+        storyCache.clear()
+        storyRequests.clear()
     }
 }
 

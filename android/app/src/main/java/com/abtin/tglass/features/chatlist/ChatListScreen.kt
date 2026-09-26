@@ -167,7 +167,7 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
     }
 
     // Stories: collapsed into the title; pulling the list down expands them (Telegram-iOS behaviour).
-    val storyUsers = repo.users.values.filter { it.hasStory }.sortedBy { it.storySeen }
+    val storyUsers = repo.storyUsers
     val hasStories = rememberUpdatedState(storyUsers.isNotEmpty())
     val storiesMax = with(density) { 104.dp.toPx() }
     var storiesPx by rememberSaveable { mutableFloatStateOf(0f) }
@@ -518,7 +518,7 @@ private fun ArchiveRow(archived: List<Chat>, repo: TelegramRepository, onClick: 
 @Composable
 private fun StoriesRow(repo: TelegramRepository, fraction: Float, modifier: Modifier, onOpen: (Long) -> Unit) {
     val c = TgTheme.colors
-    val withStories = repo.users.values.filter { it.hasStory }.sortedBy { it.storySeen }
+    val withStories = repo.storyUsers
     LazyRow(
         modifier.fillMaxWidth().graphicsLayer { alpha = fraction; scaleX = 0.85f + 0.15f * fraction; scaleY = 0.85f + 0.15f * fraction; transformOrigin = TransformOrigin(0.5f, 0f) },
         contentPadding = PaddingValues(horizontal = 12.dp),
@@ -526,9 +526,11 @@ private fun StoriesRow(repo: TelegramRepository, fraction: Float, modifier: Modi
         verticalAlignment = Alignment.CenterVertically,
     ) {
         item(key = "me") {
-            Column(Modifier.width(68.dp).fadeClickable { }, horizontalAlignment = Alignment.CenterHorizontally) {
+            val me = repo.me
+            Column(Modifier.width(68.dp).fadeClickable { if (me.hasStory) onOpen(me.id) }, horizontalAlignment = Alignment.CenterHorizontally) {
                 Box {
-                    Avatar(repo.me.name, 3, 64.dp, photoPeer = repo.me.id)
+                    if (me.hasStory) Avatar(me.name, 3, 68.dp, photoPeer = me.id, storyRing = if (me.storySeen) StoryRing.Seen else StoryRing.Unseen)
+                    else Avatar(me.name, 3, 64.dp, photoPeer = me.id)
                     Box(
                         Modifier
                             .align(Alignment.BottomEnd)
