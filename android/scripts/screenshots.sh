@@ -17,7 +17,7 @@ adb shell am start -W -n com.abtin.tglass/.MainActivity --es screen chats --es t
 sleep 20
 
 shot() {
-  local screen=$1 theme=$2 wait=${3:-5}
+  local screen=$1 theme=$2 wait=${3:-7}
   adb shell am force-stop com.abtin.tglass
   adb shell input keyevent KEYCODE_WAKEUP || true
   adb shell am start -W -n com.abtin.tglass/.MainActivity --es screen "$screen" --es theme "$theme" >/dev/null
@@ -34,7 +34,7 @@ shot() {
 for theme in light dark; do
   shot chats "$theme"
   shot chat "$theme"
-  shot chat_menu "$theme" 7
+  shot chat_menu "$theme" 10
   shot settings_tab "$theme"
   shot profile "$theme"
 done

@@ -132,7 +132,7 @@ fun ChatRow(
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f).fillMaxHeight().padding(top = 8.dp, bottom = 6.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    T(chat.title, TgTheme.type.headline.copy(fontSize = TgTheme.type.headline.fontSize * (16f / 17f)), c.text, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                    T(chat.title, TgTheme.type.headline.copy(fontSize = TgTheme.type.headline.fontSize * (16f / 17f), lineHeight = TgTheme.type.headline.fontSize * (20f / 17f)), c.text, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
                     if (chat.verified) {
                         Spacer(Modifier.width(3.dp))
                         VerifiedBadge(16.dp)
@@ -182,7 +182,8 @@ fun ChatRow(
 private fun ChatPreviewText(chat: Chat, repo: TelegramRepository) {
     val c = TgTheme.colors
     val last = repo.lastMessage(chat.id)
-    val style = TgTheme.type.subheadline
+    // 15pt text on tight 18pt lines so title + two preview lines fit the 72pt row (Telegram-iOS ChatListItem).
+    val style = TgTheme.type.subheadline.copy(lineHeight = TgTheme.type.subheadline.fontSize * 1.2f)
     when {
         chat.typing != null -> TypingText(chat.typing, style, c.accent, Modifier.padding(top = 2.dp))
         chat.draft != null -> Row {

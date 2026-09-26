@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
@@ -150,7 +151,7 @@ private fun androidx.compose.foundation.layout.RowScope.TabItem(icon: Int, label
         Box {
             Icon(icon, c.text, 28.dp)
             if (badge > 0) {
-                Badge(badge, modifier = Modifier.align(Alignment.TopEnd).offset(x = 12.dp, y = (-4).dp).size(width = 26.dp, height = 18.dp))
+                Badge(badge, modifier = Modifier.align(Alignment.TopEnd).offset(x = 14.dp, y = (-3).dp).wrapContentSize(unbounded = true))
             }
         }
         T(label, TgTheme.type.caption2.copy(fontSize = 10.sp, lineHeight = 12.sp), c.text, maxLines = 1, weight = androidx.compose.ui.text.font.FontWeight.SemiBold)
