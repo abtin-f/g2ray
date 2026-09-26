@@ -35,6 +35,20 @@ jobs:
         run: echo "ANDROID_HOME=$ANDROID_HOME" && ls "$ANDROID_HOME/platforms" "$ANDROID_HOME/build-tools" || true
       - name: Build APKs
         run: ./gradlew --no-configuration-cache assembleDebug assembleRelease --stacktrace
+      - name: Publish APK (release + builds branch)
+        if: github.event_name == 'push'
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk TGlass.apk
+          gh release delete latest-build -y --cleanup-tag || true
+          gh release create latest-build TGlass.apk --prerelease --target "${{ github.sha }}" \
+            --title "TGlass latest build" --notes "Built from ${{ github.sha }} on ${{ github.ref_name }}"
+          mkdir -p /tmp/builds && cp TGlass.apk /tmp/builds/ && cd /tmp/builds
+          git init -q && git checkout -q -b builds && git add TGlass.apk
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -qm "TGlass APK from ${{ github.sha }}"
+          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" builds
       - uses: actions/upload-artifact@v4
         with:
           name: tglass-apk
