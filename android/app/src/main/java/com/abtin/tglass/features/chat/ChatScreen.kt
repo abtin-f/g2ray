@@ -142,10 +142,20 @@ private fun groupable(a: Message?, b: Message?): Boolean =
 
 fun chatSubtitle(chat: Chat, repo: TelegramRepository): Pair<String?, Boolean> {
     if (chat.typing != null) return "${chat.typing}…" to true
+    // Live supergroups often report 0 members until their full info is loaded.
+    fun memberCount() = chat.members.takeIf { it > 0 } ?: repo.chatInfo(chat.id)?.memberCount ?: 0
     return when (chat.type) {
         ChatType.Private -> chat.peerUserId?.let { repo.user(it) }?.let { it.status to it.online } ?: (null to false)
-        ChatType.Group -> "${formatCount(chat.members)} members, ${(chat.members / 40).coerceAtLeast(1)} online" to false
-        ChatType.Channel -> "${formatCount(chat.members)} subscribers" to false
+        ChatType.Group -> {
+            val members = memberCount()
+            val online = if (repo.isLive) repo.onlineMemberCount(chat.id) else (members / 40).coerceAtLeast(1)
+            when {
+                members <= 0 -> (if (repo.isLive) null else "group") to false
+                online != null && online > 1 -> "${formatCount(members)} ${if (members == 1) "member" else "members"}, ${formatCount(online)} online" to false
+                else -> "${formatCount(members)} ${if (members == 1) "member" else "members"}" to false
+            }
+        }
+        ChatType.Channel -> memberCount().let { members -> if (members > 0) "${formatCount(members)} ${if (members == 1) "subscriber" else "subscribers"}" else "channel" } to false
         ChatType.Bot -> "bot" to false
         ChatType.Saved -> null to false
     }
@@ -191,6 +201,9 @@ fun ChatScreen(chatId: Long) {
     var bottomHeight by remember { mutableIntStateOf(0) }
     var wallpaperPhase by rememberSaveable { mutableIntStateOf(0) }
     val openedAt = remember { System.currentTimeMillis() }
+    // Bot keyboards: callback buttons waiting for an answer ("messageId:row:col") and the reply keyboard the user hid.
+    val busyButtons = remember { mutableStateListOf<String>() }
+    var hiddenKeyboardId by rememberSaveable { mutableStateOf<Long?>(null) }
 
     val messages = repo.messages(chatId)
     val reversed = messages.asReversed()
@@ -216,7 +229,10 @@ fun ChatScreen(chatId: Long) {
         }
     }
 
-    LaunchedEffect(Unit) { repo.openChat(chatId) }
+    LaunchedEffect(Unit) {
+        repo.openChat(chatId)
+        repo.loadChatExtras(chatId)
+    }
     DisposableEffect(Unit) {
         onDispose {
             repo.setDraft(chatId, text.takeIf { editingId == null })
@@ -282,12 +298,24 @@ fun ChatScreen(chatId: Long) {
         val t = text.trim()
         val editId = editingId
         if (editId != null) {
-            if (t.isNotEmpty()) repo.editText(chatId, editId, t)
+            val target = messages.firstOrNull { it.id == editId }
+            // Media keep their picture/file: only the caption changes (and may be removed).
+            if (target != null && (target.content is MessageContent.Photo || target.content is MessageContent.File)) repo.editCaption(chatId, editId, t)
+            else if (t.isNotEmpty()) repo.editText(chatId, editId, t)
             editingId = null
         } else if (t.isNotEmpty()) {
             repo.sendText(chatId, t, replyToId)
             replyToId = null
         }
+        text = ""
+    }
+
+    /** Send button long-press → "Send Without Sound". */
+    fun sendSilently() {
+        val t = text.trim()
+        if (t.isEmpty() || editingId != null) return
+        repo.sendTextSilently(chatId, t, replyToId)
+        replyToId = null
         text = ""
     }
 
@@ -331,6 +359,33 @@ fun ChatScreen(chatId: Long) {
         toast.show("Copied to clipboard")
     }
 
+    fun onInlineButton(m: Message, row: Int, col: Int, b: com.abtin.tglass.data.InlineButton) {
+        when (b.kind) {
+            com.abtin.tglass.data.InlineButtonKind.Url -> b.url?.let { openUrl(it) }
+            com.abtin.tglass.data.InlineButtonKind.Copy -> {
+                val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                cm.setPrimaryClip(ClipData.newPlainText("text", b.copyText ?: b.text))
+                toast.show("Copied to clipboard")
+            }
+            com.abtin.tglass.data.InlineButtonKind.Callback -> {
+                val data = b.data ?: return
+                val key = "${m.id}:$row:$col"
+                if (key in busyButtons) return
+                busyButtons.add(key)
+                repo.pressCallbackButton(chatId, m.id, data) { answer ->
+                    busyButtons.remove(key)
+                    if (answer != null) when {
+                        answer.url.isNotBlank() -> openUrl(answer.url)
+                        answer.text.isBlank() -> {}
+                        answer.alert -> sheet.show(SheetRequest(title = chat.title, message = answer.text, actions = emptyList(), alert = true, cancel = "OK"))
+                        else -> toast.show(answer.text)
+                    }
+                }
+            }
+            com.abtin.tglass.data.InlineButtonKind.Unsupported -> toast.show("This button isn't supported yet")
+        }
+    }
+
     fun forward(ids: List<Long>) {
         val targets = repo.chats.filter { !it.archived && it.type != ChatType.Channel }.take(6)
         sheet.show(SheetRequest(title = "Forward to…", actions = targets.map { t ->
@@ -365,10 +420,16 @@ fun ChatScreen(chatId: Long) {
         focus.clearFocus()
         keyboard?.hide()
         val hasText = m.text != null
+        // Photos, videos, GIFs and files can get a caption even when they have none yet (round video notes can't).
+        val captionable = when (val ct = m.content) {
+            is MessageContent.Photo -> ct.emoji != "📹"
+            is MessageContent.File -> true
+            else -> false
+        }
         val actions = listOfNotNull(
             if (!isChannel) MenuAction("Reply", TgIcons.CtxReply) { replyToId = m.id; editingId = null; focusRequester.requestFocus() } else null,
             if (hasText) MenuAction("Copy", TgIcons.CtxCopy) { copy(m) } else null,
-            if (m.outgoing && hasText) MenuAction("Edit", TgIcons.CtxEdit) { editingId = m.id; replyToId = null; text = m.text ?: ""; focusRequester.requestFocus() } else null,
+            if (m.outgoing && (hasText || captionable)) MenuAction("Edit", TgIcons.CtxEdit) { editingId = m.id; replyToId = null; text = m.text ?: ""; focusRequester.requestFocus() } else null,
             MenuAction(if (m.pinned) "Unpin" else "Pin", if (m.pinned) TgIcons.CtxUnpin else TgIcons.CtxPin) { repo.togglePinMessage(chatId, m.id) },
             MenuAction("Forward", TgIcons.CtxForward) { forward(listOf(m.id)) },
             if (chat.type != ChatType.Saved) MenuAction("Save to Saved Messages", TgIcons.CtxSave) { repo.forward(chatId, listOf(m.id), repo.savedChatId); toast.show("Saved to Saved Messages") } else null,
@@ -450,6 +511,9 @@ fun ChatScreen(chatId: Long) {
                                     onReact = { e -> repo.toggleReaction(chatId, m.id, e) },
                                     onVote = { o -> repo.vote(chatId, m.id, o) },
                                     onMedia = { nav.push(Route.Media(chatId, m.id)) },
+                                    keyboard = repo.inlineKeyboard(chatId, m.id),
+                                    busyButton = { r, col -> "${m.id}:$r:$col" in busyButtons },
+                                    onInlineButton = { r, col, b -> onInlineButton(m, r, col, b) },
                                 )
                             }
                             Spacer(Modifier.height(if (group.groupedBottom) 2.dp else 6.dp))
@@ -556,7 +620,29 @@ fun ChatScreen(chatId: Long) {
                         shape = Capsule(),
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp).height(46.dp),
                     ) { T(if (chat.muted) "Unmute" else "Mute", TgTheme.type.body, c.accent, weight = FontWeight.Medium) }
+                    (chat.type == ChatType.Private || chat.type == ChatType.Bot) && repo.isBlocked(chatId) -> {
+                        val bot = chat.type == ChatType.Bot
+                        ChatBottomBar(if (bot) "Restart" else "Unblock", {
+                            repo.setBlocked(chatId, false) { err ->
+                                if (err != null) toast.show(err) else if (bot) repo.startBot(chatId)
+                            }
+                        })
+                    }
+                    chat.type == ChatType.Bot && messages.isEmpty() && repo.lastMessage(chatId) == null ->
+                        ChatBottomBar("Start", { repo.startBot(chatId) })
                     else -> {
+                        val replyKb = repo.replyKeyboard(chatId)
+                        val imeVisible = WindowInsets.ime.getBottom(density) > 0
+                        if (replyKb != null && hiddenKeyboardId == replyKb.messageId && !panelOpen) {
+                            ShowBotKeyboardButton(
+                                onClick = {
+                                    hiddenKeyboardId = null
+                                    focus.clearFocus()
+                                    keyboard?.hide()
+                                },
+                                modifier = Modifier.align(Alignment.Start).padding(start = 12.dp, top = 4.dp),
+                            )
+                        }
                         Composer(
                             text = text,
                             onTextChange = {
@@ -595,7 +681,25 @@ fun ChatScreen(chatId: Long) {
                             },
                             focusRequester = focusRequester,
                             onFocus = { if (it) panelOpen = false },
+                            onSendLongPress = if (editingId == null) ({
+                                sheet.show(SheetRequest(actions = listOf(SheetAction("Send Without Sound") { sendSilently() })))
+                            }) else null,
                         )
+                        AnimatedVisibility(replyKb != null && hiddenKeyboardId != replyKb.messageId && !panelOpen && !imeVisible) {
+                            if (replyKb != null) ReplyKeyboardPanel(
+                                keyboard = replyKb,
+                                onButton = { label, supported ->
+                                    if (!supported) {
+                                        toast.show("This button isn't supported yet")
+                                    } else {
+                                        repo.sendText(chatId, label, if (isGroup) replyKb.messageId else null)
+                                        if (replyKb.oneTime) hiddenKeyboardId = replyKb.messageId
+                                    }
+                                },
+                                onHide = { hiddenKeyboardId = replyKb.messageId },
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                            )
+                        }
                         AnimatedVisibility(panelOpen) {
                             EmojiPanel(
                                 onEmoji = { e -> text += e },
@@ -659,6 +763,9 @@ private fun MessageRow(
     onReact: (String) -> Unit,
     onVote: (Int) -> Unit,
     onMedia: () -> Unit,
+    keyboard: com.abtin.tglass.data.InlineKeyboard? = null,
+    busyButton: (Int, Int) -> Boolean = { _, _ -> false },
+    onInlineButton: (Int, Int, com.abtin.tglass.data.InlineButton) -> Unit = { _, _, _ -> },
 ) {
     val c = TgTheme.colors
     val menu = LocalContextMenu.current
@@ -753,7 +860,7 @@ private fun MessageRow(
                 }
             }
             if (m.outgoing) Spacer(Modifier.weight(1f))
-            Box(
+            val bubble: @Composable () -> Unit = { Box(
                 Modifier
                     .onGloballyPositioned { bounds[0] = it.boundsInRoot() }
                     .graphicsLayer { alpha = if (menu.activeKey == key) 0f else 1f }
@@ -778,7 +885,14 @@ private fun MessageRow(
                     onVote = onVote,
                     onMediaClick = onMedia,
                 )
-            }
+            } }
+            if (keyboard == null) bubble()
+            else BubbleWithKeyboard(
+                alignEnd = m.outgoing,
+                maxWidth = maxBubble,
+                bubble = bubble,
+                keyboard = { InlineKeyboardView(keyboard, m.outgoing, busyButton, onInlineButton) },
+            )
         }
     }
 }

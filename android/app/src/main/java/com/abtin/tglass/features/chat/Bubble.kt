@@ -502,10 +502,27 @@ private fun VoiceBody(m: Message, v: MessageContent.Voice, colors: BubbleColors)
                 T(formatDuration(if (current) (player.positionMs / 1000).toInt() else v.seconds), TgTheme.type.caption1, colors.meta)
                 Spacer(Modifier.width(4.dp))
                 if (!current) Box(Modifier.size(6.dp).clip(CircleShape).background(colors.accent))
-                Spacer(Modifier.width(24.dp))
+                else VoiceSpeedButton(player.speed, colors) { player.cycleSpeed() }
+                Spacer(Modifier.width(if (current) 12.dp else 24.dp))
                 MetaRow(m, colors.meta)
             }
         }
+    }
+}
+
+/** 1x / 1.5x / 2x toggle shown while a voice note is the current one. */
+@Composable
+private fun VoiceSpeedButton(speed: Float, colors: BubbleColors, onClick: () -> Unit) {
+    val label = if (speed == 1.5f) "1.5x" else "${speed.roundToInt()}x"
+    Box(
+        Modifier
+            .clip(Capsule())
+            .background(colors.accent.copy(alpha = 0.16f))
+            .fadeClickable(onClick = onClick)
+            .padding(horizontal = 6.dp, vertical = 1.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        T(label, TgTheme.type.caption2, colors.accent, weight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 
@@ -532,53 +549,65 @@ private fun FileBody(m: Message, f: MessageContent.File, colors: BubbleColors) {
     }
     val downloading = pending && path == null
     val playing = f.music && player.currentKey == key && player.playing
-    Row(Modifier.padding(start = 8.dp, end = 10.dp, top = 8.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            Modifier
-                .size(48.dp)
-                .clip(if (f.music) CircleShape else RoundedRectangle(10.dp))
-                .background(colors.accent)
-                .bounceClickable {
-                    when {
-                        ref == null -> {}
-                        path != null -> act(path)
-                        else -> { pending = !pending; if (pending) repo.requestImage(ref) }
+    Column {
+        Row(Modifier.padding(start = 8.dp, end = 10.dp, top = 8.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier
+                    .size(48.dp)
+                    .clip(if (f.music) CircleShape else RoundedRectangle(10.dp))
+                    .background(colors.accent)
+                    .bounceClickable {
+                        when {
+                            ref == null -> {}
+                            path != null -> act(path)
+                            else -> { pending = !pending; if (pending) repo.requestImage(ref) }
+                        }
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                when {
+                    downloading -> {
+                        val progress = ref?.let { repo.fileProgress(it) } ?: 0f
+                        Canvas(Modifier.size(38.dp)) {
+                            drawArc(colors.onAccent, -90f, 360f * progress.coerceAtLeast(0.05f), false, style = androidx.compose.ui.graphics.drawscope.Stroke(2.5.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round))
+                        }
+                        Icon(IosIcons.Close, colors.onAccent, 14.dp)
                     }
-                },
-            contentAlignment = Alignment.Center,
-        ) {
-            when {
-                downloading -> {
-                    val progress = ref?.let { repo.fileProgress(it) } ?: 0f
-                    Canvas(Modifier.size(38.dp)) {
-                        drawArc(colors.onAccent, -90f, 360f * progress.coerceAtLeast(0.05f), false, style = androidx.compose.ui.graphics.drawscope.Stroke(2.5.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round))
+                    f.music -> Icon(if (playing) IosIcons.Pause else IosIcons.Play, colors.onAccent, 24.dp)
+                    ref != null && path == null -> Icon(IosIcons.ArrowDown, colors.onAccent, 24.dp)
+                    else -> {
+                        val ext = f.name.substringAfterLast('.', "").take(4).uppercase()
+                        if (ext.isNotEmpty() && ext.length <= 4) T(ext, TgTheme.type.caption1, colors.onAccent, weight = FontWeight.Bold)
+                        else Icon(TgIcons.AttFile, colors.onAccent, 26.dp)
                     }
-                    Icon(IosIcons.Close, colors.onAccent, 14.dp)
                 }
-                f.music -> Icon(if (playing) IosIcons.Pause else IosIcons.Play, colors.onAccent, 24.dp)
-                ref != null && path == null -> Icon(IosIcons.ArrowDown, colors.onAccent, 24.dp)
-                else -> {
-                    val ext = f.name.substringAfterLast('.', "").take(4).uppercase()
-                    if (ext.isNotEmpty() && ext.length <= 4) T(ext, TgTheme.type.caption1, colors.onAccent, weight = FontWeight.Bold)
-                    else Icon(TgIcons.AttFile, colors.onAccent, 26.dp)
+            }
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.widthIn(max = 190.dp)) {
+                T(f.name, TgTheme.type.subheadline, colors.text, weight = FontWeight.SemiBold, maxLines = 2)
+                if (f.music && f.performer != null) T(f.performer, TgTheme.type.footnote, colors.meta, maxLines = 1)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    val info = when {
+                        downloading -> "${((ref?.let { repo.fileProgress(it) } ?: 0f) * 100).toInt()}% of ${f.size}"
+                        playing -> "${formatDuration((player.positionMs / 1000).toInt())} / ${formatDuration(f.duration)}"
+                        f.music && f.duration > 0 -> "${formatDuration(f.duration)} · ${f.size}"
+                        else -> f.size
+                    }
+                    T(info, TgTheme.type.footnote, colors.meta)
+                    if (f.caption == null) {
+                        Spacer(Modifier.width(16.dp))
+                        MetaRow(m, colors.meta)
+                    }
                 }
             }
         }
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.widthIn(max = 190.dp)) {
-            T(f.name, TgTheme.type.subheadline, colors.text, weight = FontWeight.SemiBold, maxLines = 2)
-            if (f.music && f.performer != null) T(f.performer, TgTheme.type.footnote, colors.meta, maxLines = 1)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                val info = when {
-                    downloading -> "${((ref?.let { repo.fileProgress(it) } ?: 0f) * 100).toInt()}% of ${f.size}"
-                    playing -> "${formatDuration((player.positionMs / 1000).toInt())} / ${formatDuration(f.duration)}"
-                    f.music && f.duration > 0 -> "${formatDuration(f.duration)} · ${f.size}"
-                    else -> f.size
-                }
-                T(info, TgTheme.type.footnote, colors.meta)
-                Spacer(Modifier.width(16.dp))
-                MetaRow(m, colors.meta)
-            }
+        if (f.caption != null) {
+            TextWithMeta(
+                richFor(m, f.caption, f.captionEntities, colors),
+                TgTheme.type.body.copy(color = colors.text),
+                { MetaRow(m, colors.meta) },
+                Modifier.padding(start = 10.dp, end = 10.dp, bottom = 6.dp),
+            )
         }
     }
 }

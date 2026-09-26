@@ -117,6 +117,54 @@ fun ProfileScreen(chatId: Long) {
             } else null,
         )))
     }
+    // ---- Chat features: block / unblock, clear history, report spam ----
+    val isUserChat = chat.type == ChatType.Private || chat.type == ChatType.Bot
+    val isBot = chat.type == ChatType.Bot
+    fun toggleBlock() {
+        val name = chat.title
+        if (repo.isBlocked(chat.id)) {
+            repo.setBlocked(chat.id, false) { err ->
+                if (err != null) toast.show(err)
+                else if (isBot) { repo.startBot(chat.id); toast.show("Bot restarted") }
+                else toast.show("$name unblocked")
+            }
+        } else {
+            sheet.show(SheetRequest(
+                title = if (isBot) "Stop and block $name?" else "Block $name?",
+                message = if (isBot) "The bot won't be able to send you messages." else "$name won't be able to message or call you.",
+                actions = listOf(SheetAction(if (isBot) "Stop Bot" else "Block User", destructive = true) {
+                    repo.setBlocked(chat.id, true) { err -> toast.show(err ?: "$name blocked") }
+                }),
+            ))
+        }
+    }
+    fun confirmClearHistory() {
+        val o = repo.clearHistoryOptions(chat.id)
+        val first = chat.title.substringBefore(' ')
+        val done = { toast.show("History cleared") }
+        val actions = listOfNotNull(
+            if (o.forEveryone) SheetAction(if (chat.type == ChatType.Private) "Delete for me and $first" else "Delete for Everyone", destructive = true) {
+                repo.clearHistory(chat.id, true); done()
+            } else null,
+            if (o.forMe) SheetAction(if (o.forEveryone) "Delete just for me" else "Clear History", destructive = true) {
+                repo.clearHistory(chat.id, false); done()
+            } else null,
+        )
+        if (actions.isEmpty()) {
+            toast.show("History can't be cleared in this chat")
+            return
+        }
+        sheet.show(SheetRequest(title = "Are you sure you want to delete all messages in this chat?", message = "This action cannot be undone.", actions = actions))
+    }
+    fun confirmReportSpam() {
+        sheet.show(SheetRequest(
+            title = "Report this ${if (isChannel) "channel" else "group"} as spam?",
+            actions = listOf(SheetAction("Report Spam", destructive = true) {
+                repo.reportSpam(chat.id) { err -> toast.show(err ?: "Thank you! Your report will be reviewed by our team.") }
+            }),
+        ))
+    }
+    // ---- end Chat features ----
     val tabs = (if (isGroup) listOf("Members") else emptyList()) + listOf("Media", "Files", "Links", "Voice", "GIFs")
     androidx.compose.runtime.LaunchedEffect(chatId) { repo.loadChatInfo(chatId) }
     val info = repo.chatInfo(chatId)
@@ -166,7 +214,20 @@ fun ProfileScreen(chatId: Long) {
                                 if (canInvite && (isGroup || isChannel)) SheetAction(if (isChannel) "Add Subscribers" else "Add Members") { nav.push(Route.AddMembers(chat.id)) } else null,
                                 SheetAction("Search Messages") { searchInChat() },
                                 SheetAction("Share Contact") { toast.show("Link copied") },
-                                SheetAction("Clear History", destructive = true) { repo.deleteMessages(chat.id, repo.messages(chat.id).map { it.id }.toSet()) },
+                                if (isUserChat) {
+                                    val blocked = repo.isBlocked(chat.id)
+                                    SheetAction(
+                                        when {
+                                            blocked && isBot -> "Restart Bot"
+                                            blocked -> "Unblock User"
+                                            isBot -> "Stop Bot"
+                                            else -> "Block User"
+                                        },
+                                        destructive = !blocked,
+                                    ) { toggleBlock() }
+                                } else null,
+                                if ((isGroup || isChannel) && repo.canReportSpam(chat.id)) SheetAction("Report Spam", destructive = true) { confirmReportSpam() } else null,
+                                SheetAction("Clear History", destructive = true) { confirmClearHistory() },
                             )))
                         }
                     }

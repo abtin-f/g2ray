@@ -118,6 +118,8 @@ fun Composer(
     focusRequester: FocusRequester,
     onFocus: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    /** Long-press on the send button (e.g. "Send Without Sound"); null disables it. */
+    onSendLongPress: (() -> Unit)? = null,
 ) {
     val c = TgTheme.colors
     val view = LocalView.current
@@ -249,7 +251,9 @@ fun Composer(
                 ) { send ->
                     if (send) {
                         Box(
-                            Modifier.size(44.dp).clip(CircleShape).background(c.accent).bounceClickable {
+                            Modifier.size(44.dp).clip(CircleShape).background(c.accent).bounceLongClickable(
+                                onLongClick = if (locked) null else onSendLongPress,
+                            ) {
                                 if (locked) stopRecording(true) else onSend()
                             },
                             contentAlignment = Alignment.Center,
