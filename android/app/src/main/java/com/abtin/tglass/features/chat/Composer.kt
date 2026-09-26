@@ -112,7 +112,8 @@ fun Composer(
     onTogglePanel: () -> Unit,
     onAttach: () -> Unit,
     onSend: () -> Unit,
-    onVoice: (Int) -> Unit,
+    /** Seconds, recorded file (null if the microphone was unavailable) and waveform. */
+    onVoice: (seconds: Int, path: String?, waveform: List<Float>?) -> Unit,
     focusRequester: FocusRequester,
     onFocus: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
@@ -121,6 +122,11 @@ fun Composer(
     val view = LocalView.current
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val recorder = remember { com.abtin.tglass.core.media.VoiceRecorder(context.applicationContext) }
+    val micPermission = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) {}
+    fun hasMic() = androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { recorder.stop(discard = true) } }
     var recording by remember { mutableStateOf(false) }
     var locked by remember { mutableStateOf(false) }
     var startedAt by remember { mutableLongStateOf(0L) }
@@ -131,18 +137,20 @@ fun Composer(
     LaunchedEffect(recording) {
         while (recording) {
             elapsed = System.currentTimeMillis() - startedAt
-            delay(100)
+            recorder.sample()
+            delay(60)
         }
     }
 
     fun stopRecording(send: Boolean) {
         val secs = ((System.currentTimeMillis() - startedAt) / 1000).toInt()
+        val voice = recorder.stop(discard = !send)
         recording = false
         locked = false
         scope.launch { dragX.animateTo(0f); dragY.animateTo(0f) }
         if (send && secs >= 1) {
             Haptics.confirm(view)
-            onVoice(secs)
+            onVoice(voice?.seconds ?: secs, voice?.path, voice?.waveform)
         } else if (send) {
             Haptics.reject(view)
         }
@@ -254,6 +262,16 @@ fun Composer(
                             awaitEachGesture {
                                 val down = awaitFirstDown()
                                 down.consume()
+                                if (!hasMic()) {
+                                    // Ask once; the next press records.
+                                    micPermission.launch(android.Manifest.permission.RECORD_AUDIO)
+                                    do {
+                                        val ev = awaitPointerEvent()
+                                        ev.changes.forEach { it.consume() }
+                                    } while (ev.changes.any { it.pressed })
+                                    return@awaitEachGesture
+                                }
+                                recorder.start()
                                 startedAt = System.currentTimeMillis()
                                 elapsed = 0
                                 recording = true

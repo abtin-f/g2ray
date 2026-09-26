@@ -383,6 +383,11 @@ private fun PhotoBody(m: Message, p: MessageContent.Photo, colors: BubbleColors,
             Box(Modifier.size(48.dp).clip(CircleShape).background(Color.Black.copy(0.45f)), contentAlignment = Alignment.Center) {
                 Icon(IosIcons.Play, Color.White, 26.dp)
             }
+            if (p.duration > 0 || p.loop) {
+                Box(Modifier.align(Alignment.TopStart).padding(6.dp).clip(Capsule()).background(Color.Black.copy(0.45f)).padding(horizontal = 6.dp, vertical = 2.dp)) {
+                    T(if (p.loop) "GIF" else formatDuration(p.duration), TgTheme.type.caption2, Color.White, weight = FontWeight.SemiBold)
+                }
+            }
         }
         if (mediaOnly || p.caption == null) {
             Box(Modifier.align(Alignment.BottomEnd).padding(6.dp)) { MetaRow(m, Color.White, overlay = true) }
@@ -404,19 +409,59 @@ private fun StickerMessage(m: Message, s: MessageContent.Sticker, modifier: Modi
 
 @Composable
 private fun VoiceBody(m: Message, v: MessageContent.Voice, colors: BubbleColors) {
+    val repo = com.abtin.tglass.features.main.LocalRepository.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val player = com.abtin.tglass.core.media.VoicePlayer
+    val key = "${m.chatId}:${m.id}"
+    val current = player.currentKey == key
+    val playing = current && player.playing
+    val progress = if (current) player.progress else 0f
+    val media = v.media
+    val path = media?.let { repo.filePath(it) }
+    // Tapped before the file was downloaded: start playing as soon as it arrives.
+    var pending by androidx.compose.runtime.remember(key) { androidx.compose.runtime.mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(pending, path) {
+        if (pending && path != null) {
+            pending = false
+            player.toggle(context, key, path, v.seconds)
+        }
+    }
+    val loading = pending && path == null
     Row(Modifier.padding(start = 8.dp, end = 10.dp, top = 8.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(44.dp).clip(CircleShape).background(colors.accent).bounceClickable { }, contentAlignment = Alignment.Center) {
-            Icon(IosIcons.Play, colors.onAccent, 24.dp)
+        Box(
+            Modifier.size(44.dp).clip(CircleShape).background(colors.accent).bounceClickable {
+                when {
+                    media == null -> player.toggle(context, key, null, v.seconds)
+                    path != null -> player.toggle(context, key, path, v.seconds)
+                    else -> { pending = !pending; if (pending) repo.requestImage(media) }
+                }
+            },
+            contentAlignment = Alignment.Center,
+        ) {
+            when {
+                loading -> {
+                    val p = media?.let { repo.fileProgress(it) } ?: 0f
+                    Canvas(Modifier.size(34.dp)) {
+                        drawArc(colors.onAccent, -90f, 360f * p.coerceAtLeast(0.05f), false, style = androidx.compose.ui.graphics.drawscope.Stroke(2.5.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round))
+                    }
+                    Icon(IosIcons.Close, colors.onAccent, 14.dp)
+                }
+                playing -> Icon(IosIcons.Pause, colors.onAccent, 22.dp)
+                else -> Icon(IosIcons.Play, colors.onAccent, 24.dp)
+            }
         }
         Spacer(Modifier.width(10.dp))
         Column {
             Canvas(Modifier.width(150.dp).height(22.dp)) {
                 val n = v.waveform.size
                 val step = size.width / n
+                val played = progress * n
                 v.waveform.forEachIndexed { i, amp ->
                     val bh = (amp * size.height).coerceAtLeast(3f)
+                    // While playing, the part already played is solid and the rest faded (Telegram).
+                    val alpha = if (current) 0.4f + 0.6f * (played - i).coerceIn(0f, 1f) else 1f
                     drawRoundRect(
-                        colors.accent.copy(alpha = if (i < n / 3) 1f else 0.4f),
+                        colors.accent.copy(alpha = alpha),
                         topLeft = Offset(i * step, size.height - bh),
                         size = Size(step * 0.55f, bh),
                         cornerRadius = CornerRadius(step),
@@ -425,9 +470,9 @@ private fun VoiceBody(m: Message, v: MessageContent.Voice, colors: BubbleColors)
             }
             Spacer(Modifier.height(3.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                T(formatDuration(v.seconds), TgTheme.type.caption1, colors.meta)
+                T(formatDuration(if (current) (player.positionMs / 1000).toInt() else v.seconds), TgTheme.type.caption1, colors.meta)
                 Spacer(Modifier.width(4.dp))
-                Box(Modifier.size(6.dp).clip(CircleShape).background(colors.accent))
+                if (!current) Box(Modifier.size(6.dp).clip(CircleShape).background(colors.accent))
                 Spacer(Modifier.width(24.dp))
                 MetaRow(m, colors.meta)
             }

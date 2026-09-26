@@ -19,6 +19,14 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import com.abtin.tglass.core.media.togglePlay
+import com.abtin.tglass.ui.components.formatDuration
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -69,6 +77,12 @@ fun MediaViewer(chatId: Long, messageId: Long) {
     val dismiss = remember { Animatable(0f) }
     var chrome by remember { mutableStateOf(true) }
     val (a, b) = avatarColors(photo.seed.toLong())
+    // Videos: download (with progress) and then play with ExoPlayer.
+    val videoFile = photo.videoFile?.takeIf { photo.video }
+    val videoPath = videoFile?.let { repo.filePath(it) }
+    LaunchedEffect(videoFile, videoPath) { if (videoFile != null && videoPath == null) repo.requestImage(videoFile) }
+    val player = videoPath?.let { com.abtin.tglass.core.media.rememberVideoPlayer(it, loop = photo.loop, muted = photo.loop) }
+    val video = player?.let { com.abtin.tglass.core.media.rememberVideoState(it) }
     val bgAlpha = (1f - abs(dismiss.value) / 1200f).coerceIn(0f, 1f)
 
     val backdrop = rememberLayerBackdrop()
@@ -112,7 +126,25 @@ fun MediaViewer(chatId: Long, messageId: Long) {
                 contentAlignment = Alignment.Center,
             ) {
                 if (photo.image != null) com.abtin.tglass.ui.components.TgImage(photo.image, Modifier.matchParentSize(), maxPx = 2048, contentScale = androidx.compose.ui.layout.ContentScale.Fit)
-                else T(photo.emoji, TgTheme.type.body.copy(fontSize = 120.sp, lineHeight = 140.sp))
+                else if (videoFile == null) T(photo.emoji, TgTheme.type.body.copy(fontSize = 120.sp, lineHeight = 140.sp))
+                if (player != null) {
+                    com.abtin.tglass.core.media.VideoSurface(player, Modifier.matchParentSize())
+                    if (video?.playing == false) {
+                        GlassIconButton(IosIcons.Play, { player.play() }, size = 64.dp, iconSize = 30.dp, tint = Color.White)
+                    }
+                } else if (videoFile != null) {
+                    // Downloading: ring with the percentage, like Telegram's media overlay.
+                    val progress = repo.fileProgress(videoFile)
+                    Box(Modifier.size(64.dp).clip(CircleShape).background(Color.Black.copy(0.5f)), contentAlignment = Alignment.Center) {
+                        androidx.compose.foundation.Canvas(Modifier.size(52.dp)) {
+                            drawArc(
+                                Color.White, -90f, 360f * progress.coerceAtLeast(0.04f), false,
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(3.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round),
+                            )
+                        }
+                        T("${(progress * 100).toInt()}%", TgTheme.type.caption1, Color.White, weight = FontWeight.SemiBold)
+                    }
+                }
             }
         }
         if (chrome) {
@@ -126,6 +158,21 @@ fun MediaViewer(chatId: Long, messageId: Long) {
             }
             Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().padding(16.dp)) {
                 photo.caption?.let { T(it, TgTheme.type.body, Color.White) }
+                if (player != null && video != null && !photo.loop) {
+                    Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        GlassIconButton(if (video.playing) IosIcons.Pause else IosIcons.Play, { player.togglePlay() }, size = 40.dp, iconSize = 20.dp, tint = Color.White)
+                        Spacer(Modifier.width(10.dp))
+                        T(formatDuration((video.positionMs / 1000).toInt()), TgTheme.type.caption1, Color.White)
+                        Box(Modifier.weight(1f).padding(horizontal = 8.dp)) {
+                            com.abtin.tglass.ui.components.IOSSlider(
+                                value = if (video.durationMs > 0) video.positionMs.toFloat() / video.durationMs else 0f,
+                                onValueChange = { f -> if (video.durationMs > 0) player.seekTo((f * video.durationMs).toLong()) },
+                                range = 0f..1f,
+                            )
+                        }
+                        T(formatDuration((video.durationMs / 1000).toInt()), TgTheme.type.caption1, Color.White.copy(0.7f))
+                    }
+                }
                 Row(Modifier.fillMaxWidth().padding(top = 12.dp)) {
                     GlassIconButton(TgIcons.IcNavShare, { toast.show("Shared") })
                 }

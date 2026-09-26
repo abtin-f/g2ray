@@ -457,7 +457,18 @@ fun ChatScreen(chatId: Long) {
                             },
                             onAttach = { focus.clearFocus(); keyboard?.hide(); panelOpen = false; attachOpen = true },
                             onSend = { send() },
-                            onVoice = { secs -> repo.sendContent(chatId, MessageContent.Voice(secs, List(40) { i -> 0.2f + 0.8f * (((i * 53 + secs * 7) % 17) / 17f) }), replyToId); replyToId = null },
+                            onVoice = { secs, path, wave ->
+                                repo.sendContent(
+                                    chatId,
+                                    MessageContent.Voice(
+                                        secs,
+                                        wave ?: List(40) { i -> 0.2f + 0.8f * (((i * 53 + secs * 7) % 17) / 17f) },
+                                        path?.let { com.abtin.tglass.data.ImageRef(0, it) },
+                                    ),
+                                    replyToId,
+                                )
+                                replyToId = null
+                            },
                             focusRequester = focusRequester,
                             onFocus = { if (it) panelOpen = false },
                         )
@@ -478,7 +489,7 @@ fun ChatScreen(chatId: Long) {
                 onDismiss = { attachOpen = false },
                 onSend = { items ->
                     attachOpen = false
-                    items.forEach { repo.sendContent(chatId, it, replyToId) }
+                    repo.sendMedia(chatId, items, replyToId)
                     replyToId = null
                 },
             )

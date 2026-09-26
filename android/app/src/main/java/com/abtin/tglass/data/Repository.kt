@@ -75,6 +75,14 @@ interface TelegramRepository {
     /** Starts downloading the file behind [image]; [filePath] turns non-null once it is done. */
     fun requestImage(image: ImageRef) {}
 
+    /** Download progress 0..1 of a file started with [requestImage]. */
+    fun fileProgress(image: ImageRef): Float = if (filePath(image) != null) 1f else 0f
+
+    /** Sends picked photos/videos; several at once are grouped into an album where supported. */
+    fun sendMedia(chatId: Long, items: List<MessageContent>, replyTo: Long?) {
+        items.forEachIndexed { i, it -> sendContent(chatId, it, if (i == 0) replyTo else null) }
+    }
+
     /** Loads older messages of a chat when the user scrolls to the top of the history. */
     fun loadOlderMessages(chatId: Long) {}
 

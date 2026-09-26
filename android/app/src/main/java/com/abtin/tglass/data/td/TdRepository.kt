@@ -112,6 +112,7 @@ class TdRepository(context: Context) : TelegramRepository {
     private val messageStore = mutableStateMapOf<Long, SnapshotStateList<UiMessage>>()
     private val avatars = mutableStateMapOf<Long, ImageRef>()
     private val filePaths = mutableStateMapOf<Int, String>()
+    private val fileProgressMap = mutableStateMapOf<Int, Float>()
     private val contactIds = mutableStateListOf<Long>()
     private val callList = mutableStateListOf<CallRecord>()
     private val sessionList = mutableStateListOf<UiSession>()
@@ -153,7 +154,7 @@ class TdRepository(context: Context) : TelegramRepository {
     override fun filePath(image: ImageRef): String? = image.path ?: filePaths[image.fileId]
 
     override fun requestImage(image: ImageRef) {
-        if (filePath(image) != null || !downloading.add(image.fileId)) return
+        if (image.fileId <= 0 || filePath(image) != null || !downloading.add(image.fileId)) return
         scope.launch {
             when (val r = client.downloadFile(image.fileId, 1, 0, 0, false)) {
                 is TdlResult.Success -> onFile(r.result)
@@ -171,12 +172,74 @@ class TdRepository(context: Context) : TelegramRepository {
             is UiContent.Text -> InputMessageText(FormattedText(content.text, emptyArray()), null, true)
             is UiContent.Sticker -> InputMessageText(FormattedText(content.emoji, emptyArray()), null, true)
             is UiContent.Contact -> InputMessageContact(Contact(content.phone, content.name, "", "", 0))
+            is UiContent.Photo -> inputMedia(content) ?: run {
+                _errors.tryEmit("This kind of message can't be sent yet")
+                return
+            }
+            is UiContent.Voice -> {
+                val path = content.media?.path ?: run {
+                    _errors.tryEmit("This kind of message can't be sent yet")
+                    return
+                }
+                InputMessageVoiceNote(InputFileLocal(path), content.seconds, packWaveform(content.waveform), null, null)
+            }
             else -> {
                 _errors.tryEmit("This kind of message can't be sent yet")
                 return
             }
         }
         send(chatId, replyTo, input)
+    }
+
+    override fun sendMedia(chatId: Long, items: List<UiContent>, replyTo: Long?) {
+        val inputs = items.mapNotNull { (it as? UiContent.Photo)?.let(::inputMedia) }
+        if (inputs.size < 2 || inputs.size != items.size) {
+            super.sendMedia(chatId, items, replyTo)
+            return
+        }
+        scope.launch {
+            inputs.chunked(10).forEachIndexed { i, chunk ->
+                val reply = if (i == 0) replyTo?.let { InputMessageReplyToMessage(it, null, 0, "") } else null
+                if (chunk.size == 1) client.sendMessage(chatId = chatId, replyTo = reply, inputMessageContent = chunk[0]).orReport()
+                else client.sendMessageAlbum(chatId = chatId, replyTo = reply, inputMessageContents = chunk.toTypedArray()).also { r ->
+                    if (r is TdlResult.Success) r.result.messages.filterNotNull().forEach { addMessage(it) }
+                }.orReport()
+            }
+        }
+    }
+
+    /** A locally prepared photo/video (see MediaPrep) as TDLib input. */
+    private fun inputMedia(p: UiContent.Photo): InputMessageContent? {
+        val caption = p.caption?.let { FormattedText(it, emptyArray()) }
+        val image = p.image?.takeIf { it.fileId == 0 && it.path != null }
+        if (p.video) {
+            val vf = p.videoFile?.takeIf { it.fileId == 0 } ?: return null
+            val file = vf.path ?: return null
+            val thumb = image?.let { InputThumbnail(InputFileLocal(it.path!!), it.width, it.height) }
+            return InputMessageVideo(InputVideo(InputFileLocal(file), thumb, null, 0, IntArray(0), p.duration, vf.width, vf.height, true), caption, false, null, false)
+        }
+        image ?: return null
+        return InputMessagePhoto(InputPhoto(InputFileLocal(image.path!!), null, null, IntArray(0), image.width, image.height), caption, false, null, false)
+    }
+
+    /** Inverse of [waveform]: 0..1 levels → Telegram's packed 5-bit samples. */
+    private fun packWaveform(levels: List<Float>): ByteArray {
+        val values = levels.map { (it.coerceIn(0f, 1f) * 31).toInt() }
+        val bytes = ByteArray((values.size * 5 + 7) / 8)
+        values.forEachIndexed { i, v ->
+            val bit = i * 5
+            val idx = bit / 8
+            val shift = bit % 8
+            val word = v shl shift
+            bytes[idx] = (bytes[idx].toInt() or (word and 0xFF)).toByte()
+            if (idx + 1 < bytes.size) bytes[idx + 1] = (bytes[idx + 1].toInt() or ((word shr 8) and 0xFF)).toByte()
+        }
+        return bytes
+    }
+
+    override fun fileProgress(image: ImageRef): Float {
+        if (filePath(image) != null) return 1f
+        return fileProgressMap[image.fileId] ?: 0f
     }
 
     private fun send(chatId: Long, replyTo: Long?, input: InputMessageContent) = scope.launch {
@@ -453,7 +516,7 @@ class TdRepository(context: Context) : TelegramRepository {
     private fun reset() {
         chatStates.clear(); rawUsers.clear(); basicGroups.clear(); supergroups.clear()
         typingJobs.values.forEach { it.cancel() }; typingJobs.clear()
-        downloading.clear(); historyLoading.clear(); historyComplete.clear(); openChats.clear()
+        downloading.clear(); fileProgressMap.clear(); historyLoading.clear(); historyComplete.clear(); openChats.clear()
         chatMap.clear(); userMap.clear(); lastMessages.clear(); messageStore.clear(); avatars.clear(); filePaths.clear()
         contactIds.clear(); callList.clear(); sessionList.clear(); folderInfos = emptyList()
         myId = 0
@@ -718,7 +781,11 @@ class TdRepository(context: Context) : TelegramRepository {
     private fun onFile(f: File) {
         if (f.local.isDownloadingCompleted && f.local.path.isNotEmpty()) {
             filePaths[f.id] = f.local.path
+            fileProgressMap.remove(f.id)
             downloading.remove(f.id)
+        } else if (f.id in downloading) {
+            val total = if (f.size > 0) f.size else f.expectedSize
+            if (total > 0) fileProgressMap[f.id] = (f.local.downloadedSize.toFloat() / total).coerceIn(0f, 1f)
         }
     }
 
@@ -923,8 +990,10 @@ class TdRepository(context: Context) : TelegramRepository {
                 aspect = if (v.height > 0) v.width.toFloat() / v.height else 1.6f,
                 caption = c.caption.text.ifBlank { null },
                 emoji = "🎬",
-                image = v.thumbnail?.let { imageOf(it.file, v.minithumbnail, it.width, it.height) },
+                image = v.thumbnail?.let { imageOf(it.file, v.minithumbnail, it.width, it.height) } ?: v.minithumbnail?.let { ImageRef(-v.video.id, null, it.data) },
                 video = true,
+                videoFile = imageOf(v.video, null, v.width, v.height),
+                duration = v.duration,
             )
         }
         is MessageAnimation -> {
@@ -934,15 +1003,19 @@ class TdRepository(context: Context) : TelegramRepository {
                 aspect = if (a.height > 0) a.width.toFloat() / a.height else 1.4f,
                 caption = c.caption.text.ifBlank { null },
                 emoji = "🎞",
-                image = a.thumbnail?.let { imageOf(it.file, a.minithumbnail, it.width, it.height) },
+                image = a.thumbnail?.let { imageOf(it.file, a.minithumbnail, it.width, it.height) } ?: a.minithumbnail?.let { ImageRef(-a.animation.id, null, it.data) },
                 video = true,
+                videoFile = imageOf(a.animation, null, a.width, a.height),
+                duration = a.duration,
+                loop = true,
             )
         }
         is MessageVideoNote -> UiContent.Photo(
             seed = c.videoNote.video.id, aspect = 1f, emoji = "📹",
             image = c.videoNote.thumbnail?.let { imageOf(it.file, c.videoNote.minithumbnail) }, video = true,
+            videoFile = imageOf(c.videoNote.video, null, c.videoNote.length, c.videoNote.length), duration = c.videoNote.duration,
         )
-        is MessageVoiceNote -> UiContent.Voice(c.voiceNote.duration, waveform(c.voiceNote.waveform))
+        is MessageVoiceNote -> UiContent.Voice(c.voiceNote.duration, waveform(c.voiceNote.waveform), imageOf(c.voiceNote.voice, null))
         is MessageAudio -> UiContent.File(
             listOf(c.audio.performer, c.audio.title).filter { it.isNotBlank() }.joinToString(" – ").ifBlank { c.audio.fileName },
             Formats.size(c.audio.audio.size),

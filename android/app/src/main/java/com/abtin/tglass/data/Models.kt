@@ -26,7 +26,7 @@ data class User(
 }
 
 /**
- * A picture that may live in a local file ([path]) or still need downloading ([fileId], via the repository).
+ * A file (picture, voice note, video) that may live in a local file ([path]) or still need downloading ([fileId], via the repository).
  * [mini] is Telegram's tiny inline JPEG preview, shown blurred until the real file is ready.
  */
 @Immutable
@@ -41,8 +41,21 @@ data class Reaction(val emoji: String, val count: Int, val chosen: Boolean)
 @Immutable
 sealed interface MessageContent {
     data class Text(val text: String) : MessageContent
-    data class Photo(val seed: Int, val aspect: Float, val caption: String? = null, val emoji: String = "🏞", val image: ImageRef? = null, val video: Boolean = false) : MessageContent
-    data class Voice(val seconds: Int, val waveform: List<Float>) : MessageContent
+    data class Photo(
+        val seed: Int,
+        val aspect: Float,
+        val caption: String? = null,
+        val emoji: String = "🏞",
+        /** Picture to show (the photo itself, or a video's thumbnail). */
+        val image: ImageRef? = null,
+        val video: Boolean = false,
+        /** The playable video file when [video] is true. */
+        val videoFile: ImageRef? = null,
+        val duration: Int = 0,
+        /** GIF-style animation: loops silently. */
+        val loop: Boolean = false,
+    ) : MessageContent
+    data class Voice(val seconds: Int, val waveform: List<Float>, val media: ImageRef? = null) : MessageContent
     data class Sticker(val emoji: String, val image: ImageRef? = null) : MessageContent
     data class File(val name: String, val size: String) : MessageContent
     data class Location(val title: String, val address: String) : MessageContent
