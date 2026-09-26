@@ -70,7 +70,7 @@ fun MediaViewer(chatId: Long, messageId: Long) {
     val nav = LocalNavigator.current
     val toast = LocalToast.current
     val scope = rememberCoroutineScope()
-    val m = repo.messages(chatId).firstOrNull { it.id == messageId } ?: return
+    val m = repo.findMessage(chatId, messageId) ?: return
     val photo = m.content as? MessageContent.Photo ?: return
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }

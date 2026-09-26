@@ -48,6 +48,8 @@ import com.abtin.tglass.core.glass.LocalBackdrop
 import com.abtin.tglass.core.navigation.LocalNavigator
 import com.abtin.tglass.core.navigation.Route
 import com.abtin.tglass.data.ChatType
+import com.abtin.tglass.data.MediaKind
+import com.abtin.tglass.data.senderName
 import com.abtin.tglass.data.MessageContent
 import com.abtin.tglass.features.chat.chatSubtitle
 import com.abtin.tglass.features.chatlist.ChatAvatar
@@ -95,6 +97,17 @@ fun ProfileScreen(chatId: Long) {
     val collapse = rememberHeroCollapse(listState)
     val isGroup = chat.type == ChatType.Group
     val tabs = (if (isGroup) listOf("Members") else emptyList()) + listOf("Media", "Files", "Links", "Voice", "GIFs")
+    androidx.compose.runtime.LaunchedEffect(chatId) { repo.loadChatInfo(chatId) }
+    val info = repo.chatInfo(chatId)
+    androidx.compose.runtime.LaunchedEffect(chatId, tab) {
+        when (tabs.getOrNull(tab)) {
+            "Media" -> repo.loadSharedMedia(chatId, MediaKind.Media)
+            "Files" -> repo.loadSharedMedia(chatId, MediaKind.Files)
+            "Links" -> repo.loadSharedMedia(chatId, MediaKind.Links)
+            "Voice" -> repo.loadSharedMedia(chatId, MediaKind.Voice)
+            "GIFs" -> repo.loadSharedMedia(chatId, MediaKind.Gifs)
+        }
+    }
 
     CompositionLocalProvider(LocalBackdrop provides backdrop) {
         Box(Modifier.fillMaxSize().background(c.groupedBackground)) {
@@ -140,15 +153,14 @@ fun ProfileScreen(chatId: Long) {
                 }
                 item {
                     Section {
+                        val about = info?.about
                         if (user != null) {
                             if (user.phone.isNotBlank()) InfoRow("mobile", user.phone, accent = true)
-                            if (user.username != null) {
-                                InfoRow("username", "@${user.username}", accent = true)
-                            }
-                            if (user.bio != null) InfoRow("bio", user.bio)
+                            if (user.username != null) InfoRow("username", "@${user.username}", accent = true)
+                            (about ?: user.bio)?.let { InfoRow("bio", it) }
                         } else {
-                            chat.description?.let { InfoRow("info", it) }
-                            chat.username?.let { InfoRow("link", "t.me/$it", accent = true) }
+                            (about ?: chat.description)?.let { InfoRow("info", it) }
+                            (info?.link ?: chat.username)?.let { l -> InfoRow("link", if (l.startsWith("http")) l.removePrefix("https://") else "t.me/$l", accent = true) }
                         }
                         Cell("Notifications", chevron = false, trailing = { IOSSwitch(!chat.muted, { repo.toggleMute(chat.id) }) }, divider = false)
                     }
@@ -158,39 +170,57 @@ fun ProfileScreen(chatId: Long) {
                     ChipTabs(tabs, tab, { tab = it }, Modifier.fillMaxWidth().padding(bottom = 8.dp))
                 }
                 val tabName = tabs[tab]
+                val kind = when (tabName) {
+                    "Media" -> MediaKind.Media
+                    "Files" -> MediaKind.Files
+                    "Links" -> MediaKind.Links
+                    "Voice" -> MediaKind.Voice
+                    "GIFs" -> MediaKind.Gifs
+                    else -> null
+                }
+                val shared = kind?.let { repo.sharedMedia(chat.id, it) }.orEmpty()
                 if (tabName == "Members") {
-                    val members = if (repo.isLive) emptyList() else repo.users.values.filter { it.id != 0L }.take(8)
+                    val members = info?.members.orEmpty().mapNotNull { m -> repo.user(m.userId)?.let { it to m.role } }
                     item {
-                        Section {
-                            Cell("Add Members", icon = TgIcons.PiAddMember, iconColor = c.accent, titleColor = c.accent, chevron = false, onClick = { toast.show("Invite link copied") })
-                            members.forEachIndexed { i, u ->
+                        Section(footer = info?.memberCount?.takeIf { it > members.size }?.let { "$it members" }) {
+                            Cell("Add Members", icon = TgIcons.PiAddMember, iconColor = c.accent, titleColor = c.accent, chevron = false, divider = members.isNotEmpty(), onClick = { toast.show("Invite link copied") })
+                            members.forEachIndexed { i, (u, role) ->
                                 Cell(
                                     u.name,
                                     subtitle = u.status,
                                     leading = { Avatar(u.name, u.id, 40.dp) },
                                     chevron = false,
                                     divider = i != members.lastIndex,
-                                    value = if (i == 0) "owner" else if (i < 3) "admin" else null,
+                                    value = role,
                                     onClick = { nav.push(Route.UserProfile(u.id)) },
                                 )
                             }
                         }
                     }
-                } else if (tabName == "Media" || tabName == "GIFs") {
-                    val photos = repo.messages(chat.id).mapNotNull { it.content as? MessageContent.Photo }
-                    val fillers = if (repo.isLive) emptyList() else (0 until 14).map { MessageContent.Photo(it + chat.id.toInt(), 1f, emoji = listOf("🏔", "🌅", "🐈", "🍜", "🌸", "🎨", "🌊")[it % 7]) }
-                    val tiles = photos.asReversed() + fillers
-                    tiles.chunked(3).forEachIndexed { r, row ->
+                } else if (kind == MediaKind.Media || kind == MediaKind.Gifs) {
+                    val tiles = shared.mapNotNull { m -> (m.content as? MessageContent.Photo)?.let { m to it } }
+                    val fillers = if (repo.isLive || tiles.isNotEmpty()) emptyList()
+                    else (0 until 14).map { null to MessageContent.Photo(it + chat.id.toInt(), 1f, emoji = listOf("🏔", "🌅", "🐈", "🍜", "🌸", "🎨", "🌊")[it % 7]) }
+                    val all: List<Pair<com.abtin.tglass.data.Message?, MessageContent.Photo>> = tiles + fillers
+                    if (all.isEmpty()) emptyTab(tabName)
+                    all.chunked(3).forEachIndexed { r, row ->
                         item(key = "row$r") {
                             Row(Modifier.fillMaxWidth().padding(horizontal = 1.dp), horizontalArrangement = Arrangement.spacedBy(1.dp)) {
-                                row.forEach { p ->
+                                row.forEach { (m, p) ->
                                     val (a, b) = avatarColors(p.seed.toLong())
                                     Box(
-                                        Modifier.weight(1f).aspectRatio(1f).background(Brush.linearGradient(listOf(a, b))),
+                                        Modifier.weight(1f).aspectRatio(1f).background(Brush.linearGradient(listOf(a, b)))
+                                            .then(if (m != null) Modifier.bounceClickable { nav.push(Route.Media(chat.id, m.id)) } else Modifier),
                                         contentAlignment = Alignment.Center,
                                     ) {
                                         if (p.image != null) com.abtin.tglass.ui.components.TgImage(p.image, Modifier.matchParentSize(), maxPx = 360)
                                         else T(p.emoji, TgTheme.type.body.copy(fontSize = 34.sp, lineHeight = 40.sp))
+                                        if (p.video && !p.loop && p.duration > 0) {
+                                            T(
+                                                com.abtin.tglass.ui.components.formatDuration(p.duration), TgTheme.type.caption2, androidx.compose.ui.graphics.Color.White,
+                                                weight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp),
+                                            )
+                                        }
                                     }
                                 }
                                 repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
@@ -198,14 +228,16 @@ fun ProfileScreen(chatId: Long) {
                             Spacer(Modifier.height(1.dp))
                         }
                     }
+                } else if (shared.isEmpty()) {
+                    emptyTab(tabName)
                 } else {
                     item {
-                        Column(Modifier.fillMaxWidth().padding(40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            T("No ${tabName.lowercase()} yet", TgTheme.type.headline, c.text, align = TextAlign.Center)
-                            T("Shared ${tabName.lowercase()} from this chat will appear here.", TgTheme.type.subheadline, c.secondaryText, align = TextAlign.Center)
+                        Section {
+                            shared.forEachIndexed { i, m -> SharedRow(m, divider = i != shared.lastIndex) }
                         }
                     }
                 }
+                item { Spacer(Modifier.height(24.dp)) }
             }
             GlassTopBar(title = null, fade = c.groupedBackground, center = { CollapsedTitle(chat.title, chat.id, collapse, saved = chat.type == ChatType.Saved) }, right = { GlassTextButton("Edit", { toast.show("Edit profile") }) })
         }
@@ -245,4 +277,80 @@ private fun ActionTile(icon: ImageVector, label: String, modifier: Modifier, onC
 fun UserProfileScreen(userId: Long) {
     val repo = LocalRepository.current
     ProfileScreen(repo.privateChatWith(userId))
+}
+
+
+private fun androidx.compose.foundation.lazy.LazyListScope.emptyTab(tabName: String) {
+    item {
+        val c = TgTheme.colors
+        Column(Modifier.fillMaxWidth().padding(40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            T("No ${tabName.lowercase()} yet", TgTheme.type.headline, c.text, align = TextAlign.Center)
+            T("Shared ${tabName.lowercase()} from this chat will appear here.", TgTheme.type.subheadline, c.secondaryText, align = TextAlign.Center)
+        }
+    }
+}
+
+/** A row of the Files / Links / Voice tabs. Files download and open on tap, voice notes play. */
+@Composable
+private fun SharedRow(m: com.abtin.tglass.data.Message, divider: Boolean) {
+    val repo = LocalRepository.current
+    val c = TgTheme.colors
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val toast = LocalToast.current
+    val uri = androidx.compose.ui.platform.LocalUriHandler.current
+    val player = com.abtin.tglass.core.media.VoicePlayer
+    val key = "${m.chatId}:${m.id}"
+    val content = m.content
+    val ref = when (content) {
+        is MessageContent.File -> content.file
+        is MessageContent.Voice -> content.media
+        else -> null
+    }
+    val path = ref?.let { repo.filePath(it) }
+    var pending by androidx.compose.runtime.remember(key) { androidx.compose.runtime.mutableStateOf(false) }
+    fun act(p: String) {
+        when (content) {
+            is MessageContent.File -> if (content.music) player.toggle(context, key, p, content.duration)
+                else if (!com.abtin.tglass.core.media.Files.open(context, p, content.mime)) toast.show("No app can open this file")
+            is MessageContent.Voice -> player.toggle(context, key, p, content.seconds)
+            else -> {}
+        }
+    }
+    androidx.compose.runtime.LaunchedEffect(pending, path) { if (pending && path != null) { pending = false; act(path) } }
+    val (title, subtitle) = when (content) {
+        is MessageContent.File -> content.name to listOfNotNull(content.performer, content.size).joinToString(" · ")
+        is MessageContent.Voice -> repo.senderName(m) to com.abtin.tglass.ui.components.formatDuration(content.seconds)
+        is MessageContent.Link -> content.title.ifBlank { content.site } to content.text
+        else -> m.preview to ""
+    }
+    Cell(
+        title,
+        subtitle = listOf(subtitle, com.abtin.tglass.ui.components.formatDay(m.date)).filter { it.isNotBlank() }.joinToString(" · "),
+        chevron = false,
+        divider = divider,
+        leading = {
+            Box(Modifier.height(40.dp).aspectRatio(1f).clip(RoundedRectangle(10.dp)).background(c.accent), contentAlignment = Alignment.Center) {
+                val playing = player.currentKey == key && player.playing
+                when {
+                    pending && path == null -> com.abtin.tglass.ui.components.ActivityIndicator(18.dp, androidx.compose.ui.graphics.Color.White)
+                    content is MessageContent.Voice || (content is MessageContent.File && content.music) ->
+                        Icon(if (playing) com.abtin.tglass.ui.components.IosIcons.Pause else com.abtin.tglass.ui.components.IosIcons.Play, androidx.compose.ui.graphics.Color.White, 20.dp)
+                    content is MessageContent.Link -> T(content.site.take(1).uppercase(), TgTheme.type.headline, androidx.compose.ui.graphics.Color.White)
+                    else -> Icon(TgIcons.AttFile, androidx.compose.ui.graphics.Color.White, 22.dp)
+                }
+            }
+        },
+        onClick = {
+            when {
+                content is MessageContent.Link -> {
+                    val url = com.abtin.tglass.features.chat.detectEntities(content.text).firstOrNull { it.type == com.abtin.tglass.data.EntityType.Url }
+                        ?.let { content.text.substring(it.start, it.end) }
+                    if (url != null) runCatching { uri.openUri(if (url.startsWith("http")) url else "https://$url") }
+                }
+                ref == null -> {}
+                path != null -> act(path)
+                else -> { pending = true; repo.requestImage(ref) }
+            }
+        },
+    )
 }

@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -351,8 +352,17 @@ private val StickerSet = listOf("🥳", "😎", "🤩", "😂", "😍", "🙏", 
 
 /** Emoji / Stickers / GIF panel shown in place of the keyboard (spec §25). */
 @Composable
-fun EmojiPanel(onEmoji: (String) -> Unit, onSticker: (String) -> Unit, onGif: (Int) -> Unit, modifier: Modifier = Modifier) {
+fun EmojiPanel(
+    onEmoji: (String) -> Unit,
+    onSticker: (String) -> Unit,
+    onGif: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    onStickerItem: (com.abtin.tglass.data.StickerItem) -> Unit = {},
+    onGifItem: (com.abtin.tglass.data.GifItem) -> Unit = {},
+) {
     val c = TgTheme.colors
+    val repo = com.abtin.tglass.features.main.LocalRepository.current
+    androidx.compose.runtime.LaunchedEffect(Unit) { repo.loadStickers() }
     var tab by remember { mutableIntStateOf(0) }
     GlassBox(onClick = null, shape = RoundedRectangle(28.dp), modifier = modifier.fillMaxWidth().height(310.dp), contentAlignment = Alignment.TopCenter) {
         Column(Modifier.fillMaxWidth()) {
@@ -369,7 +379,7 @@ fun EmojiPanel(onEmoji: (String) -> Unit, onSticker: (String) -> Unit, onGif: (I
                         }
                     }
                 }
-                1 -> LazyVerticalGrid(
+                1 -> if (repo.isLive) AccountStickers(repo, onStickerItem) else LazyVerticalGrid(
                     GridCells.Fixed(4),
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -381,7 +391,7 @@ fun EmojiPanel(onEmoji: (String) -> Unit, onSticker: (String) -> Unit, onGif: (I
                         }
                     }
                 }
-                else -> LazyVerticalGrid(
+                else -> if (repo.isLive) SavedGifs(repo.savedGifs, onGifItem) else LazyVerticalGrid(
                     GridCells.Fixed(2),
                     contentPadding = PaddingValues(8.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -400,6 +410,99 @@ fun EmojiPanel(onEmoji: (String) -> Unit, onSticker: (String) -> Unit, onGif: (I
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+
+/** Stickers tab for a real account: recent stickers and installed sets, switchable from a strip of set covers. */
+@Composable
+private fun AccountStickers(repo: com.abtin.tglass.data.TelegramRepository, onSend: (com.abtin.tglass.data.StickerItem) -> Unit) {
+    val c = TgTheme.colors
+    val packs = repo.stickerPacks
+    val recent = repo.recentStickers
+    // 0 = recent, i > 0 = packs[i - 1]
+    var selected by remember { mutableIntStateOf(0) }
+    val stickers = if (selected == 0) recent else packs.getOrNull(selected - 1)?.stickers.orEmpty()
+    Column(Modifier.fillMaxWidth()) {
+        androidx.compose.foundation.lazy.LazyRow(
+            contentPadding = PaddingValues(horizontal = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.fillMaxWidth().height(44.dp),
+        ) {
+            item {
+                Box(
+                    Modifier.size(40.dp).clip(RoundedRectangle(10.dp))
+                        .background(if (selected == 0) c.text.copy(0.1f) else Color.Transparent)
+                        .bounceClickable { selected = 0 },
+                    contentAlignment = Alignment.Center,
+                ) { Icon(IosIcons.Clock, c.secondaryText, 22.dp) }
+            }
+            items(packs.size) { i ->
+                val cover = packs[i].stickers.firstOrNull()
+                Box(
+                    Modifier.size(40.dp).clip(RoundedRectangle(10.dp))
+                        .background(if (selected == i + 1) c.text.copy(0.1f) else Color.Transparent)
+                        .bounceClickable { selected = i + 1 }
+                        .padding(4.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (cover?.image != null) com.abtin.tglass.ui.components.TgImage(cover.image, Modifier.fillMaxSize(), maxPx = 96, contentScale = androidx.compose.ui.layout.ContentScale.Fit)
+                    else T(cover?.emoji ?: "🙂", TgTheme.type.body.copy(fontSize = 22.sp, lineHeight = 26.sp))
+                }
+            }
+        }
+        if (stickers.isEmpty()) {
+            Box(Modifier.fillMaxWidth().padding(top = 60.dp), contentAlignment = Alignment.Center) {
+                if (packs.isEmpty() && recent.isEmpty()) com.abtin.tglass.ui.components.ActivityIndicator(24.dp)
+                else T("No recent stickers", TgTheme.type.subheadline, c.secondaryText)
+            }
+        } else {
+            LazyVerticalGrid(
+                GridCells.Fixed(5),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.fillMaxWidth().fillMaxHeight(),
+            ) {
+                items(stickers.size) { i ->
+                    val st = stickers[i]
+                    Box(Modifier.aspectRatio(1f).bounceClickable { onSend(st) }.padding(4.dp), contentAlignment = Alignment.Center) {
+                        if (st.image != null) com.abtin.tglass.ui.components.TgImage(st.image, Modifier.fillMaxSize(), maxPx = 192, contentScale = androidx.compose.ui.layout.ContentScale.Fit)
+                        else T(st.emoji, TgTheme.type.body.copy(fontSize = 34.sp, lineHeight = 40.sp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Saved GIFs of a real account. */
+@Composable
+private fun SavedGifs(gifs: List<com.abtin.tglass.data.GifItem>, onSend: (com.abtin.tglass.data.GifItem) -> Unit) {
+    val c = TgTheme.colors
+    if (gifs.isEmpty()) {
+        Box(Modifier.fillMaxWidth().padding(top = 70.dp), contentAlignment = Alignment.Center) {
+            T("Saved GIFs will appear here", TgTheme.type.subheadline, c.secondaryText)
+        }
+        return
+    }
+    LazyVerticalGrid(
+        GridCells.Fixed(3),
+        contentPadding = PaddingValues(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.fillMaxWidth().fillMaxHeight(),
+    ) {
+        items(gifs.size) { i ->
+            val g = gifs[i]
+            Box(
+                Modifier.aspectRatio(1f).clip(RoundedRectangle(8.dp)).background(c.searchField).bounceClickable { onSend(g) },
+                contentAlignment = Alignment.Center,
+            ) {
+                com.abtin.tglass.ui.components.TgImage(g.thumb, Modifier.fillMaxSize(), maxPx = 256)
+                T("GIF", TgTheme.type.caption2, Color.White, weight = FontWeight.Bold,
+                    modifier = Modifier.align(Alignment.BottomStart).padding(5.dp).clip(Capsule()).background(Color.Black.copy(0.35f)).padding(horizontal = 5.dp, vertical = 1.dp))
             }
         }
     }

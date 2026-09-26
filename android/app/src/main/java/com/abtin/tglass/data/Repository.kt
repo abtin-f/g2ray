@@ -88,6 +88,47 @@ interface TelegramRepository {
 
     fun closeChat(chatId: Long) {}
 
+    /** Profile details; null until [loadChatInfo] delivered them (the demo builds them locally). */
+    fun chatInfo(chatId: Long): ChatInfo? {
+        val chat = chat(chatId) ?: return null
+        val user = chat.peerUserId?.let { user(it) }
+        val members = if (chat.type == ChatType.Group) {
+            users.values.filter { it.id != me.id }.take(8).mapIndexed { i, u -> Member(u.id, if (i == 0) "owner" else if (i < 3) "admin" else null) }
+        } else emptyList()
+        return ChatInfo(about = user?.bio ?: chat.description, link = user?.username ?: chat.username, memberCount = chat.members, members = members)
+    }
+
+    fun loadChatInfo(chatId: Long) {}
+
+    /** Messages of one shared-media kind, newest first. */
+    fun sharedMedia(chatId: Long, kind: MediaKind): List<Message> = messages(chatId).asReversed().filter { m ->
+        when (kind) {
+            MediaKind.Media -> (m.content as? MessageContent.Photo)?.loop == false
+            MediaKind.Gifs -> (m.content as? MessageContent.Photo)?.loop == true
+            MediaKind.Files -> m.content is MessageContent.File
+            MediaKind.Links -> m.content is MessageContent.Link
+            MediaKind.Voice -> m.content is MessageContent.Voice
+        }
+    }
+
+    fun loadSharedMedia(chatId: Long, kind: MediaKind) {}
+
+    /** The account's installed sticker sets, recent stickers and saved GIFs (empty in the demo). */
+    val stickerPacks: List<StickerPack> get() = emptyList()
+    val recentStickers: List<StickerItem> get() = emptyList()
+    val savedGifs: List<GifItem> get() = emptyList()
+    fun loadStickers() {}
+    fun sendSticker(chatId: Long, sticker: StickerItem, replyTo: Long?) {}
+    fun sendGif(chatId: Long, gif: GifItem, replyTo: Long?) {}
+
+    /** Server-side search (public usernames and all messages). The demo has no server, so nothing. */
+    fun searchGlobal(query: String, onResult: (GlobalResults) -> Unit) {}
+
+    /** A message from the loaded history or from shared media. */
+    fun findMessage(chatId: Long, messageId: Long): Message? =
+        messages(chatId).firstOrNull { it.id == messageId }
+            ?: MediaKind.entries.firstNotNullOfOrNull { k -> sharedMedia(chatId, k).firstOrNull { it.id == messageId } }
+
     /** Finds the chat behind a public @username (null if there is none). */
     fun resolveUsername(username: String, onResult: (Long?) -> Unit) {
         val name = username.removePrefix("@")
@@ -99,6 +140,8 @@ interface TelegramRepository {
     fun forward(fromChatId: Long, messageIds: List<Long>, toChatId: Long) {
         messageIds.mapNotNull { id -> messages(fromChatId).firstOrNull { it.id == id } }.forEach { sendContent(toChatId, it.content) }
     }
+
+    fun joinChat(chatId: Long) {}
 
     fun logOut() {}
 }

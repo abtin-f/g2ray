@@ -65,7 +65,16 @@ sealed interface MessageContent {
     data class Voice(val seconds: Int, val waveform: List<Float>, val media: ImageRef? = null) : MessageContent
     /** [animation] is a Telegram animated sticker (gzipped Lottie, .tgs). */
     data class Sticker(val emoji: String, val image: ImageRef? = null, val animation: ImageRef? = null) : MessageContent
-    data class File(val name: String, val size: String) : MessageContent
+    /** A document; [music] files play inline like Telegram's audio player. */
+    data class File(
+        val name: String,
+        val size: String,
+        val file: ImageRef? = null,
+        val mime: String? = null,
+        val music: Boolean = false,
+        val duration: Int = 0,
+        val performer: String? = null,
+    ) : MessageContent
     data class Location(val title: String, val address: String) : MessageContent
     data class Contact(val name: String, val phone: String) : MessageContent
     data class Poll(val question: String, val options: List<String>, val votes: List<Int>, val voted: Int? = null, val quiz: Boolean = false) : MessageContent
@@ -136,6 +145,10 @@ data class Chat(
     val order: Long = 0,
     /** TDLib chat folders this chat is in. */
     val folderIds: Set<Int> = emptySet(),
+    /** False for public groups/channels opened from search that the user has not joined. */
+    val joined: Boolean = true,
+    /** Channels: whether the user may post (owner/admin). */
+    val canPost: Boolean = false,
 )
 
 @Immutable
@@ -154,6 +167,31 @@ data class Story(val userId: Long, val emoji: String, val colors: List<Long>, va
 
 @Immutable
 data class Session(val device: String, val app: String, val location: String, val lastActive: String, val current: Boolean = false, val id: Long = 0)
+
+/** Details shown on a profile page (bio / description, public link, members). */
+@Immutable
+data class ChatInfo(val about: String? = null, val link: String? = null, val memberCount: Int = 0, val members: List<Member> = emptyList())
+
+@Immutable
+data class Member(val userId: Long, val role: String? = null)
+
+/** Results of a server-side search: public chats/users and messages from all chats. */
+@Immutable
+data class GlobalResults(val chats: List<Chat>, val messages: List<Message>)
+
+/** A sticker from the user's sticker sets; [image] is a static preview, [animation] the .tgs if animated. */
+@Immutable
+data class StickerItem(val fileId: Int, val emoji: String, val image: ImageRef?, val animation: ImageRef?, val width: Int, val height: Int)
+
+@Immutable
+data class StickerPack(val id: Long, val title: String, val stickers: List<StickerItem>)
+
+/** A saved GIF (MP4 animation). */
+@Immutable
+data class GifItem(val fileId: Int, val thumb: ImageRef?, val width: Int, val height: Int, val duration: Int)
+
+/** Shared media tabs of a profile. */
+enum class MediaKind { Media, Files, Links, Voice, Gifs }
 
 /** Sample bubbles for the Appearance preview. */
 object BubbleDemo {

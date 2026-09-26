@@ -146,6 +146,38 @@ fun AttachSheet(visible: Boolean, onDismiss: () -> Unit, onSend: (List<MessageCo
         pickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
     }
 
+    fun sendDocuments(uris: List<Uri>) {
+        if (uris.isEmpty() || preparing) return
+        preparing = true
+        scope.launch {
+            val files = com.abtin.tglass.core.media.Files.prepareDocuments(context, uris)
+            preparing = false
+            if (files.isNotEmpty()) onSend(files)
+        }
+    }
+    val documentLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { sendDocuments(it) }
+    val toast = com.abtin.tglass.ui.components.LocalToast.current
+    fun sendLocation() {
+        if (preparing) return
+        preparing = true
+        scope.launch {
+            val loc = com.abtin.tglass.core.media.Files.currentLocation(context)
+            preparing = false
+            if (loc == null) toast.show("Location is not available. Turn on location and try again.")
+            else onSend(listOf(MessageContent.Location("Location", "%.6f, %.6f".format(java.util.Locale.US, loc.latitude, loc.longitude))))
+        }
+    }
+    val locationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
+        if (granted.values.any { it }) sendLocation() else toast.show("Allow location access to share your location")
+    }
+    fun requestLocation() {
+        val ok = listOf(android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION).any {
+            androidx.core.content.ContextCompat.checkSelfPermission(context, it) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        }
+        if (ok) sendLocation()
+        else locationPermission.launch(arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION))
+    }
+
     LaunchedEffect(visible, gallery.access, gallery.version) {
         if (visible && gallery.access) gallery.items = loadRecentMedia(context)
     }
@@ -253,12 +285,15 @@ fun AttachSheet(visible: Boolean, onDismiss: () -> Unit, onSend: (List<MessageCo
                         GlassBox(onClick = null, shape = Capsule(), modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp).fillMaxWidth().height(64.dp)) {
                             Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
                                 AttachType(TgIcons.AttGallery, "Gallery", selected = true) { openPicker() }
-                                AttachType(TgIcons.AttFile, "File") { onSend(listOf(MessageContent.File("Document.pdf", "2.4 MB"))) }
-                                AttachType(TgIcons.AttLocation, "Location") { onSend(listOf(MessageContent.Location("Current Location", "Azadi Tower, Tehran"))) }
-                                AttachType(TgIcons.AttPoll, "Poll") { onSend(listOf(MessageContent.Poll("What should we build next?", listOf("Stories editor", "Video calls", "Themes"), listOf(3, 5, 2)))) }
-                                AttachType(TgIcons.AttContact, "Contact") { onSend(listOf(MessageContent.Contact("Sara Ahmadi", "+98 912 111 2233"))) }
-                                AttachType(TgIcons.AttGift, "Gift") { onSend(listOf(MessageContent.Sticker("🎁"))) }
-                                AttachType(TgIcons.AttAudio, "Music") { onSend(listOf(MessageContent.File("Song.mp3", "4.8 MB"))) }
+                                AttachType(TgIcons.AttFile, "File") { runCatching { documentLauncher.launch(arrayOf("*/*")) } }
+                                AttachType(TgIcons.AttLocation, "Location") { requestLocation() }
+                                if (!repo.isLive) {
+                                    // Sample content for the demo; real polls/contacts/gifts need their own editors.
+                                    AttachType(TgIcons.AttPoll, "Poll") { onSend(listOf(MessageContent.Poll("What should we build next?", listOf("Stories editor", "Video calls", "Themes"), listOf(3, 5, 2)))) }
+                                    AttachType(TgIcons.AttContact, "Contact") { onSend(listOf(MessageContent.Contact("Sara Ahmadi", "+98 912 111 2233"))) }
+                                    AttachType(TgIcons.AttGift, "Gift") { onSend(listOf(MessageContent.Sticker("🎁"))) }
+                                }
+                                AttachType(TgIcons.AttAudio, "Music") { runCatching { documentLauncher.launch(arrayOf("audio/*")) } }
                             }
                         }
                     }

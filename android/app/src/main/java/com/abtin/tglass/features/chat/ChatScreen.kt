@@ -460,7 +460,12 @@ fun ChatScreen(chatId: Long) {
                         })
                         GlassIconButton(TgIcons.CtxForward, { if (selected.isNotEmpty()) forward(selected.toList()) })
                     }
-                    isChannel -> GlassBox(
+                    !chat.joined -> GlassBox(
+                        onClick = { repo.joinChat(chatId) },
+                        shape = Capsule(),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp).height(46.dp),
+                    ) { T(if (isChannel) "Join Channel" else "Join Group", TgTheme.type.body, c.accent, weight = FontWeight.SemiBold) }
+                    isChannel && !(repo.isLive && chat.canPost) -> GlassBox(
                         onClick = { repo.toggleMute(chatId) },
                         shape = Capsule(),
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp).height(46.dp),
@@ -508,6 +513,8 @@ fun ChatScreen(chatId: Long) {
                                 onSticker = { e -> repo.sendContent(chatId, MessageContent.Sticker(e), replyToId); replyToId = null },
                                 onGif = { i -> repo.sendContent(chatId, MessageContent.Photo(i + 3, 1.4f, null, "🎞"), replyToId); replyToId = null },
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                                onStickerItem = { st -> repo.sendSticker(chatId, st, replyToId); replyToId = null },
+                                onGifItem = { g -> repo.sendGif(chatId, g, replyToId); replyToId = null },
                             )
                         }
                     }

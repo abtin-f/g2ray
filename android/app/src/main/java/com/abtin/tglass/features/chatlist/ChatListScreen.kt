@@ -147,6 +147,17 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
     LaunchedEffect(searching, editing) { tabBar.hidden = searching || editing }
     DisposableEffect(Unit) { onDispose { tabBar.hidden = false } }
     LaunchedEffect(searching) { if (searching) searchFocus.requestFocus() }
+    // Server search (live accounts), debounced; results for an outdated query are dropped.
+    var global by remember { mutableStateOf<com.abtin.tglass.data.GlobalResults?>(null) }
+    val currentQuery = rememberUpdatedState(query.trim())
+    LaunchedEffect(query, searching) {
+        global = null
+        val q = query.trim()
+        if (searching && repo.isLive && q.length >= 2) {
+            kotlinx.coroutines.delay(350)
+            repo.searchGlobal(q) { r -> if (currentQuery.value == q) global = r }
+        }
+    }
     var handledSearch by rememberSaveable { mutableIntStateOf(tabBar.searchRequests) }
     LaunchedEffect(tabBar.searchRequests) {
         if (tabBar.searchRequests > handledSearch) {
@@ -223,7 +234,7 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
             contentPadding = PaddingValues(top = top + headerHeight + 4.dp + if (searching) 0.dp else storiesHeight, bottom = bottom + 112.dp),
         ) {
             if (searching) {
-                searchResults(repo, query, onOpen = { focus.clearFocus(); nav.push(Route.Chat(it)) })
+                searchResults(repo, query, global, onOpen = { focus.clearFocus(); nav.push(Route.Chat(it)) })
             } else {
                 item(key = "folders") {
                     if (folders.size > 1) FolderTabs(folders, folder, { folder = it }, unreadFor = { f -> all.count { ch -> inFolder(ch, f) && (ch.unread > 0 || ch.markedUnread) && !ch.muted } })
@@ -545,7 +556,7 @@ private fun StoriesRow(repo: TelegramRepository, fraction: Float, modifier: Modi
 }
 
 /** Spec §9 search: recent peers, chats and messages. */
-private fun androidx.compose.foundation.lazy.LazyListScope.searchResults(repo: TelegramRepository, query: String, onOpen: (Long) -> Unit) {
+private fun androidx.compose.foundation.lazy.LazyListScope.searchResults(repo: TelegramRepository, query: String, global: com.abtin.tglass.data.GlobalResults?, onOpen: (Long) -> Unit) {
     val q = query.trim()
     item(key = "filters") {
         var sel by remember { mutableIntStateOf(0) }
@@ -567,19 +578,47 @@ private fun androidx.compose.foundation.lazy.LazyListScope.searchResults(repo: T
         }
         return
     }
-    val chats = repo.chats.filter { it.title.contains(q, ignoreCase = true) }
-    val messages = repo.chats.flatMap { chat ->
+    val chats = repo.chats.filter { it.title.contains(q, ignoreCase = true) || it.username?.contains(q.removePrefix("@"), ignoreCase = true) == true }
+    val localMessages = repo.chats.flatMap { chat ->
         repo.messages(chat.id).filter { m ->
             m.content !is MessageContent.Service && m.preview.contains(q, ignoreCase = true)
         }.map { chat to it }
-    }.sortedByDescending { it.second.date }
-    if (chats.isEmpty() && messages.isEmpty()) {
-        item(key = "none") { EmptyState("🔍", "No Results", "There were no results for \"$q\".\nTry a new search.") }
+    }
+    val serverMessages = global?.messages.orEmpty().mapNotNull { m -> repo.chat(m.chatId)?.let { it to m } }
+    val messages = (localMessages + serverMessages).distinctBy { it.first.id to it.second.id }.sortedByDescending { it.second.date }
+    val publicChats = global?.chats.orEmpty().filter { pc -> chats.none { it.id == pc.id } }
+    if (chats.isEmpty() && messages.isEmpty() && publicChats.isEmpty()) {
+        if (repo.isLive && global == null && q.length >= 2) {
+            item(key = "searching") { Box(Modifier.fillMaxWidth().padding(top = 60.dp), contentAlignment = Alignment.Center) { com.abtin.tglass.ui.components.ActivityIndicator(24.dp) } }
+        } else {
+            item(key = "none") { EmptyState("🔍", "No Results", "There were no results for \"$q\".\nTry a new search.") }
+        }
         return
     }
     if (chats.isNotEmpty()) {
         item(key = "chatsHeader") { SectionHeader("Chats") }
         items(chats, key = { "c${it.id}" }) { chat -> ChatRow(chat, repo, onClick = { onOpen(chat.id) }) }
+    }
+    if (publicChats.isNotEmpty()) {
+        item(key = "globalHeader") { SectionHeader("Global Search") }
+        items(publicChats, key = { "g${it.id}" }) { chat ->
+            val c = TgTheme.colors
+            Row(
+                Modifier.fillMaxWidth().iosClickable { onOpen(chat.id) }.padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ChatAvatar(chat, repo, 48.dp)
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    T(chat.title, TgTheme.type.headline, c.text, maxLines = 1)
+                    val sub = listOfNotNull(
+                        chat.username?.let { "@$it" },
+                        chat.members.takeIf { it > 0 }?.let { "$it ${if (chat.type == ChatType.Channel) "subscribers" else "members"}" },
+                    ).joinToString(", ")
+                    if (sub.isNotEmpty()) T(sub, TgTheme.type.subheadline, c.secondaryText, maxLines = 1)
+                }
+            }
+        }
     }
     if (messages.isNotEmpty()) {
         item(key = "msgHeader") { SectionHeader("Messages") }

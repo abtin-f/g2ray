@@ -11,6 +11,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import com.abtin.tglass.BuildConfig
 import com.abtin.tglass.data.CallRecord
+import com.abtin.tglass.data.ChatInfo
+import com.abtin.tglass.data.GifItem
+import com.abtin.tglass.data.GlobalResults
+import com.abtin.tglass.data.StickerItem
+import com.abtin.tglass.data.StickerPack
+import com.abtin.tglass.data.MediaKind
+import com.abtin.tglass.data.Member
 import com.abtin.tglass.data.Entity
 import com.abtin.tglass.data.EntityType
 import com.abtin.tglass.data.ImageRef
@@ -116,6 +123,12 @@ class TdRepository(context: Context) : TelegramRepository {
     private val filePaths = mutableStateMapOf<Int, String>()
     private val fileProgressMap = mutableStateMapOf<Int, Float>()
     private val contactIds = mutableStateListOf<Long>()
+    private val chatInfos = mutableStateMapOf<Long, ChatInfo>()
+    private val sharedMediaStore = mutableStateMapOf<String, List<UiMessage>>()
+    private val packs = mutableStateListOf<StickerPack>()
+    private val recents = mutableStateListOf<StickerItem>()
+    private val gifs = mutableStateListOf<GifItem>()
+    private var stickersLoaded = false
     private val callList = mutableStateListOf<CallRecord>()
     private val sessionList = mutableStateListOf<UiSession>()
     private var connection by mutableStateOf<String?>("Connecting…")
@@ -177,6 +190,21 @@ class TdRepository(context: Context) : TelegramRepository {
             is UiContent.Photo -> inputMedia(content) ?: run {
                 _errors.tryEmit("This kind of message can't be sent yet")
                 return
+            }
+            is UiContent.File -> {
+                val path = content.file?.takeIf { it.fileId == 0 }?.path ?: run {
+                    _errors.tryEmit("This kind of message can't be sent yet")
+                    return
+                }
+                InputMessageDocument(InputDocument(InputFileLocal(path), null, false), null)
+            }
+            is UiContent.Location -> {
+                val parts = content.address.split(",").mapNotNull { it.trim().toDoubleOrNull() }
+                if (parts.size != 2) {
+                    _errors.tryEmit("This kind of message can't be sent yet")
+                    return
+                }
+                InputMessageLocation(Location(parts[0], parts[1], 0.0))
             }
             is UiContent.Voice -> {
                 val path = content.media?.path ?: run {
@@ -391,6 +419,10 @@ class TdRepository(context: Context) : TelegramRepository {
         }
     }
 
+    override fun joinChat(chatId: Long) {
+        scope.launch { client.joinChat(chatId).orReport() }
+    }
+
     override fun logOut() {
         scope.launch { client.logOut() }
     }
@@ -522,6 +554,8 @@ class TdRepository(context: Context) : TelegramRepository {
         downloading.clear(); fileProgressMap.clear(); historyLoading.clear(); historyComplete.clear(); openChats.clear()
         chatMap.clear(); userMap.clear(); lastMessages.clear(); messageStore.clear(); avatars.clear(); filePaths.clear()
         contactIds.clear(); callList.clear(); sessionList.clear(); folderInfos = emptyList()
+        chatInfos.clear(); sharedMediaStore.clear()
+        packs.clear(); recents.clear(); gifs.clear(); stickersLoaded = false
         myId = 0
     }
 
@@ -879,6 +913,8 @@ class TdRepository(context: Context) : TelegramRepository {
         var members = 0
         var verified = false
         var username: String? = null
+        var joined = true
+        var canPost = false
         val type = when (val t = st.type) {
             is ChatTypePrivate -> {
                 peer = t.userId
@@ -898,6 +934,8 @@ class TdRepository(context: Context) : TelegramRepository {
                 members = sg?.memberCount ?: 0
                 verified = sg?.verificationStatus?.isVerified == true
                 username = sg?.usernames?.activeUsernames?.firstOrNull()
+                joined = sg?.status.let { it !is ChatMemberStatusLeft && it !is ChatMemberStatusBanned }
+                canPost = sg?.status.let { it is ChatMemberStatusCreator || it is ChatMemberStatusAdministrator }
                 if (t.isChannel) UiChatType.Channel else UiChatType.Group
             }
             else -> UiChatType.Private
@@ -924,6 +962,8 @@ class TdRepository(context: Context) : TelegramRepository {
             username = username,
             order = pos?.order ?: 0L,
             folderIds = st.positions.values.mapNotNull { p -> (p.list as? ChatListFolder)?.chatFolderId?.takeIf { p.order != 0L } }.toSet(),
+            joined = joined,
+            canPost = canPost,
         )
     }
 
@@ -1078,10 +1118,20 @@ class TdRepository(context: Context) : TelegramRepository {
         )
         is MessageVoiceNote -> UiContent.Voice(c.voiceNote.duration, waveform(c.voiceNote.waveform), imageOf(c.voiceNote.voice, null))
         is MessageAudio -> UiContent.File(
-            listOf(c.audio.performer, c.audio.title).filter { it.isNotBlank() }.joinToString(" – ").ifBlank { c.audio.fileName },
-            Formats.size(c.audio.audio.size),
+            name = c.audio.title.ifBlank { c.audio.fileName.ifBlank { "Audio" } },
+            size = Formats.size(c.audio.audio.size),
+            file = imageOf(c.audio.audio, null),
+            mime = c.audio.mimeType,
+            music = true,
+            duration = c.audio.duration,
+            performer = c.audio.performer.ifBlank { null },
         )
-        is MessageDocument -> UiContent.File(c.document.fileName.ifBlank { "File" }, Formats.size(c.document.document.size))
+        is MessageDocument -> UiContent.File(
+            name = c.document.fileName.ifBlank { "File" },
+            size = Formats.size(c.document.document.size),
+            file = imageOf(c.document.document, null),
+            mime = c.document.mimeType,
+        )
         is MessageSticker -> {
             val s = c.sticker
             val image = when {
@@ -1153,6 +1203,136 @@ class TdRepository(context: Context) : TelegramRepository {
             is TextEntityTypeEmailAddress -> Entity(e.offset, end, EntityType.Email)
             is TextEntityTypePhoneNumber -> Entity(e.offset, end, EntityType.Phone)
             else -> null
+        }
+    }
+
+    override fun chatInfo(chatId: Long): ChatInfo? = chatInfos[chatId]
+
+    override fun loadChatInfo(chatId: Long) {
+        val st = chatStates[chatId] ?: return
+        scope.launch {
+            val info = when (val t = st.type) {
+                is ChatTypePrivate -> {
+                    val full = client.getUserFullInfo(t.userId)
+                    ChatInfo(
+                        about = if (full is TdlResult.Success) full.result.bio?.text?.ifBlank { null } else null,
+                        link = rawUsers[t.userId]?.usernames?.activeUsernames?.firstOrNull(),
+                    )
+                }
+                is ChatTypeBasicGroup -> {
+                    val r = client.getBasicGroupFullInfo(t.basicGroupId)
+                    if (r !is TdlResult.Success) return@launch
+                    ChatInfo(
+                        about = r.result.description.ifBlank { null },
+                        link = r.result.inviteLink?.inviteLink,
+                        memberCount = r.result.members.size,
+                        members = r.result.members.mapNotNull { member(it) },
+                    )
+                }
+                is ChatTypeSupergroup -> {
+                    val r = client.getSupergroupFullInfo(t.supergroupId)
+                    if (r !is TdlResult.Success) return@launch
+                    val full = r.result
+                    val members = if (!t.isChannel && full.canGetMembers) {
+                        val m = client.getSupergroupMembers(t.supergroupId, SupergroupMembersFilterRecent(), 0, 100)
+                        if (m is TdlResult.Success) m.result.members.mapNotNull { member(it) } else emptyList()
+                    } else emptyList()
+                    ChatInfo(
+                        about = full.description.ifBlank { null },
+                        link = supergroups[t.supergroupId]?.usernames?.activeUsernames?.firstOrNull() ?: full.inviteLink?.inviteLink,
+                        memberCount = full.memberCount,
+                        members = members,
+                    )
+                }
+                else -> return@launch
+            }
+            chatInfos[chatId] = info
+        }
+    }
+
+    private fun member(m: ChatMember): Member? {
+        val id = (m.memberId as? MessageSenderUser)?.userId ?: return null
+        val role = when (m.status) {
+            is ChatMemberStatusCreator -> "owner"
+            is ChatMemberStatusAdministrator -> "admin"
+            else -> null
+        }
+        return Member(id, role)
+    }
+
+    override fun sharedMedia(chatId: Long, kind: MediaKind): List<UiMessage> = sharedMediaStore["$chatId:$kind"] ?: emptyList()
+
+    override fun loadSharedMedia(chatId: Long, kind: MediaKind) {
+        val filter: SearchMessagesFilter = when (kind) {
+            MediaKind.Media -> SearchMessagesFilterPhotoAndVideo()
+            MediaKind.Files -> SearchMessagesFilterDocument()
+            MediaKind.Links -> SearchMessagesFilterUrl()
+            MediaKind.Voice -> SearchMessagesFilterVoiceNote()
+            MediaKind.Gifs -> SearchMessagesFilterAnimation()
+        }
+        scope.launch {
+            val r = client.searchChatMessages(chatId = chatId, query = "", fromMessageId = 0, offset = 0, limit = 90, filter = filter)
+            if (r is TdlResult.Success) sharedMediaStore["$chatId:$kind"] = r.result.messages.map { mapMessage(it) }
+        }
+    }
+
+    override val stickerPacks: List<StickerPack> get() = packs
+    override val recentStickers: List<StickerItem> get() = recents
+    override val savedGifs: List<GifItem> get() = gifs
+
+    override fun loadStickers() {
+        if (stickersLoaded) return
+        stickersLoaded = true
+        scope.launch {
+            val recent = client.getRecentStickers(false)
+            if (recent is TdlResult.Success) { recents.clear(); recents.addAll(recent.result.stickers.map { stickerItem(it) }) }
+            val saved = client.getSavedAnimations()
+            if (saved is TdlResult.Success) {
+                gifs.clear()
+                gifs.addAll(saved.result.animations.map { a ->
+                    GifItem(a.animation.id, a.thumbnail?.let { imageOf(it.file, a.minithumbnail, it.width, it.height) }, a.width, a.height, a.duration)
+                })
+            }
+            val sets = client.getInstalledStickerSets(StickerTypeRegular())
+            if (sets is TdlResult.Success) {
+                packs.clear()
+                for (info in sets.result.sets.take(40)) {
+                    val set = client.getStickerSet(info.id)
+                    if (set is TdlResult.Success) packs.add(StickerPack(info.id, info.title, set.result.stickers.map { stickerItem(it) }))
+                }
+            }
+        }
+    }
+
+    private fun stickerItem(s: Sticker): StickerItem {
+        val thumb = s.thumbnail?.takeIf { it.format is ThumbnailFormatWebp || it.format is ThumbnailFormatJpeg }
+        return StickerItem(
+            fileId = s.sticker.id,
+            emoji = s.emoji,
+            image = if (s.format is StickerFormatWebp) imageOf(s.sticker, null) else thumb?.let { imageOf(it.file, null) },
+            animation = if (s.format is StickerFormatTgs) imageOf(s.sticker, null) else null,
+            width = s.width,
+            height = s.height,
+        )
+    }
+
+    override fun sendSticker(chatId: Long, sticker: StickerItem, replyTo: Long?) {
+        send(chatId, replyTo, InputMessageSticker(InputFileId(sticker.fileId), null, sticker.width, sticker.height, sticker.emoji))
+    }
+
+    override fun sendGif(chatId: Long, gif: GifItem, replyTo: Long?) {
+        send(chatId, replyTo, InputMessageAnimation(InputAnimation(InputFileId(gif.fileId), null, IntArray(0), gif.duration, gif.width, gif.height), null, false, false))
+    }
+
+    override fun searchGlobal(query: String, onResult: (GlobalResults) -> Unit) {
+        scope.launch {
+            val publicChats = if (query.length >= 4) {
+                val r = client.searchPublicChats(query)
+                if (r is TdlResult.Success) r.result.chatIds.mapNotNull { chatMap[it] } else emptyList()
+            } else emptyList()
+            val found = client.searchMessages(query = query, offset = "", limit = 40, minDate = 0, maxDate = 0)
+            val messages = if (found is TdlResult.Success) found.result.messages.map { mapMessage(it) } else emptyList()
+            onResult(GlobalResults(publicChats, messages))
         }
     }
 
