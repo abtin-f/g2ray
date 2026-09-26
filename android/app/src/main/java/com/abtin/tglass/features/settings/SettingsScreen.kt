@@ -84,6 +84,7 @@ import com.abtin.tglass.ui.components.LocalToast
 import com.abtin.tglass.ui.components.Section
 import com.abtin.tglass.ui.components.SheetAction
 import com.abtin.tglass.ui.components.SheetRequest
+import com.abtin.tglass.ui.components.SegmentedControl
 import com.abtin.tglass.ui.components.T
 import com.abtin.tglass.ui.components.CollapsedTitle
 import com.abtin.tglass.ui.components.IosIcons
@@ -255,6 +256,20 @@ fun SettingsPageScreen(page: Page) {
 private fun LazyListScope.gap() = item { Spacer(Modifier.height(24.dp)) }
 
 private fun LazyListScope.appearance() {
+    item {
+        val s = LocalAppSettings.current
+        Section(header = "Chat List", footer = "Compact matches Telegram for iPhone. Larger sizes show bigger photos and text.") {
+            Box(Modifier.padding(12.dp)) {
+                SegmentedControl(
+                    com.abtin.tglass.core.design.ChatListSize.entries.map { it.title },
+                    s.chatListSize.ordinal,
+                    { s.updateChatListSize(com.abtin.tglass.core.design.ChatListSize.entries[it]) },
+                    Modifier.fillMaxWidth(),
+                )
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+    }
     item {
         val s = LocalAppSettings.current
         val c = TgTheme.colors

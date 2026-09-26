@@ -172,6 +172,14 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
     val storiesMax = with(density) { 104.dp.toPx() }
     var storiesPx by rememberSaveable { mutableFloatStateOf(0f) }
     val storiesFraction = (storiesPx / storiesMax).coerceIn(0f, 1f)
+    // Like Telegram iOS 26, the stories row starts expanded at the top of the list; scrolling collapses it.
+    var storiesShownOnce by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(storyUsers.isNotEmpty()) {
+        if (storyUsers.isNotEmpty() && !storiesShownOnce) {
+            storiesShownOnce = true
+            animate(storiesPx, storiesMax, animationSpec = spring(dampingRatio = 0.85f, stiffness = 380f)) { v, _ -> storiesPx = v }
+        }
+    }
     val storiesConnection = remember(storiesMax) {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
@@ -404,9 +412,16 @@ private fun ChatsTitle(stories: List<Pair<Long, String>>, status: String?, colla
 @Composable
 private fun FolderTabs(folders: List<String>, selected: Int, onSelect: (Int) -> Unit, unreadFor: (Int) -> Int) {
     val c = TgTheme.colors
+    // Telegram iOS 26: the folder tabs sit in one glass capsule, the selected tab in a lighter pill.
+    com.abtin.tglass.core.glass.GlassBox(
+        onClick = null,
+        shape = Capsule(),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp).height(42.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
     Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         folders.forEachIndexed { i, f ->
@@ -432,6 +447,7 @@ private fun FolderTabs(folders: List<String>, selected: Int, onSelect: (Int) -> 
                 }
             }
         }
+    }
     }
 }
 
@@ -499,11 +515,11 @@ private fun ArchiveRow(archived: List<Chat>, repo: TelegramRepository, onClick: 
             Modifier
                 .fillMaxWidth()
                 .iosClickable(onClick = onClick)
-                .height(72.dp)
-                .padding(start = 16.dp, end = 12.dp),
+                .height(com.abtin.tglass.core.design.LocalAppSettings.current.chatListSize.row.dp)
+                .padding(start = 14.dp, end = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Avatar("Archive", 0, 60.dp, iconRes = TgIcons.IcArchiveLarge, iconColors = Color(0xFFDEDEE5) to Color(0xFFC5C6CC))
+            Avatar("Archive", 0, com.abtin.tglass.core.design.LocalAppSettings.current.chatListSize.avatar.dp, iconRes = TgIcons.IcArchiveLarge, iconColors = Color(0xFFDEDEE5) to Color(0xFFC5C6CC))
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {

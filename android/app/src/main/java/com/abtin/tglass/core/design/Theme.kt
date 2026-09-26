@@ -203,6 +203,13 @@ enum class GlassLevel(val title: String) {
 }
 
 /** User-tunable appearance settings, persisted in SharedPreferences. */
+/** Chat list density (Settings → Appearance → Chat List). Compact matches Telegram iOS 26. */
+enum class ChatListSize(val title: String, val row: Int, val avatar: Int, val titleSp: Float, val previewSp: Float) {
+    Compact("Compact", 64, 52, 15f, 14f),
+    Regular("Regular", 72, 60, 16f, 15f),
+    Large("Large", 80, 64, 17f, 16f),
+}
+
 class AppSettings(context: Context) {
     private val prefs = context.getSharedPreferences("tglass", Context.MODE_PRIVATE)
 
@@ -229,6 +236,8 @@ class AppSettings(context: Context) {
     /** Glass banner at the top for messages in other chats while the app is open. */
     var inAppPreview by mutableStateOf(prefs.getBoolean("inAppPreview", true))
         private set
+    var chatListSize by mutableStateOf(ChatListSize.entries.getOrElse(prefs.getInt("chatListSize", 0)) { ChatListSize.Compact })
+        private set
     var autoplayVideo by mutableStateOf(prefs.getBoolean("autoplayVideo", true))
         private set
     var autoplayGif by mutableStateOf(prefs.getBoolean("autoplayGif", true))
@@ -241,6 +250,7 @@ class AppSettings(context: Context) {
     fun updateBubbleRadius(v: Float) { bubbleRadius = v; prefs.edit().putFloat("bubbleRadius", v).apply() }
     fun updateWallpaper(v: Int) { wallpaperIndex = v; prefs.edit().putInt("wallpaper", v).apply() }
     fun updateLoggedIn(v: Boolean) { loggedIn = v; prefs.edit().putBoolean("loggedIn", v).apply() }
+    fun updateChatListSize(v: ChatListSize) { chatListSize = v; prefs.edit().putInt("chatListSize", v.ordinal).apply() }
     fun updateDemoMode(v: Boolean) { demoMode = v; prefs.edit().putBoolean("demoMode", v).apply() }
     fun updateBackgroundConnection(v: Boolean) { backgroundConnection = v; prefs.edit().putBoolean("bgConnection", v).apply() }
     fun updateInAppPreview(v: Boolean) { inAppPreview = v; prefs.edit().putBoolean("inAppPreview", v).apply() }

@@ -109,6 +109,7 @@ fun ChatRow(
     onLongClick: (() -> Unit)? = null,
 ) {
     val c = TgTheme.colors
+    val size = com.abtin.tglass.core.design.LocalAppSettings.current.chatListSize
     val last = repo.lastMessage(chat.id)
     val bg = if (chat.pinned) c.pinnedRow else c.background
     Box(modifier.fillMaxWidth().background(bg)) {
@@ -116,8 +117,8 @@ fun ChatRow(
             Modifier
                 .fillMaxWidth()
                 .iosClickable(onLongClick = onLongClick, onClick = onClick)
-                .height(72.dp)
-                .padding(start = 16.dp, end = 12.dp),
+                .height(size.row.dp)
+                .padding(start = 14.dp, end = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (editing) {
@@ -130,11 +131,11 @@ fun ChatRow(
                     contentAlignment = Alignment.Center,
                 ) { if (selected) Icon(IosIcons.Checkmark, Color.White, 15.dp) }
             }
-            ChatAvatar(chat, repo, 60.dp)
+            ChatAvatar(chat, repo, size.avatar.dp)
             Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f).fillMaxHeight().padding(top = 8.dp, bottom = 6.dp)) {
+            Column(Modifier.weight(1f).fillMaxHeight().padding(top = if (size == com.abtin.tglass.core.design.ChatListSize.Compact) 6.dp else 8.dp, bottom = 5.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    T(chat.title, TgTheme.type.headline.copy(fontSize = TgTheme.type.headline.fontSize * (16f / 17f), lineHeight = TgTheme.type.headline.fontSize * (20f / 17f)), c.text, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                    T(chat.title, TgTheme.type.headline.copy(fontSize = size.titleSp.sp, lineHeight = (size.titleSp + 4f).sp), c.text, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
                     if (chat.verified) {
                         Spacer(Modifier.width(3.dp))
                         VerifiedBadge(16.dp)
@@ -154,7 +155,7 @@ fun ChatRow(
                         Icon(icon, tint, 17.dp)
                         Spacer(Modifier.width(3.dp))
                     }
-                    if (last != null) T(formatListDate(last.date), TgTheme.type.subheadline.copy(fontSize = 14.sp), c.secondaryText, maxLines = 1)
+                    if (last != null) T(formatListDate(last.date), TgTheme.type.subheadline.copy(fontSize = (size.previewSp - 0.5f).sp), c.secondaryText, maxLines = 1)
                 }
                 Spacer(Modifier.height(1.dp))
                 Row(Modifier.weight(1f)) {
@@ -176,7 +177,7 @@ fun ChatRow(
                 }
             }
         }
-        Separator(Modifier.align(Alignment.BottomStart), startPadding = if (editing) 120.dp else 86.dp)
+        Separator(Modifier.align(Alignment.BottomStart), startPadding = (14 + size.avatar + 10 + if (editing) 34 else 0).dp)
     }
 }
 
@@ -184,8 +185,9 @@ fun ChatRow(
 private fun ChatPreviewText(chat: Chat, repo: TelegramRepository) {
     val c = TgTheme.colors
     val last = repo.lastMessage(chat.id)
-    // 15pt text on tight 18pt lines so title + two preview lines fit the 72pt row (Telegram-iOS ChatListItem).
-    val style = TgTheme.type.subheadline.copy(lineHeight = TgTheme.type.subheadline.fontSize * 1.2f)
+    // Tight lines so the title + two preview lines fit the row (Telegram-iOS ChatListItem).
+    val size = com.abtin.tglass.core.design.LocalAppSettings.current.chatListSize
+    val style = TgTheme.type.subheadline.copy(fontSize = size.previewSp.sp, lineHeight = (size.previewSp * 1.2f).sp)
     when {
         chat.typing != null -> TypingText(chat.typing, style, c.accent, Modifier.padding(top = 2.dp))
         chat.draft != null -> Row {
