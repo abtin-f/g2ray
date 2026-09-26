@@ -2050,6 +2050,68 @@ class TdRepository(context: Context) : TelegramRepository {
         }
     }
 
+
+    // ---- Contacts, media, calls ----
+
+    override fun addContact(firstName: String, lastName: String, phone: String, onDone: (userId: Long?, error: String?) -> Unit) {
+        val number = phone.filter { it.isDigit() || it == '+' }
+        scope.launch {
+            val r = client.importContacts(arrayOf(ImportedContact(number, firstName.trim(), lastName.trim(), null)))
+            if (r is TdlResult.Failure) {
+                onDone(null, humanize(r.message))
+                return@launch
+            }
+            val userId = if (r is TdlResult.Success) r.result.userIds.firstOrNull() ?: 0L else 0L
+            if (userId == 0L) {
+                // The number is not registered on Telegram.
+                onDone(null, null)
+                return@launch
+            }
+            client.getUser(userId).let { u -> if (u is TdlResult.Success) onUser(u.result) }
+            if (userId !in contactIds) contactIds.add(userId)
+            client.createPrivateChat(userId, false)
+            onDone(userId, null)
+        }
+    }
+
+    override fun removeContact(userId: Long, onDone: (String?) -> Unit) {
+        scope.launch {
+            val r = client.removeContacts(longArrayOf(userId))
+            if (r is TdlResult.Failure) {
+                onDone(humanize(r.message))
+            } else {
+                contactIds.remove(userId)
+                client.getUser(userId).let { u -> if (u is TdlResult.Success) onUser(u.result) }
+                onDone(null)
+            }
+        }
+    }
+
+    override fun lastSeenOrder(userId: Long): Long {
+        val now = System.currentTimeMillis() / 1000L
+        return when (val s = rawUsers[userId]?.status) {
+            is UserStatusOnline -> Long.MAX_VALUE
+            is UserStatusOffline -> s.wasOnline.toLong()
+            is UserStatusRecently -> now - 3L * 86_400L
+            is UserStatusLastWeek -> now - 7L * 86_400L
+            is UserStatusLastMonth -> now - 30L * 86_400L
+            else -> 0L
+        }
+    }
+
+    override fun deleteCallRecords(records: List<CallRecord>) {
+        if (records.isEmpty()) return
+        scope.launch {
+            records.groupBy { it.chatId }.forEach { (chatId, list) ->
+                val r = client.deleteMessages(chatId, list.map { it.id }.toLongArray(), false)
+                if (r is TdlResult.Success) {
+                    val ids = list.map { it.id }.toSet()
+                    callList.removeAll { it.chatId == chatId && it.id in ids }
+                } else r.orReport()
+            }
+        }
+    }
+    // ---- end Contacts, media, calls ----
 }
 
 /** Process-wide TDLib instance (TDLib must not be created twice for the same database). */

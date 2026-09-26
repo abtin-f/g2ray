@@ -190,6 +190,8 @@ data class CallRecord(
     val missed: Boolean,
     val video: Boolean,
     val durationSec: Int,
+    /** Chat that holds the call message (the private chat with [userId]); [id] is that message's id. */
+    val chatId: Long = userId,
 )
 
 /**

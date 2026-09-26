@@ -45,6 +45,13 @@ import com.abtin.tglass.ui.components.GlassTextButton
 import com.abtin.tglass.ui.components.GlassTopBar
 import com.abtin.tglass.ui.components.Icon
 import com.abtin.tglass.ui.components.LocalToast
+import com.abtin.tglass.ui.components.LocalActionSheet
+import com.abtin.tglass.ui.components.SheetAction
+import com.abtin.tglass.ui.components.SheetRequest
+import com.abtin.tglass.core.media.Sharing
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.material.icons.rounded.ErrorOutline
 import com.abtin.tglass.ui.components.SearchField
 import com.abtin.tglass.ui.components.Separator
 import com.abtin.tglass.ui.components.T
@@ -61,14 +68,45 @@ fun ContactsScreen(backdrop: LayerBackdrop, isTab: Boolean) {
     val repo = LocalRepository.current
     val nav = LocalNavigator.current
     val toast = LocalToast.current
+    val sheet = LocalActionSheet.current
+    val context = LocalContext.current
     val c = TgTheme.colors
     var query by remember { mutableStateOf("") }
-    var byName by remember { mutableStateOf(false) }
+    var byName by rememberSaveable { mutableStateOf(false) }
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val contacts = repo.contacts
-        .filter { query.isBlank() || it.name.contains(query, true) }
-        .let { list -> if (byName) list.sortedBy { it.name } else list.sortedWith(compareByDescending<User> { it.online }.thenBy { it.name }) }
+        .filter { query.isBlank() || it.name.contains(query.trim(), true) }
+        .let { list ->
+            if (byName) list.sortedBy { it.name.lowercase() }
+            else list.sortedWith(compareByDescending<User> { repo.lastSeenOrder(it.id) }.thenBy { it.name.lowercase() })
+        }
+
+    fun sortOptions() {
+        sheet.show(SheetRequest(title = "Sort Contacts", actions = listOf(
+            SheetAction("by Last Seen Time", bold = !byName) { byName = false },
+            SheetAction("by Name", bold = byName) { byName = true },
+        )))
+    }
+
+    fun contactOptions(u: User) {
+        sheet.show(SheetRequest(title = u.name, actions = listOf(
+            SheetAction("Send Message") { nav.push(Route.Chat(repo.privateChatWith(u.id))) },
+            SheetAction("Delete Contact", destructive = true) {
+                sheet.show(SheetRequest(
+                    title = "Delete Contact",
+                    message = "Are you sure you want to delete ${u.name} from your contacts?",
+                    actions = listOf(SheetAction("Delete", destructive = true) {
+                        repo.removeContact(u.id) { error ->
+                            if (error != null) toast.show(error, Icons.Rounded.ErrorOutline)
+                            else toast.show("${u.name} deleted from contacts")
+                        }
+                    }),
+                    alert = true,
+                ))
+            },
+        )))
+    }
 
     Box(Modifier.fillMaxSize().background(c.background)) {
         LazyColumn(
@@ -76,14 +114,20 @@ fun ContactsScreen(backdrop: LayerBackdrop, isTab: Boolean) {
             contentPadding = PaddingValues(top = top + 62.dp, bottom = bottom + if (isTab) 110.dp else 20.dp),
         ) {
             item { SearchField(query, { query = it }, Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) }
-            item { ActionRow(TgIcons.CtInvite, "Invite Friends") { toast.show("Invite link copied") } }
-            item { ActionRow(TgIcons.CtAddMember, "Add Contact") { toast.show("Add contact") } }
-            items(contacts, key = { it.id }) { u -> ContactRow(u) { nav.push(Route.Chat(repo.privateChatWith(u.id))) } }
+            item {
+                ActionRow(TgIcons.CtInvite, "Invite Friends") {
+                    if (!Sharing.shareText(context, Sharing.InviteText, "Invite Friends")) toast.show("No app to share the invitation", Icons.Rounded.ErrorOutline)
+                }
+            }
+            item { ActionRow(TgIcons.CtAddMember, "Add Contact") { nav.push(Route.NewContact) } }
+            items(contacts, key = { it.id }) { u ->
+                ContactRow(u, onLongClick = { contactOptions(u) }) { nav.push(Route.Chat(repo.privateChatWith(u.id))) }
+            }
         }
         GlassTopBar(
             title = "Contacts",
-            left = { GlassTextButton("Sort", { byName = !byName; toast.show(if (byName) "Sorted by name" else "Sorted by last seen") }) },
-            right = { GlassIconButton(IosIcons.Plus, { toast.show("New contact") }, iconSize = 22.dp) },
+            left = { GlassTextButton("Sort", { sortOptions() }) },
+            right = { GlassIconButton(IosIcons.Plus, { nav.push(Route.NewContact) }, iconSize = 22.dp) },
         )
     }
 }
@@ -105,11 +149,11 @@ private fun ActionRow(icon: Int, title: String, onClick: () -> Unit) {
 }
 
 @Composable
-fun ContactRow(u: User, onClick: () -> Unit) {
+fun ContactRow(u: User, onLongClick: (() -> Unit)? = null, onClick: () -> Unit) {
     val c = TgTheme.colors
     Box {
         Row(
-            Modifier.fillMaxWidth().iosClickable(onClick = onClick).height(58.dp).padding(horizontal = 14.dp),
+            Modifier.fillMaxWidth().iosClickable(onLongClick = onLongClick, onClick = onClick).height(58.dp).padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Avatar(u.name, u.id, 42.dp)
@@ -139,7 +183,7 @@ fun NewMessageScreen() {
             LazyColumn(Modifier.fillMaxSize().layerBackdrop(backdrop), contentPadding = PaddingValues(top = top + 62.dp, bottom = 30.dp)) {
                 item { SearchField(query, { query = it }, Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) }
                 item { ActionRow(TgIcons.CtCreateGroup, "New Group") { nav.push(Route.NewGroup) } }
-                item { ActionRow(TgIcons.CtAddMember, "New Contact") { toast.show("New contact") } }
+                item { ActionRow(TgIcons.CtAddMember, "New Contact") { nav.push(Route.NewContact) } }
                 item { ActionRow(TgIcons.CtCreateChannel, "New Channel") { nav.push(Route.NewChannel) } }
                 var letter = ' '
                 contacts.forEach { u ->

@@ -54,6 +54,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -62,7 +63,12 @@ import com.abtin.tglass.core.glass.GlassIconButton
 import com.abtin.tglass.core.glass.LocalBackdrop
 import com.abtin.tglass.core.navigation.LocalNavigator
 import com.abtin.tglass.core.navigation.Route
+import com.abtin.tglass.data.CallRecord
 import com.abtin.tglass.features.main.LocalRepository
+import com.abtin.tglass.ui.components.LocalActionSheet
+import com.abtin.tglass.ui.components.LocalToast
+import com.abtin.tglass.ui.components.SheetAction
+import com.abtin.tglass.ui.components.SheetRequest
 import com.abtin.tglass.ui.components.Avatar
 import com.abtin.tglass.ui.components.EmptyState
 import com.abtin.tglass.ui.components.GlassTextButton
@@ -84,30 +90,71 @@ import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import kotlinx.coroutines.delay
 
-/** Spec §30: recent calls. */
+/**
+ * Spec §30: recent calls. Real accounts show their call history (tap opens the chat, Edit deletes entries);
+ * placing calls is handed off to the official app (see [requestCall]).
+ */
 @Composable
 fun CallsScreen(backdrop: LayerBackdrop, isTab: Boolean) {
     val repo = LocalRepository.current
     val nav = LocalNavigator.current
+    val sheet = LocalActionSheet.current
+    val toast = LocalToast.current
+    val context = LocalContext.current
     val c = TgTheme.colors
     var filter by remember { mutableIntStateOf(0) }
+    var editing by remember { mutableStateOf(false) }
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val calls = repo.calls.filter { filter == 0 || it.missed }
+    LaunchedEffect(calls.isEmpty()) { if (calls.isEmpty()) editing = false }
+
+    fun confirmDelete(records: List<CallRecord>, title: String) {
+        if (records.isEmpty()) return
+        sheet.show(SheetRequest(actions = listOf(SheetAction(title, destructive = true) { repo.deleteCallRecords(records) })))
+    }
+
+    fun newCall() {
+        if (repo.isLive) {
+            requestNewCall(context, sheet, toast)
+        } else {
+            val people = repo.contacts.take(6)
+            sheet.show(SheetRequest(title = "New Call", actions = people.map { u ->
+                SheetAction(u.name) { requestCall(context, repo, nav, sheet, toast, u.id, video = false) }
+            }))
+        }
+    }
 
     Box(Modifier.fillMaxSize().background(c.background)) {
         LazyColumn(
             Modifier.fillMaxSize().layerBackdrop(backdrop),
             contentPadding = PaddingValues(top = top + 62.dp, bottom = bottom + if (isTab) 110.dp else 20.dp),
         ) {
-            if (calls.isEmpty()) item { EmptyState("📞", "No Missed Calls", "Your missed calls will appear here.") }
-            items(calls, key = { it.id }) { call ->
+            if (calls.isEmpty()) item {
+                if (filter == 1) EmptyState("📞", "No Missed Calls", "Your missed calls will appear here.")
+                else EmptyState("📞", "No Recent Calls", "Your recent calls will appear here.")
+            }
+            items(calls, key = { "${it.chatId}:${it.id}" }) { call ->
                 val u = repo.user(call.userId) ?: return@items
+                val deleteOne = { confirmDelete(listOf(call), "Delete from Call History") }
                 Box {
                     Row(
-                        Modifier.fillMaxWidth().iosClickable { nav.push(Route.ActiveCall(u.id, call.video)) }.height(62.dp).padding(start = 14.dp, end = 8.dp),
+                        Modifier
+                            .fillMaxWidth()
+                            .iosClickable(onLongClick = deleteOne) {
+                                if (editing) deleteOne() else nav.push(Route.Chat(repo.privateChatWith(u.id)))
+                            }
+                            .height(62.dp)
+                            .padding(start = 14.dp, end = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        if (editing) {
+                            Box(Modifier.size(34.dp).fadeClickable(onClick = deleteOne), contentAlignment = Alignment.CenterStart) {
+                                Box(Modifier.size(22.dp).clip(CircleShape).background(c.destructive), contentAlignment = Alignment.Center) {
+                                    Box(Modifier.width(11.dp).height(2.dp).background(Color.White))
+                                }
+                            }
+                        }
                         Avatar(u.name, u.id, 42.dp)
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
@@ -120,22 +167,40 @@ fun CallsScreen(backdrop: LayerBackdrop, isTab: Boolean) {
                             }
                         }
                         T(formatListDate(call.date), TgTheme.type.subheadline, c.secondaryText)
-                        Box(Modifier.size(40.dp).fadeClickable { nav.push(Route.UserProfile(u.id)) }, contentAlignment = Alignment.Center) {
-                            Icon(TgIcons.ClInfo, c.accent, 26.dp)
-                        }
+                        if (!editing) {
+                            Box(Modifier.size(40.dp).fadeClickable { nav.push(Route.UserProfile(u.id)) }, contentAlignment = Alignment.Center) {
+                                Icon(TgIcons.ClInfo, c.accent, 26.dp)
+                            }
+                        } else Spacer(Modifier.width(8.dp))
                     }
-                    Separator(Modifier.align(Alignment.BottomStart), startPadding = 68.dp)
+                    Separator(Modifier.align(Alignment.BottomStart), startPadding = if (editing) 102.dp else 68.dp)
                 }
             }
         }
         GlassTopBar(
             title = null,
             left = {
-                if (isTab) GlassTextButton("Edit", {})
+                if (isTab) GlassTextButton(if (editing) "Done" else "Edit", { if (editing || calls.isNotEmpty()) editing = !editing }, bold = editing)
                 else BackButton({ nav.pop() })
             },
             center = { SegmentedControl(listOf("All", "Missed"), filter, { filter = it }, Modifier.width(180.dp)) },
-            right = { GlassIconButton(TgIcons.ClNewCall, {}) },
+            right = {
+                if (editing) {
+                    GlassTextButton("Clear", {
+                        confirmDelete(calls, if (filter == 1) "Clear Missed Calls" else "Clear Call History")
+                    }, color = c.destructive)
+                    if (!isTab) {
+                        Spacer(Modifier.width(8.dp))
+                        GlassTextButton("Done", { editing = false }, bold = true)
+                    }
+                } else {
+                    if (!isTab && calls.isNotEmpty()) {
+                        GlassTextButton("Edit", { editing = true })
+                        Spacer(Modifier.width(8.dp))
+                    }
+                    GlassIconButton(TgIcons.ClNewCall, { newCall() })
+                }
+            },
         )
     }
 }
