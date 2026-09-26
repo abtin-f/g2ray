@@ -447,6 +447,7 @@ fun ChatListItem(
 ) {
     val menu = LocalContextMenu.current
     val nav = LocalNavigator.current
+    val sheet = LocalActionSheet.current
     val bounds = remember { arrayOf(Rect.Zero) }
     val key = "chat-${chat.id}"
     val (leading, trailing) = chatSwipeActions(chat, repo, onDelete)
@@ -475,7 +476,7 @@ fun ChatListItem(
                             actions = listOfNotNull(
                                 MenuAction(if (unread) "Mark as Read" else "Mark as Unread", TgIcons.CtxRead) { repo.toggleRead(chat.id) },
                                 if (!chat.archived) MenuAction(if (chat.pinned) "Unpin" else "Pin", if (chat.pinned) TgIcons.CtxUnpin else TgIcons.CtxPin) { repo.togglePin(chat.id) } else null,
-                                MenuAction(if (chat.muted) "Unmute" else "Mute", if (chat.muted) TgIcons.CtxUnmute else TgIcons.CtxMuted) { repo.toggleMute(chat.id) },
+                                MenuAction(if (chat.muted) "Unmute" else "Mute", if (chat.muted) TgIcons.CtxUnmute else TgIcons.CtxMuted) { com.abtin.tglass.features.groups.toggleMuteWithOptions(sheet, repo, chat.id) },
                                 MenuAction(if (chat.archived) "Unarchive" else "Archive", TgIcons.CtxArchive) { repo.toggleArchive(chat.id) },
                                 MenuAction("Delete", TgIcons.CtxDelete, destructive = true, groupStart = true, onClick = onDelete),
                             ),

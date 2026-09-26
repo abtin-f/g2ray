@@ -199,6 +199,45 @@ interface TelegramRepository {
 
     /** The viewer stopped showing [story]. */
     fun closeStory(story: Story) {}
+
+    // ---- Groups & channels, mute durations ----
+
+    /** Mutes notifications of a chat for [seconds] ([MUTE_FOREVER] = forever); 0 unmutes. */
+    fun muteFor(chatId: Long, seconds: Int) {
+        val chat = chat(chatId) ?: return
+        if ((seconds > 0) != chat.muted) toggleMute(chatId)
+    }
+
+    /** Creates a group with [userIds] and an optional photo; [onDone] gets the new chat id or an error message. */
+    fun createGroup(title: String, userIds: List<Long>, photoPath: String?, onDone: (chatId: Long?, error: String?) -> Unit) =
+        onDone(null, "Not available in the demo")
+
+    /** Creates a channel; [onDone] gets the new chat id or an error message. */
+    fun createChannel(title: String, description: String, photoPath: String?, onDone: (chatId: Long?, error: String?) -> Unit) =
+        onDone(null, "Not available in the demo")
+
+    /** Changes the title and description of a group/channel; [onDone] gets an error message or null. */
+    fun editChat(chatId: Long, title: String, description: String, onDone: (String?) -> Unit) = onDone(null)
+
+    /** Sets (or with a null [path] removes) the photo of a group/channel. */
+    fun updateChatPhoto(chatId: Long, path: String?, onDone: (String?) -> Unit) = onDone(null)
+
+    /** Adds users to a group/channel; [onDone] gets an error message (e.g. privacy restrictions) or null. */
+    fun addMembers(chatId: Long, userIds: List<Long>, onDone: (String?) -> Unit) = onDone(null)
+
+    /** Removes a member from a group. */
+    fun removeMember(chatId: Long, userId: Long, onDone: (String?) -> Unit) = onDone(null)
+
+    /** Deletes a group/channel for all members (owner only). */
+    fun deleteChatForAll(chatId: Long, onDone: (String?) -> Unit) {
+        deleteChat(chatId)
+        onDone(null)
+    }
+
+    companion object {
+        /** Anything over a year counts as "forever" for Telegram. */
+        const val MUTE_FOREVER = Int.MAX_VALUE
+    }
 }
 
 class DemoRepository(private val scope: CoroutineScope) : TelegramRepository {
@@ -492,6 +531,74 @@ class DemoRepository(private val scope: CoroutineScope) : TelegramRepository {
 
     override fun terminateOtherSessions() {
         sessionList.removeAll { !it.current }
+    }
+
+    // ---- Groups & channels (demo: everything happens locally) ----
+
+    /** Member lists of groups the user created or changed in the demo (others use the generated default). */
+    private val demoMembers = mutableStateMapOf<Long, List<Member>>()
+    private val demoPhotos = mutableStateMapOf<Long, String>()
+    private val demoAbout = mutableStateMapOf<Long, String>()
+    private var nextChatId = 5_000L
+
+    override fun avatar(peerId: Long): ImageRef? = demoPhotos[peerId]?.let { ImageRef(0, it) }
+
+    override fun chatInfo(chatId: Long): ChatInfo? {
+        val base = super.chatInfo(chatId) ?: return null
+        val members = demoMembers[chatId]
+        val about = demoAbout[chatId]
+        if (members == null && about == null) return base
+        return base.copy(
+            about = about ?: base.about,
+            members = members ?: base.members,
+            memberCount = if (members != null) maxOf(chat(chatId)?.members ?: 0, members.size) else base.memberCount,
+        )
+    }
+
+    override fun muteFor(chatId: Long, seconds: Int) = updateChat(chatId) { it.copy(muted = seconds > 0) }
+
+    private fun createLocal(type: ChatType, title: String, description: String?, members: List<Member>, photoPath: String?, service: String): Long {
+        val id = nextChatId++
+        chatList.add(chatList.count { it.pinned }, Chat(id, type, title.trim(), members = members.size, description = description?.ifBlank { null }, rights = ChatRights.Owner, canPost = type == ChatType.Channel))
+        if (type == ChatType.Group) demoMembers[id] = members
+        if (photoPath != null) demoPhotos[id] = photoPath
+        list(id).add(Message(nextId++, id, 0, System.currentTimeMillis(), MessageContent.Service(service), outgoing = true))
+        return id
+    }
+
+    override fun createGroup(title: String, userIds: List<Long>, photoPath: String?, onDone: (chatId: Long?, error: String?) -> Unit) {
+        val members = listOf(Member(me.id, "owner")) + userIds.map { Member(it) }
+        onDone(createLocal(ChatType.Group, title, null, members, photoPath, "You created the group \"${title.trim()}\""), null)
+    }
+
+    override fun createChannel(title: String, description: String, photoPath: String?, onDone: (chatId: Long?, error: String?) -> Unit) {
+        onDone(createLocal(ChatType.Channel, title, description, listOf(Member(me.id, "owner")), photoPath, "Channel created"), null)
+    }
+
+    override fun editChat(chatId: Long, title: String, description: String, onDone: (String?) -> Unit) {
+        updateChat(chatId) { it.copy(title = title.trim().ifBlank { it.title }, description = description.trim().ifBlank { null }) }
+        demoAbout[chatId] = description.trim()
+        onDone(null)
+    }
+
+    override fun updateChatPhoto(chatId: Long, path: String?, onDone: (String?) -> Unit) {
+        if (path == null) demoPhotos.remove(chatId) else demoPhotos[chatId] = path
+        onDone(null)
+    }
+
+    override fun addMembers(chatId: Long, userIds: List<Long>, onDone: (String?) -> Unit) {
+        val current = demoMembers[chatId] ?: super.chatInfo(chatId)?.members.orEmpty()
+        val added = userIds.filter { id -> current.none { it.userId == id } }
+        demoMembers[chatId] = current + added.map { Member(it) }
+        updateChat(chatId) { it.copy(members = it.members + added.size) }
+        onDone(null)
+    }
+
+    override fun removeMember(chatId: Long, userId: Long, onDone: (String?) -> Unit) {
+        val current = demoMembers[chatId] ?: super.chatInfo(chatId)?.members.orEmpty()
+        demoMembers[chatId] = current.filter { it.userId != userId }
+        updateChat(chatId) { it.copy(members = (it.members - 1).coerceAtLeast(0)) }
+        onDone(null)
     }
 }
 

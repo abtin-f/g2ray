@@ -322,13 +322,14 @@ private fun ActionButton(a: SwipeAction, width: androidx.compose.ui.unit.Dp, onC
 @Composable
 fun chatSwipeActions(chat: Chat, repo: TelegramRepository, onDelete: () -> Unit): Pair<List<SwipeAction>, List<SwipeAction>> {
     val c = TgTheme.colors
+    val sheet = com.abtin.tglass.ui.components.LocalActionSheet.current
     val unread = chat.unread > 0 || chat.markedUnread
     val leading = listOf(
         SwipeAction(if (unread) "Read" else "Unread", TgIcons.CtxRead, if (unread) Color(0xFFAAAAAF) else c.accent, if (unread) TgAnimations.Read else TgAnimations.Unread) { repo.toggleRead(chat.id) },
         SwipeAction(if (chat.pinned) "Unpin" else "Pin", if (chat.pinned) TgIcons.CtxUnpin else TgIcons.CtxPin, c.green, if (chat.pinned) TgAnimations.Unpin else TgAnimations.Pin) { repo.togglePin(chat.id) },
     )
     val trailing = listOf(
-        SwipeAction(if (chat.muted) "Unmute" else "Mute", if (chat.muted) TgIcons.CtxUnmute else TgIcons.CtxMuted, c.orange, if (chat.muted) TgAnimations.Unmute else TgAnimations.Mute) { repo.toggleMute(chat.id) },
+        SwipeAction(if (chat.muted) "Unmute" else "Mute", if (chat.muted) TgIcons.CtxUnmute else TgIcons.CtxMuted, c.orange, if (chat.muted) TgAnimations.Unmute else TgAnimations.Mute) { com.abtin.tglass.features.groups.toggleMuteWithOptions(sheet, repo, chat.id) },
         SwipeAction("Delete", TgIcons.CtxDelete, c.destructive, TgAnimations.Delete, onDelete),
         SwipeAction(if (chat.archived) "Unarchive" else "Archive", TgIcons.CtxArchive, Color(0xFFAAAAAF), if (chat.archived) TgAnimations.Unarchive else TgAnimations.Archive) { repo.toggleArchive(chat.id) },
     )

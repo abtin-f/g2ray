@@ -241,5 +241,10 @@ private fun Screen(route: Route) {
         is Route.Media -> MediaViewer(route.chatId, route.messageId)
         is Route.SettingsPage -> SettingsPageScreen(route.page)
         Route.Calls -> CallsPage()
+        Route.NewGroup -> com.abtin.tglass.features.groups.MemberPickerScreen(chatId = null)
+        is Route.NewGroupInfo -> com.abtin.tglass.features.groups.NewGroupInfoScreen(route.userIds)
+        Route.NewChannel -> com.abtin.tglass.features.groups.NewChannelScreen()
+        is Route.EditChat -> com.abtin.tglass.features.groups.EditChatScreen(route.chatId)
+        is Route.AddMembers -> com.abtin.tglass.features.groups.MemberPickerScreen(chatId = route.chatId)
     }
 }
