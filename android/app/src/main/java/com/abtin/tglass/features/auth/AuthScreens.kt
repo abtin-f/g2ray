@@ -1,6 +1,22 @@
 package com.abtin.tglass.features.auth
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableIntStateOf
+import com.abtin.tglass.core.glass.GlassBox
+import com.abtin.tglass.core.glass.LocalBackdrop
+import com.abtin.tglass.features.chat.ChatWallpaper
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.kyant.shapes.Capsule
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -86,28 +102,78 @@ fun PlaneLogo(size: androidx.compose.ui.unit.Dp) {
     }
 }
 
-/** Spec §47 Welcome. */
+/** Spec §47 Welcome: Telegram's animated gradient behind a glass logo, content on a sheet. */
 @Composable
 fun WelcomeScreen() {
     val nav = LocalNavigator.current
     val c = TgTheme.colors
     val t = rememberInfiniteTransition(label = "logo")
     val bob by t.animateFloat(-6f, 6f, infiniteRepeatable(tween(1800), RepeatMode.Reverse), label = "bob")
-    Box(Modifier.fillMaxSize().background(c.background)) {
-        Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Spacer(Modifier.weight(1f))
-            Box(Modifier.graphicsLayer { translationY = bob * density }) { PlaneLogo(150.dp) }
-            Spacer(Modifier.height(36.dp))
-            T("TGlass", TgTheme.type.largeTitle.copy(fontSize = 30.sp), c.text, align = TextAlign.Center)
-            Spacer(Modifier.height(12.dp))
-            T("The world's fastest messaging app.\nIt is free and secure.", TgTheme.type.body, c.secondaryText, align = TextAlign.Center)
-            Spacer(Modifier.height(24.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                repeat(6) { i -> Box(Modifier.size(7.dp).clip(CircleShape).background(if (i == 0) c.accent else c.tertiaryText)) }
+    var phase by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1600)
+            phase++
+        }
+    }
+    val backdrop = rememberLayerBackdrop()
+    var page by remember { mutableIntStateOf(0) }
+    val pages = listOf(
+        "TGlass" to "The world's fastest messaging app.\nIt is free and secure.",
+        "Fast" to "TGlass delivers messages faster\nthan any other application.",
+        "Liquid Glass" to "A living interface that refracts\nand reacts to your touch.",
+        "Powerful" to "No limits on the size of your\nmedia and chats.",
+    )
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(3500)
+            page = (page + 1) % pages.size
+        }
+    }
+    CompositionLocalProvider(LocalBackdrop provides backdrop) {
+        Box(Modifier.fillMaxSize().background(c.background)) {
+            Box(Modifier.fillMaxWidth().fillMaxHeight(0.62f).layerBackdrop(backdrop)) {
+                ChatWallpaper(phase = phase)
             }
-            Spacer(Modifier.weight(1f))
-            PrimaryButton("Start Messaging", { nav.push(Route.Phone) })
-            Spacer(Modifier.height(24.dp))
+            Box(Modifier.fillMaxWidth().fillMaxHeight(0.62f), contentAlignment = Alignment.Center) {
+                GlassBox(
+                    onClick = {},
+                    shape = Capsule(),
+                    modifier = Modifier.size(176.dp).graphicsLayer { translationY = bob * density },
+                ) { PlaneLogo(132.dp) }
+            }
+            Column(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.42f)
+                    .clip(RoundedRectangle(34.dp))
+                    .background(c.background)
+                    .navigationBarsPadding()
+                    .padding(horizontal = 28.dp, vertical = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                AnimatedContent(
+                    targetState = page,
+                    transitionSpec = { (fadeIn(tween(300)) + slideInHorizontally { it / 4 }) togetherWith (fadeOut(tween(200)) + slideOutHorizontally { -it / 4 }) },
+                    label = "welcomePage",
+                ) { p ->
+                    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                        T(pages[p].first, TgTheme.type.largeTitle.copy(fontSize = 30.sp), c.text, align = TextAlign.Center)
+                        Spacer(Modifier.height(10.dp))
+                        T(pages[p].second, TgTheme.type.body, c.secondaryText, align = TextAlign.Center)
+                    }
+                }
+                Spacer(Modifier.height(18.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    repeat(pages.size) { i ->
+                        val w by animateDpAsState(if (i == page) 18.dp else 7.dp, label = "dot")
+                        Box(Modifier.size(width = w, height = 7.dp).clip(CircleShape).background(if (i == page) c.accent else c.tertiaryText))
+                    }
+                }
+                Spacer(Modifier.weight(1f))
+                PrimaryButton("Start Messaging", { nav.push(Route.Phone) })
+            }
         }
     }
 }

@@ -51,6 +51,11 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import com.abtin.tglass.core.design.LocalAppSettings
 import com.abtin.tglass.core.design.TgTheme
+import com.abtin.tglass.core.glass.glass
+import com.kyant.backdrop.Backdrop
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import androidx.compose.ui.graphics.graphicsLayer
 import com.kyant.shapes.Capsule
 import com.kyant.shapes.RoundedRectangle
 import kotlin.math.roundToInt
@@ -113,17 +118,19 @@ fun ContextMenuHost(state: ContextMenuState, content: @Composable () -> Unit) {
         if (animations) tween(220) else tween(0),
         label = "menuBlur",
     )
+    // The whole screen is recorded (unblurred) so the menu and reaction bar can be real refracting glass.
+    val rootBackdrop = rememberLayerBackdrop()
     Box(Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxSize().then(if (blur > 0.5.dp) Modifier.blur(blur) else Modifier)) {
-            content()
+            Box(Modifier.fillMaxSize().layerBackdrop(rootBackdrop)) { content() }
         }
         val req = state.request
-        if (req != null) ContextMenuOverlay(req, state)
+        if (req != null) ContextMenuOverlay(req, state, rootBackdrop)
     }
 }
 
 @Composable
-private fun ContextMenuOverlay(req: ContextMenuRequest, state: ContextMenuState) {
+private fun ContextMenuOverlay(req: ContextMenuRequest, state: ContextMenuState, rootBackdrop: Backdrop) {
     val c = TgTheme.colors
     val view = LocalView.current
     val progress = remember(req) { Animatable(0f) }
@@ -154,7 +161,7 @@ private fun ContextMenuOverlay(req: ContextMenuRequest, state: ContextMenuState)
         content = {
             // 0: reactions
             if (req.reactions != null && req.onReact != null) {
-                ReactionBar(req.reactions) { emoji ->
+                ReactionBar(req.reactions, rootBackdrop) { emoji ->
                     Haptics.tap(view)
                     req.onReact?.invoke(emoji)
                     state.dismiss()
@@ -165,7 +172,7 @@ private fun ContextMenuOverlay(req: ContextMenuRequest, state: ContextMenuState)
             // 1: preview (sharp copy of the pressed content)
             Box(Modifier.pointerInput(req) { detectTapGestures { state.dismiss() } }) { req.preview() }
             // 2: menu
-            MenuList(req.actions) { action ->
+            MenuList(req.actions, rootBackdrop) { action ->
                 Haptics.tap(view)
                 state.dismiss()
                 action.onClick()
@@ -245,15 +252,19 @@ private fun ContextMenuOverlay(req: ContextMenuRequest, state: ContextMenuState)
 }
 
 @Composable
-private fun MenuList(actions: List<MenuAction>, onClick: (MenuAction) -> Unit) {
+private fun MenuList(actions: List<MenuAction>, backdrop: Backdrop, onClick: (MenuAction) -> Unit) {
     val c = TgTheme.colors
     Column(
         Modifier
             .width(250.dp)
-            .shadow(24.dp, RoundedRectangle(22.dp), clip = false, ambientColor = Color.Black.copy(0.2f), spotColor = Color.Black.copy(0.25f))
-            .clip(RoundedRectangle(22.dp))
-            .background(c.menuSurface)
-            .background(if (c.isDark) Color.Black.copy(0.2f) else Color.White.copy(0.55f))
+            .glass(
+                shape = RoundedRectangle(24.dp),
+                backdrop = backdrop,
+                surface = if (c.isDark) Color(0xFF1C1C1C).copy(alpha = 0.62f) else Color.White.copy(alpha = 0.66f),
+                blurRadius = 12.dp,
+                lensHeight = 14.dp,
+                lensAmount = 20.dp,
+            )
     ) {
         actions.forEachIndexed { i, a ->
             if (i > 0) {
@@ -284,22 +295,33 @@ private fun MenuList(actions: List<MenuAction>, onClick: (MenuAction) -> Unit) {
 }
 
 @Composable
-private fun ReactionBar(reactions: List<String>, onReact: (String) -> Unit) {
+private fun ReactionBar(reactions: List<String>, backdrop: Backdrop, onReact: (String) -> Unit) {
     val c = TgTheme.colors
     var expanded by remember { mutableStateOf(false) }
     Row(
         Modifier
-            .shadow(16.dp, Capsule(), clip = false, ambientColor = Color.Black.copy(0.15f), spotColor = Color.Black.copy(0.2f))
-            .clip(Capsule())
-            .background(c.menuSurface)
-            .background(if (c.isDark) Color.Black.copy(0.2f) else Color.White.copy(0.55f))
+            .glass(
+                shape = Capsule(),
+                backdrop = backdrop,
+                surface = if (c.isDark) Color(0xFF1C1C1C).copy(alpha = 0.62f) else Color.White.copy(alpha = 0.66f),
+                blurRadius = 12.dp,
+            )
             .padding(horizontal = 6.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(Modifier.width(if (expanded) 300.dp else 272.dp).horizontalScroll(rememberScrollState())) {
-            reactions.forEach { e ->
+            reactions.forEachIndexed { i, e ->
+                val pop = remember { Animatable(0f) }
+                LaunchedEffect(Unit) {
+                    kotlinx.coroutines.delay(30L * i)
+                    pop.animateTo(1f, spring(dampingRatio = 0.55f, stiffness = 500f))
+                }
                 Box(
-                    Modifier.size(38.dp).clip(Capsule()).bounceClickable { onReact(e) },
+                    Modifier
+                        .size(38.dp)
+                        .graphicsLayer { scaleX = pop.value; scaleY = pop.value; alpha = pop.value.coerceIn(0f, 1f) }
+                        .clip(Capsule())
+                        .bounceClickable { onReact(e) },
                     contentAlignment = Alignment.Center,
                 ) {
                     T(e, TgTheme.type.body.copy(fontSize = 26.sp, lineHeight = 30.sp))

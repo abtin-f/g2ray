@@ -34,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -82,6 +83,16 @@ fun MainScreen() {
 
     Box(Modifier.fillMaxSize().background(c.background)) {
         CompositionLocalProvider(LocalBackdrop provides backdrop) {
+            val tabFade = remember { androidx.compose.animation.core.Animatable(1f) }
+            androidx.compose.runtime.LaunchedEffect(tab) {
+                tabFade.snapTo(0f)
+                tabFade.animateTo(1f, androidx.compose.animation.core.tween(220))
+            }
+            Box(Modifier.fillMaxSize().graphicsLayer {
+                alpha = 0.4f + 0.6f * tabFade.value
+                val s = 0.985f + 0.015f * tabFade.value
+                scaleX = s; scaleY = s
+            }) {
             holder.SaveableStateProvider(tab) {
                 when (tab) {
                     0 -> ContactsScreen(backdrop, isTab = true)
@@ -89,6 +100,7 @@ fun MainScreen() {
                     2 -> ChatListScreen(backdrop, tabBar)
                     else -> SettingsScreen(backdrop)
                 }
+            }
             }
 
             AnimatedVisibility(
