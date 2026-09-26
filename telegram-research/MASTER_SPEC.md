@@ -115,6 +115,9 @@ Paths are shortened: `CLI` = `submodules/ChatListUI/Sources/Node/ChatListItem.sw
 | Chat wallpaper: 4-color gradient, 8 base positions, swirl, advances on send | `submodules/GradientBackground/Sources/SoftwareGradientBackground.swift` | ✅ exact algorithm |
 | Glass context menu & reaction bar | `ContextControllerImpl`, `GlassBackgroundComponent` | ✅ |
 | Stories collapsed into the chat list title | Chat list header | ✅ pull-down to expand |
+| Animated tab icons (play on select) | `Resources/Animations/Tab{Chats,Contacts,Calls,Settings}.json` | ✅ Lottie |
+| Swipe-action icon animations | `Resources/Animations/anim_{read,unread,pin,unpin,mute,unmute,delete,archive,unarchive}.json` | ✅ play when revealed |
+| Intro / empty-state illustrations | `PlaneLogo.tgs`, `Intro*.tgs`, `ChatListEmpty.tgs` | ✅ |
 
 ## Next steps
 

@@ -4,6 +4,8 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
@@ -71,6 +73,8 @@ import com.abtin.tglass.ui.components.GlassTopBar
 import com.abtin.tglass.ui.components.PrimaryButton
 import com.abtin.tglass.ui.components.Separator
 import com.abtin.tglass.ui.components.T
+import com.abtin.tglass.ui.components.LottieLoop
+import com.abtin.tglass.ui.components.TgAnimations
 import com.abtin.tglass.ui.components.TextButton
 import com.abtin.tglass.ui.components.fadeClickable
 import com.kyant.shapes.RoundedRectangle
@@ -136,11 +140,21 @@ fun WelcomeScreen() {
                 ChatWallpaper(phase = phase)
             }
             Box(Modifier.fillMaxWidth().fillMaxHeight(0.62f), contentAlignment = Alignment.Center) {
+                // Telegram-iOS intro animations (PlaneLogo / IntroMessage / IntroPhone / IntroLetter).
                 GlassBox(
                     onClick = {},
                     shape = Capsule(),
-                    modifier = Modifier.size(176.dp).graphicsLayer { translationY = bob * density },
-                ) { PlaneLogo(132.dp) }
+                    modifier = Modifier.size(196.dp).graphicsLayer { translationY = bob * density },
+                ) {
+                    AnimatedContent(
+                        targetState = page,
+                        transitionSpec = { (fadeIn(tween(350)) + scaleIn(initialScale = 0.8f)) togetherWith (fadeOut(tween(200)) + scaleOut(targetScale = 0.8f)) },
+                        label = "introAnim",
+                    ) { p ->
+                        val anim = listOf(TgAnimations.PlaneLogo, TgAnimations.IntroMessage, TgAnimations.IntroPhone, TgAnimations.IntroLetter)[p]
+                        LottieLoop(anim, if (p == 0) 150.dp else 160.dp)
+                    }
+                }
             }
             Column(
                 Modifier

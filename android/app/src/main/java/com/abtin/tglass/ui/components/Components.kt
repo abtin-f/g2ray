@@ -424,10 +424,11 @@ fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifi
 
 /** Empty state placeholder (spec §53). */
 @Composable
-fun EmptyState(emoji: String, title: String, subtitle: String, modifier: Modifier = Modifier) {
+fun EmptyState(emoji: String, title: String, subtitle: String, modifier: Modifier = Modifier, animation: Int? = null) {
     val c = TgTheme.colors
     Column(modifier.fillMaxWidth().padding(40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        T(emoji, TgTheme.type.largeTitle.copy(fontSize = 64.sp, lineHeight = 72.sp))
+        if (animation != null) LottieLoop(animation, 140.dp)
+        else T(emoji, TgTheme.type.largeTitle.copy(fontSize = 64.sp, lineHeight = 72.sp))
         Spacer(Modifier.height(12.dp))
         T(title, TgTheme.type.title3, c.text, align = TextAlign.Center)
         Spacer(Modifier.height(6.dp))

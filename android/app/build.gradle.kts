@@ -53,4 +53,5 @@ dependencies {
     implementation(libs.androidx.compose.icons.extended)
     implementation(libs.kyant.backdrop)
     implementation(libs.kyant.shapes)
+    implementation(libs.lottie.compose)
 }

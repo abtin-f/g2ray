@@ -65,6 +65,8 @@ import com.abtin.tglass.ui.components.StoryRing
 import com.abtin.tglass.ui.components.T
 import com.abtin.tglass.ui.components.IosIcons
 import com.abtin.tglass.ui.components.TgIcons
+import com.abtin.tglass.ui.components.LottieIcon
+import com.abtin.tglass.ui.components.TgAnimations
 import com.abtin.tglass.ui.components.TypingText
 import com.abtin.tglass.ui.components.VerifiedBadge
 import com.abtin.tglass.ui.components.formatListDate
@@ -73,7 +75,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-class SwipeAction(val label: String, val icon: Int, val color: Color, val onClick: () -> Unit)
+class SwipeAction(val label: String, val icon: Int, val color: Color, val animation: Int? = null, val onClick: () -> Unit)
 
 fun chatIcon(chat: Chat): ImageVector? = when (chat.type) {
     ChatType.Group -> Icons.Rounded.Group
@@ -305,7 +307,9 @@ private fun ActionButton(a: SwipeAction, width: androidx.compose.ui.unit.Dp, onC
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
     ) {
-        Icon(a.icon, Color.White, 28.dp)
+        val revealed = width > 56.dp
+        if (a.animation != null) LottieIcon(a.animation, Color.White, 32.dp, playKey = if (revealed) a.label else null, play = revealed)
+        else Icon(a.icon, Color.White, 28.dp)
         Spacer(Modifier.height(4.dp))
         T(a.label, TgTheme.type.caption1.copy(fontSize = 13.sp), Color.White, maxLines = 1, weight = FontWeight.Medium)
     }
@@ -317,13 +321,13 @@ fun chatSwipeActions(chat: Chat, repo: TelegramRepository, onDelete: () -> Unit)
     val c = TgTheme.colors
     val unread = chat.unread > 0 || chat.markedUnread
     val leading = listOf(
-        SwipeAction(if (unread) "Read" else "Unread", TgIcons.CtxRead, if (unread) Color(0xFFAAAAAF) else c.accent) { repo.toggleRead(chat.id) },
-        SwipeAction(if (chat.pinned) "Unpin" else "Pin", if (chat.pinned) TgIcons.CtxUnpin else TgIcons.CtxPin, c.green) { repo.togglePin(chat.id) },
+        SwipeAction(if (unread) "Read" else "Unread", TgIcons.CtxRead, if (unread) Color(0xFFAAAAAF) else c.accent, if (unread) TgAnimations.Read else TgAnimations.Unread) { repo.toggleRead(chat.id) },
+        SwipeAction(if (chat.pinned) "Unpin" else "Pin", if (chat.pinned) TgIcons.CtxUnpin else TgIcons.CtxPin, c.green, if (chat.pinned) TgAnimations.Unpin else TgAnimations.Pin) { repo.togglePin(chat.id) },
     )
     val trailing = listOf(
-        SwipeAction(if (chat.muted) "Unmute" else "Mute", if (chat.muted) TgIcons.CtxUnmute else TgIcons.CtxMuted, c.orange) { repo.toggleMute(chat.id) },
-        SwipeAction("Delete", TgIcons.CtxDelete, c.destructive, onDelete),
-        SwipeAction(if (chat.archived) "Unarchive" else "Archive", TgIcons.CtxArchive, Color(0xFFAAAAAF)) { repo.toggleArchive(chat.id) },
+        SwipeAction(if (chat.muted) "Unmute" else "Mute", if (chat.muted) TgIcons.CtxUnmute else TgIcons.CtxMuted, c.orange, if (chat.muted) TgAnimations.Unmute else TgAnimations.Mute) { repo.toggleMute(chat.id) },
+        SwipeAction("Delete", TgIcons.CtxDelete, c.destructive, TgAnimations.Delete, onDelete),
+        SwipeAction(if (chat.archived) "Unarchive" else "Archive", TgIcons.CtxArchive, Color(0xFFAAAAAF), if (chat.archived) TgAnimations.Unarchive else TgAnimations.Archive) { repo.toggleArchive(chat.id) },
     )
     return leading to trailing
 }

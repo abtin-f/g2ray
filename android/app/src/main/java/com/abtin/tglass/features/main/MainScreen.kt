@@ -53,6 +53,8 @@ import com.abtin.tglass.ui.components.Badge
 import com.abtin.tglass.ui.components.Icon
 import com.abtin.tglass.ui.components.T
 import com.abtin.tglass.ui.components.TgIcons
+import com.abtin.tglass.ui.components.LottieIcon
+import com.abtin.tglass.ui.components.TgAnimations
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 
 val LocalRepository = staticCompositionLocalOf<TelegramRepository> { error("Repository not provided") }
@@ -126,10 +128,10 @@ fun MainScreen() {
                         tabsCount = 4,
                         modifier = Modifier.weight(1f),
                     ) {
-                        TabItem(TgIcons.TabContacts, "Contacts") { tab = 0 }
-                        TabItem(TgIcons.TabCalls, "Calls") { tab = 1 }
-                        TabItem(TgIcons.TabChats, "Chats", badge = unread) { tab = 2 }
-                        TabItem(TgIcons.TabSettings, "Settings") { tab = 3 }
+                        TabItem(TgAnimations.TabContacts, "Contacts", selected = tab == 0) { tab = 0 }
+                        TabItem(TgAnimations.TabCalls, "Calls", selected = tab == 1) { tab = 1 }
+                        TabItem(TgAnimations.TabChats, "Chats", selected = tab == 2, badge = unread) { tab = 2 }
+                        TabItem(TgAnimations.TabSettings, "Settings", selected = tab == 3) { tab = 3 }
                     }
                     Spacer(Modifier.width(8.dp))
                     GlassIconButton(
@@ -145,11 +147,12 @@ fun MainScreen() {
 }
 
 @Composable
-private fun androidx.compose.foundation.layout.RowScope.TabItem(icon: Int, label: String, badge: Int = 0, onClick: () -> Unit) {
+private fun androidx.compose.foundation.layout.RowScope.TabItem(animation: Int, label: String, selected: Boolean, badge: Int = 0, onClick: () -> Unit) {
     val c = TgTheme.colors
     LiquidBottomTab(onClick = onClick) {
         Box {
-            Icon(icon, c.text, 28.dp)
+            // Telegram-iOS tab icons are Lottie animations that play when the tab gets selected.
+            LottieIcon(animation, c.text, 30.dp, playKey = if (selected) label else null, play = selected)
             if (badge > 0) {
                 Badge(badge, modifier = Modifier.align(Alignment.TopEnd).offset(x = 14.dp, y = (-3).dp).wrapContentSize(unbounded = true))
             }

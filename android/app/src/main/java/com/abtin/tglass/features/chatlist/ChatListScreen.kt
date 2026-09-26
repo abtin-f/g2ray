@@ -233,7 +233,7 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
                     item(key = "archive") { ArchiveRow(archived, repo) { nav.push(Route.Archive) } }
                 }
                 if (chats.isEmpty()) {
-                    item(key = "empty") { EmptyState("💬", "No Chats", "There are no chats in this folder yet.") }
+                    item(key = "empty") { EmptyState("💬", "No Chats", "There are no chats in this folder yet.", animation = com.abtin.tglass.ui.components.TgAnimations.ChatListEmpty) }
                 }
                 items(chats, key = { it.id }) { chat ->
                     ChatListItem(
