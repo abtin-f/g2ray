@@ -36,7 +36,7 @@ Paths are shortened: `CLI` = `submodules/ChatListUI/Sources/Node/ChatListItem.sw
 |---|---|---|---|
 | Main corner radius | 16 | `PresentationThemeSettings.swift` `mainRadius` | ✅ (default, adjustable) |
 | Grouped corner radius | 8 | same, `auxiliaryRadius` | ✅ (= main/2) |
-| Tail | ellipse-cut tail (27×17 fill, 23×21 cut) | `ChatMessageBubbleImages.swift` | 🟡 bezier approximation |
+| Tail | ellipse-cut tail (27×17 fill, 23×21 cut) | `ChatMessageBubbleImages.swift` | ✅ exact port (path ops) |
 | Text insets | 6 / 11 / 6 / 11 | MIC `text.bubbleInsets` | ✅ |
 | Spacing | 2 (grouped 0) | MIC `bubble.defaultSpacing` | 🟡 2 / 6 |
 | Max width | screen − 36 | MIC `compactInset` | ✅ (− 38 more in groups) |
@@ -72,7 +72,7 @@ Paths are shortened: `CLI` = `submodules/ChatListUI/Sources/Node/ChatListItem.sw
 |---|---|---|---|
 | Renderer | `UIGlassEffect(.regular)` on iOS 26 | GLS `GlassBackgroundComponent.swift` | ✅ backdrop lib: blur + lens + vibrancy |
 | Fallback fill | white@0.70 / #1C1C1C@0.85 | GLS legacy path | ✅ (Translucent level) |
-| Fallback backdrop | blur 2 + saturation matrix | GLS `LegacyGlassView.swift` | 🟡 |
+| Fallback backdrop | blur 2 + saturation matrix | GLS `LegacyGlassView.swift` | 🟡 blur + vibrancy |
 | Shadow | blur 40, alpha 0.04, y +1 | GLS `generateLegacyShadowImage` | 🟡 |
 | Press growth | +20pt per axis | GLS `TouchEffect.pressedSizeIncrease` | ✅ |
 | Press spring | on: m1.36 k568 c39.7 · off: m2.0 k460 c21.8 | GLS `TouchEffect` | 🟡 library spring |
@@ -107,9 +107,17 @@ Paths are shortened: `CLI` = `submodules/ChatListUI/Sources/Node/ChatListItem.sw
 | Secondary text | #8E8E93 | #98989E | ✅ |
 | Separator | #C8C7CC | #545458@0.55 | ✅ |
 
+## Assets & motion taken from Telegram-iOS
+
+| Item | Source | App |
+|---|---|---|
+| 82 UI icons (tab bar, context menu, settings, profile, attach, calls) | `submodules/TelegramUI/Images.xcassets` (PDF → VectorDrawable) | ✅ |
+| Chat wallpaper: 4-color gradient, 8 base positions, swirl, advances on send | `submodules/GradientBackground/Sources/SoftwareGradientBackground.swift` | ✅ exact algorithm |
+| Glass context menu & reaction bar | `ContextControllerImpl`, `GlassBackgroundComponent` | ✅ |
+| Stories collapsed into the chat list title | Chat list header | ✅ pull-down to expand |
+
 ## Next steps
 
-1. Replace the approximated tail with the ellipse-based tail from `ChatMessageBubbleImages.swift`.
-2. Port `TouchEffect` springs (stretch toward the drag direction) into `GlassBox`.
-3. Menu item subtitles and animated icons.
-4. TDLib repository implementation.
+1. Port `TouchEffect` springs (stretch toward the drag direction) into `GlassBox`.
+2. Menu item subtitles and animated icons.
+3. TDLib repository implementation.
