@@ -30,8 +30,9 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      - uses: android-actions/setup-android@v3
       - uses: gradle/actions/setup-gradle@v4
+      - name: Show SDK
+        run: echo "ANDROID_HOME=$ANDROID_HOME" && ls "$ANDROID_HOME/platforms" "$ANDROID_HOME/build-tools" || true
       - name: Build APKs
         run: ./gradlew --no-configuration-cache assembleDebug assembleRelease --stacktrace
       - uses: actions/upload-artifact@v4
@@ -52,7 +53,6 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      - uses: android-actions/setup-android@v3
       - uses: gradle/actions/setup-gradle@v4
       - name: Build debug APK
         working-directory: android
