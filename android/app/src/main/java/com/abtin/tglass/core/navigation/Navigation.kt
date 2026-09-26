@@ -60,6 +60,8 @@ sealed interface Route {
     data object NewChannel : Route
     data class EditChat(val chatId: Long) : Route
     data class AddMembers(val chatId: Long) : Route
+    /** Settings → Chat Folders editor; [folderId] null creates a new folder. */
+    data class FolderEdit(val folderId: Int?) : Route
 }
 
 /** Routes presented modally (slide up) instead of pushed (slide from right). */

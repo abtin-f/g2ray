@@ -105,6 +105,11 @@ fun AttachSheet(visible: Boolean, onDismiss: () -> Unit, onSend: (List<MessageCo
     var caption by remember { mutableStateOf("") }
     var preparing by remember { mutableStateOf(false) }
     val selectionCount = selected.size + selectedDemo.size
+    var pollOpen by remember { mutableStateOf(false) }
+    var contactOpen by remember { mutableStateOf(false) }
+    // Telegram allows polls in private chats only with bots and in Saved Messages.
+    val currentChatId = (com.abtin.tglass.core.navigation.LocalNavigator.current.top as? com.abtin.tglass.core.navigation.Route.Chat)?.chatId
+    val canPoll = !repo.isLive || currentChatId?.let { repo.chat(it)?.type } != com.abtin.tglass.data.ChatType.Private
 
     fun sendPicked(items: List<PickedMedia>, text: String?) {
         if (items.isEmpty() || preparing) return
@@ -287,10 +292,10 @@ fun AttachSheet(visible: Boolean, onDismiss: () -> Unit, onSend: (List<MessageCo
                                 AttachType(TgIcons.AttGallery, "Gallery", selected = true) { openPicker() }
                                 AttachType(TgIcons.AttFile, "File") { runCatching { documentLauncher.launch(arrayOf("*/*")) } }
                                 AttachType(TgIcons.AttLocation, "Location") { requestLocation() }
+                                if (canPoll) AttachType(TgIcons.AttPoll, "Poll") { onDismiss(); pollOpen = true }
+                                AttachType(TgIcons.AttContact, "Contact") { onDismiss(); contactOpen = true }
                                 if (!repo.isLive) {
-                                    // Sample content for the demo; real polls/contacts/gifts need their own editors.
-                                    AttachType(TgIcons.AttPoll, "Poll") { onSend(listOf(MessageContent.Poll("What should we build next?", listOf("Stories editor", "Video calls", "Themes"), listOf(3, 5, 2)))) }
-                                    AttachType(TgIcons.AttContact, "Contact") { onSend(listOf(MessageContent.Contact("Sara Ahmadi", "+98 912 111 2233"))) }
+                                    // Sample content for the demo; real gifts need their own editor.
                                     AttachType(TgIcons.AttGift, "Gift") { onSend(listOf(MessageContent.Sticker("🎁"))) }
                                 }
                                 AttachType(TgIcons.AttAudio, "Music") { runCatching { documentLauncher.launch(arrayOf("audio/*")) } }
@@ -301,6 +306,22 @@ fun AttachSheet(visible: Boolean, onDismiss: () -> Unit, onSend: (List<MessageCo
             }
         }
     }
+    NewPollSheet(
+        visible = pollOpen,
+        onDismiss = { pollOpen = false },
+        onSend = { poll ->
+            pollOpen = false
+            onSend(listOf(poll))
+        },
+    )
+    ContactPickerSheet(
+        visible = contactOpen,
+        onDismiss = { contactOpen = false },
+        onPick = { u ->
+            contactOpen = false
+            onSend(listOf(MessageContent.Contact(u.name, u.phone, u.id)))
+        },
+    )
 }
 
 @Composable

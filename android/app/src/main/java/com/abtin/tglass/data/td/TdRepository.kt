@@ -193,7 +193,8 @@ class TdRepository(context: Context) : TelegramRepository {
         val input: InputMessageContent = when (content) {
             is UiContent.Text -> InputMessageText(FormattedText(content.text, emptyArray()), null, true)
             is UiContent.Sticker -> InputMessageText(FormattedText(content.emoji, emptyArray()), null, true)
-            is UiContent.Contact -> InputMessageContact(Contact(content.phone, content.name, "", "", 0))
+            is UiContent.Contact -> contactInput(content)
+            is UiContent.Poll -> pollInput(content)
             is UiContent.Photo -> inputMedia(content) ?: run {
                 _errors.tryEmit("This kind of message can't be sent yet")
                 return
@@ -1293,13 +1294,15 @@ class TdRepository(context: Context) : TelegramRepository {
         is MessageDice -> UiContent.Sticker(c.emoji)
         is MessageLocation -> UiContent.Location("Location", "%.5f, %.5f".format(Locale.US, c.location.latitude, c.location.longitude))
         is MessageVenue -> UiContent.Location(c.venue.title, c.venue.address)
-        is MessageContact -> UiContent.Contact("${c.contact.firstName} ${c.contact.lastName}".trim(), c.contact.phoneNumber)
+        is MessageContact -> UiContent.Contact("${c.contact.firstName} ${c.contact.lastName}".trim(), c.contact.phoneNumber, c.contact.userId)
         is MessagePoll -> UiContent.Poll(
             question = c.poll.question.text,
             options = c.poll.options.map { it.text.text },
             votes = c.poll.options.map { it.voterCount },
             voted = c.poll.options.indexOfFirst { it.isChosen }.takeIf { it >= 0 },
             quiz = c.poll.type is PollTypeQuiz,
+            anonymous = c.poll.isAnonymous,
+            multiple = c.poll.allowsMultipleAnswers,
         )
         is MessageCall -> UiContent.Text(
             (if (c.isVideo) "📹 " else "📞 ") + (if (c.duration > 0) "Call (${Formats.duration(c.duration)})" else "Missed call"),
@@ -1829,6 +1832,139 @@ class TdRepository(context: Context) : TelegramRepository {
             }
         }
     }
+    // ---- Polls, contacts, folders ----
+    // =====================================================================================
+
+    /** A poll/quiz from the New Poll screen (options already trimmed and non-empty). */
+    private fun pollInput(p: UiContent.Poll): InputMessageContent {
+        val type: InputPollType = if (p.quiz) {
+            val correct = (p.correctOption ?: 0).coerceIn(0, (p.options.size - 1).coerceAtLeast(0))
+            InputPollTypeQuiz(intArrayOf(correct), FormattedText(p.explanation?.trim().orEmpty(), emptyArray()), null)
+        } else {
+            InputPollTypeRegular(false)
+        }
+        return InputMessagePoll(
+            question = FormattedText(p.question.trim(), emptyArray()),
+            options = p.options.map { InputPollOption(FormattedText(it.trim(), emptyArray()), null) }.toTypedArray(),
+            description = null,
+            media = null,
+            isAnonymous = p.anonymous,
+            allowsMultipleAnswers = p.multiple && !p.quiz,
+            allowsRevoting = false,
+            membersOnly = false,
+            countryCodes = emptyArray(),
+            shuffleOptions = false,
+            hideResultsUntilCloses = false,
+            type = type,
+            openPeriod = 0,
+            closeDate = 0,
+            isClosed = false,
+        )
+    }
+
+    /** A shared contact; a known Telegram user is sent with their real name, phone and user id. */
+    private fun contactInput(c: UiContent.Contact): InputMessageContent {
+        val u = if (c.userId != 0L) rawUsers[c.userId] else null
+        val first = u?.firstName?.takeIf { it.isNotBlank() } ?: c.name.substringBefore(' ')
+        val last = if (u != null) u.lastName else c.name.substringAfter(' ', "")
+        val phone = u?.phoneNumber?.takeIf { it.isNotBlank() } ?: c.phone
+        return InputMessageContact(Contact(phone, first, last, "", if (u != null) u.id else 0L))
+    }
+
+    /** Folders as last fetched for editing, so saving keeps icon, color and pinned chats. */
+    private val folderCache = HashMap<Int, ChatFolder>()
+
+    override val editableFolders: List<com.abtin.tglass.data.FolderSummary>
+        get() = folderInfos.map { f ->
+            val n = chatMap.values.count { f.id in it.folderIds }
+            com.abtin.tglass.data.FolderSummary(
+                id = f.id,
+                title = f.name.text.text,
+                subtitle = when (n) { 0 -> "No chats"; 1 -> "1 chat"; else -> "$n chats" },
+            )
+        }
+
+    override fun loadFolder(folderId: Int, onResult: (com.abtin.tglass.data.FolderDraft?) -> Unit) {
+        scope.launch {
+            val r = client.getChatFolder(folderId)
+            if (r is TdlResult.Success) {
+                val f = r.result
+                folderCache[folderId] = f
+                onResult(
+                    com.abtin.tglass.data.FolderDraft(
+                        name = f.name.text.text,
+                        includeContacts = f.includeContacts,
+                        includeNonContacts = f.includeNonContacts,
+                        includeGroups = f.includeGroups,
+                        includeChannels = f.includeChannels,
+                        includeBots = f.includeBots,
+                        excludeMuted = f.excludeMuted,
+                        excludeRead = f.excludeRead,
+                        excludeArchived = f.excludeArchived,
+                        includedChatIds = (f.pinnedChatIds.toList() + f.includedChatIds.toList()).distinct(),
+                        excludedChatIds = f.excludedChatIds.toList(),
+                    ),
+                )
+            } else {
+                r.orReport()
+                onResult(null)
+            }
+        }
+    }
+
+    override fun saveFolder(folderId: Int?, draft: com.abtin.tglass.data.FolderDraft, onDone: (String?) -> Unit) {
+        scope.launch {
+            var old: ChatFolder? = null
+            if (folderId != null) {
+                old = folderCache[folderId]
+                if (old == null) {
+                    val r = client.getChatFolder(folderId)
+                    if (r is TdlResult.Success) old = r.result
+                }
+            }
+            val name = draft.name.trim()
+            val chosen = draft.includedChatIds.distinct()
+            val pinned = old?.pinnedChatIds?.toList().orEmpty().filter { it in chosen }
+            val oldName = old?.name
+            val folder = ChatFolder(
+                name = if (oldName != null && oldName.text.text == name) oldName else ChatFolderName(FormattedText(name, emptyArray()), oldName?.animateCustomEmoji ?: false),
+                icon = old?.icon,
+                colorId = old?.colorId ?: -1,
+                isShareable = old?.isShareable ?: false,
+                pinnedChatIds = pinned.toLongArray(),
+                includedChatIds = chosen.filter { it !in pinned }.toLongArray(),
+                excludedChatIds = draft.excludedChatIds.distinct().filter { it !in chosen }.toLongArray(),
+                excludeMuted = draft.excludeMuted,
+                excludeRead = draft.excludeRead,
+                excludeArchived = draft.excludeArchived,
+                includeContacts = draft.includeContacts,
+                includeNonContacts = draft.includeNonContacts,
+                includeBots = draft.includeBots,
+                includeGroups = draft.includeGroups,
+                includeChannels = draft.includeChannels,
+            )
+            val r = if (folderId == null) client.createChatFolder(folder) else client.editChatFolder(folderId, folder)
+            if (folderId != null) folderCache.remove(folderId)
+            onDone(if (r is TdlResult.Failure) folderError(r.message) else null)
+        }
+    }
+
+    override fun deleteFolder(folderId: Int, onDone: (String?) -> Unit) {
+        scope.launch {
+            val r = client.deleteChatFolder(folderId, LongArray(0))
+            folderCache.remove(folderId)
+            onDone(if (r is TdlResult.Failure) folderError(r.message) else null)
+        }
+    }
+
+    private fun folderError(error: String): String = when {
+        "FILTER_INCLUDE_EMPTY" in error -> "Please add at least one chat or chat type to the folder."
+        "FILTER_TITLE_EMPTY" in error -> "Please enter a folder name."
+        "FILTERS_TOO_MUCH" in error || "CHATLISTS_TOO_MUCH" in error -> "You have reached the limit of chat folders."
+        "CHAT_FOLDER" in error && "LIMIT" in error.uppercase() -> "You have reached the limit of chats in a folder."
+        else -> humanize(error)
+    }
+    // ---- end Polls, contacts, folders ----
 }
 
 /** Process-wide TDLib instance (TDLib must not be created twice for the same database). */

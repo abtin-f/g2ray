@@ -613,9 +613,18 @@ private fun LocationBody(m: Message, l: MessageContent.Location, colors: BubbleC
 
 @Composable
 private fun ContactBody(m: Message, ct: MessageContent.Contact, colors: BubbleColors) {
+    val repo = com.abtin.tglass.features.main.LocalRepository.current
+    val nav = com.abtin.tglass.core.navigation.LocalNavigator.current
+    // A contact that is a Telegram user opens the chat with them.
+    val openChat: () -> Unit = {
+        if (ct.userId != 0L) nav.push(com.abtin.tglass.core.navigation.Route.Chat(repo.privateChatWith(ct.userId)))
+    }
     Column(Modifier.padding(top = 8.dp)) {
-        Row(Modifier.padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Avatar(ct.name, ct.phone.hashCode().toLong(), 44.dp)
+        Row(
+            Modifier.padding(horizontal = 10.dp).then(if (ct.userId != 0L) Modifier.fadeClickable(onClick = openChat) else Modifier),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Avatar(ct.name, if (ct.userId != 0L) ct.userId else ct.phone.hashCode().toLong(), 44.dp)
             Spacer(Modifier.width(10.dp))
             Column {
                 T(ct.name, TgTheme.type.subheadline, colors.accent, weight = FontWeight.SemiBold)
@@ -624,8 +633,8 @@ private fun ContactBody(m: Message, ct: MessageContent.Contact, colors: BubbleCo
         }
         Spacer(Modifier.height(6.dp))
         Box(Modifier.padding(horizontal = 10.dp)) { Separator() }
-        Box(Modifier.fillMaxWidth().height(36.dp).fadeClickable { }, contentAlignment = Alignment.Center) {
-            T("View Contact", TgTheme.type.subheadline, colors.accent, weight = FontWeight.SemiBold)
+        Box(Modifier.fillMaxWidth().height(36.dp).fadeClickable(onClick = openChat), contentAlignment = Alignment.Center) {
+            T(if (ct.userId != 0L) "Message" else "View Contact", TgTheme.type.subheadline, colors.accent, weight = FontWeight.SemiBold)
         }
         Box(Modifier.align(Alignment.End).padding(end = 10.dp, bottom = 6.dp)) { MetaRow(m, colors.meta) }
     }
@@ -636,7 +645,13 @@ private fun PollBody(m: Message, p: MessageContent.Poll, colors: BubbleColors, o
     val total = p.votes.sum().coerceAtLeast(1)
     Column(Modifier.width(260.dp).padding(horizontal = 10.dp, vertical = 8.dp)) {
         T(p.question, TgTheme.type.body, colors.text, weight = FontWeight.SemiBold)
-        T(if (p.quiz) "Quiz" else "Anonymous Poll", TgTheme.type.footnote, colors.meta)
+        T(
+            when {
+                p.quiz -> if (p.anonymous) "Anonymous Quiz" else "Quiz"
+                else -> if (p.anonymous) "Anonymous Poll" else "Public Poll"
+            },
+            TgTheme.type.footnote, colors.meta,
+        )
         Spacer(Modifier.height(8.dp))
         p.options.forEachIndexed { i, opt ->
             val pct = p.votes[i] * 100 / total

@@ -246,5 +246,6 @@ private fun Screen(route: Route) {
         Route.NewChannel -> com.abtin.tglass.features.groups.NewChannelScreen()
         is Route.EditChat -> com.abtin.tglass.features.groups.EditChatScreen(route.chatId)
         is Route.AddMembers -> com.abtin.tglass.features.groups.MemberPickerScreen(chatId = route.chatId)
+        is Route.FolderEdit -> com.abtin.tglass.features.settings.FolderEditScreen(route.folderId)
     }
 }
