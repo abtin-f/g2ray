@@ -99,6 +99,8 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         com.abtin.tglass.notify.AppVisibility.foreground = true
+        // (Re)start the background connection whenever the app is opened; it may have been killed.
+        com.abtin.tglass.notify.ConnectionService.sync(this)
     }
 
     override fun onStop() {

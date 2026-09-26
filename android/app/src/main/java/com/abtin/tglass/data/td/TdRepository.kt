@@ -600,7 +600,14 @@ class TdRepository(context: Context) : TelegramRepository {
         updatesJob?.cancel()
         // Subscribe before the first request so no update is missed.
         updatesJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
-            client.allUpdates.collect { handle(it) }
+            // One bad update must never stop the stream (that would silently freeze chats and notifications).
+            client.allUpdates.collect { u ->
+                try {
+                    handle(u)
+                } catch (e: Exception) {
+                    android.util.Log.e("TGlass", "Failed to handle ${u::class.simpleName}", e)
+                }
+            }
         }
         scope.launch {
             client.setLogVerbosityLevel(1)
@@ -884,7 +891,11 @@ class TdRepository(context: Context) : TelegramRepository {
                 if (u.message.chatId in openChats && !u.message.isOutgoing) {
                     scope.launch { client.viewMessages(u.message.chatId, longArrayOf(u.message.id), null, true) }
                 }
-                maybeNotify(u.message)
+                try {
+                    maybeNotify(u.message)
+                } catch (e: Exception) {
+                    android.util.Log.e("TGlass", "Notification failed", e)
+                }
             }
             is UpdateMessageSendSucceeded -> replaceMessage(u.message, u.oldMessageId)
             is UpdateMessageSendFailed -> {

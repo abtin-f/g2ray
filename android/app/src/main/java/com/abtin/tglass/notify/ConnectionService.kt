@@ -36,12 +36,22 @@ class ConnectionService : Service() {
             else -> startForeground(ID, notification)
         }
         Td.get(this)
+        running = true
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
 
+    override fun onDestroy() {
+        running = false
+        super.onDestroy()
+    }
+
     companion object {
         private const val ID = 7_777
+
+        /** True while the background connection is up (shown in Settings → Notifications). */
+        @Volatile var running = false
+            private set
 
         private fun enabled(context: Context): Boolean {
             val prefs = context.getSharedPreferences("tglass", Context.MODE_PRIVATE)

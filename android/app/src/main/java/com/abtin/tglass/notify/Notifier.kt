@@ -71,6 +71,37 @@ object Notifier {
     fun canPost(context: Context): Boolean =
         Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
 
+    /** Whether the user allowed this app's notifications in system settings. */
+    fun systemEnabled(context: Context): Boolean = canPost(context) && NotificationManagerCompat.from(context).areNotificationsEnabled()
+
+    /** Opens Android's notification settings for this app. */
+    fun openSystemSettings(context: Context) {
+        val intent = Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+            .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { context.startActivity(intent) }.onFailure {
+            runCatching {
+                context.startActivity(
+                    Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:${context.packageName}"))
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+            }
+        }
+    }
+
+    /** Posts a sample notification so the user can check that notifications reach them. */
+    fun showTest(context: Context) {
+        history.remove(0L)
+        show(
+            context,
+            NotifyMessage(
+                chatId = 0L, messageId = System.currentTimeMillis(), chatTitle = "TGlass", group = false,
+                senderId = 0L, senderName = "TGlass", text = "Notifications are working ✅",
+                date = System.currentTimeMillis(), senderAvatarPath = null, chatAvatarPath = null,
+            ),
+        )
+    }
+
     private fun notificationId(chatId: Long) = (chatId xor (chatId ushr 32)).toInt()
 
     fun openChatIntent(context: Context, chatId: Long): PendingIntent {

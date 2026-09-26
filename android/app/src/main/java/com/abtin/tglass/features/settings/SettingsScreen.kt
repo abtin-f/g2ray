@@ -363,6 +363,31 @@ private fun LazyListScope.notifications() {
     item {
         val s = LocalAppSettings.current
         val context = androidx.compose.ui.platform.LocalContext.current
+        val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current
+        // Re-check the system state whenever the user comes back from Android settings.
+        var systemOn by remember { mutableStateOf(com.abtin.tglass.notify.Notifier.systemEnabled(context)) }
+        var serviceOn by remember { mutableStateOf(com.abtin.tglass.notify.ConnectionService.running) }
+        androidx.compose.runtime.DisposableEffect(lifecycle) {
+            val observer = androidx.lifecycle.LifecycleEventObserver { _, e ->
+                if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                    systemOn = com.abtin.tglass.notify.Notifier.systemEnabled(context)
+                    serviceOn = com.abtin.tglass.notify.ConnectionService.running
+                }
+            }
+            lifecycle.lifecycle.addObserver(observer)
+            onDispose { lifecycle.lifecycle.removeObserver(observer) }
+        }
+        Section(
+            header = "Status",
+            footer = if (!systemOn) "Notifications are turned off for TGlass in Android settings. Tap above to allow them." else null,
+        ) {
+            Cell("Notifications", value = if (systemOn) "Allowed" else "Off", onClick = { com.abtin.tglass.notify.Notifier.openSystemSettings(context) })
+            Cell("Background Connection", value = if (serviceOn) "Running" else "Stopped", chevron = false)
+            Cell("Send Test Notification", titleColor = TgTheme.colors.accent, chevron = false, divider = false, onClick = {
+                if (systemOn) com.abtin.tglass.notify.Notifier.showTest(context) else com.abtin.tglass.notify.Notifier.openSystemSettings(context)
+            })
+        }
+        Spacer(Modifier.height(24.dp))
         Section(
             header = "Background",
             footer = "Keeps TGlass connected while it is closed so new messages arrive as notifications. " +
