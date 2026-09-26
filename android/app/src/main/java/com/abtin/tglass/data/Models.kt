@@ -190,6 +190,18 @@ data class StickerPack(val id: Long, val title: String, val stickers: List<Stick
 @Immutable
 data class GifItem(val fileId: Int, val thumb: ImageRef?, val width: Int, val height: Int, val duration: Int)
 
+/** Privacy settings Telegram exposes as Everybody / My Contacts / Nobody. */
+enum class PrivacyKey(val title: String) {
+    PhoneNumber("Phone Number"),
+    LastSeen("Last Seen & Online"),
+    ProfilePhoto("Profile Photos"),
+    Forwards("Forwarded Messages"),
+    Calls("Calls"),
+    Invites("Groups & Channels"),
+}
+
+enum class PrivacyValue(val title: String) { Everybody("Everybody"), Contacts("My Contacts"), Nobody("Nobody") }
+
 /** Shared media tabs of a profile. */
 enum class MediaKind { Media, Files, Links, Voice, Gifs }
 

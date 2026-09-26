@@ -168,6 +168,18 @@ interface TelegramRepository {
 
     fun joinChat(chatId: Long) {}
 
+    /** Saves name and bio; [onDone] gets an error message or null. */
+    fun updateProfile(firstName: String, lastName: String, bio: String, onDone: (String?) -> Unit) = onDone(null)
+    fun updateUsername(username: String, onDone: (String?) -> Unit) = onDone(null)
+    fun updateProfilePhoto(path: String, onDone: (String?) -> Unit) = onDone(null)
+
+    fun privacy(key: PrivacyKey): PrivacyValue? = when (key) {
+        PrivacyKey.PhoneNumber -> PrivacyValue.Contacts
+        else -> PrivacyValue.Everybody
+    }
+    fun loadPrivacy() {}
+    fun setPrivacy(key: PrivacyKey, value: PrivacyValue) {}
+
     fun logOut() {}
 }
 

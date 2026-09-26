@@ -17,6 +17,8 @@ import com.abtin.tglass.data.GlobalResults
 import com.abtin.tglass.data.StickerItem
 import com.abtin.tglass.data.StickerPack
 import com.abtin.tglass.data.MediaKind
+import com.abtin.tglass.data.PrivacyKey
+import com.abtin.tglass.data.PrivacyValue
 import com.abtin.tglass.data.Member
 import com.abtin.tglass.data.Entity
 import com.abtin.tglass.data.EntityType
@@ -471,6 +473,80 @@ class TdRepository(context: Context) : TelegramRepository {
     override fun forward(fromChatId: Long, messageIds: List<Long>, toChatId: Long) {
         scope.launch {
             client.forwardMessages(chatId = toChatId, fromChatId = fromChatId, messageIds = messageIds.toLongArray(), sendCopy = false, removeCaption = false).orReport()
+        }
+    }
+
+    override fun updateProfile(firstName: String, lastName: String, bio: String, onDone: (String?) -> Unit) {
+        scope.launch {
+            val a = client.setName(firstName, lastName)
+            val b = client.setBio(bio)
+            val error = (a as? TdlResult.Failure ?: b as? TdlResult.Failure)?.message
+            if (error == null) loadChatInfo(myId)
+            onDone(error?.let { humanize(it) })
+        }
+    }
+
+    override fun updateUsername(username: String, onDone: (String?) -> Unit) {
+        scope.launch {
+            val r = client.setUsername(username.removePrefix("@"))
+            onDone(if (r is TdlResult.Failure) when {
+                "USERNAME_OCCUPIED" in r.message -> "This username is already taken."
+                "USERNAME_INVALID" in r.message -> "This username is invalid."
+                else -> humanize(r.message)
+            } else null)
+        }
+    }
+
+    override fun updateProfilePhoto(path: String, onDone: (String?) -> Unit) {
+        scope.launch {
+            val r = client.setProfilePhoto(InputChatPhotoStatic(InputFileLocal(path)), false)
+            onDone(if (r is TdlResult.Failure) humanize(r.message) else null)
+        }
+    }
+
+    private val privacyValues = mutableStateMapOf<PrivacyKey, PrivacyValue>()
+
+    private fun privacySetting(key: PrivacyKey): UserPrivacySetting = when (key) {
+        PrivacyKey.PhoneNumber -> UserPrivacySettingShowPhoneNumber()
+        PrivacyKey.LastSeen -> UserPrivacySettingShowStatus()
+        PrivacyKey.ProfilePhoto -> UserPrivacySettingShowProfilePhoto()
+        PrivacyKey.Forwards -> UserPrivacySettingShowLinkInForwardedMessages()
+        PrivacyKey.Calls -> UserPrivacySettingAllowCalls()
+        PrivacyKey.Invites -> UserPrivacySettingAllowChatInvites()
+    }
+
+    override fun privacy(key: PrivacyKey): PrivacyValue? = privacyValues[key]
+
+    override fun loadPrivacy() {
+        scope.launch {
+            for (key in PrivacyKey.entries) {
+                val r = client.getUserPrivacySettingRules(privacySetting(key))
+                if (r is TdlResult.Success) {
+                    val rules = r.result.rules
+                    privacyValues[key] = when {
+                        rules.any { it is UserPrivacySettingRuleAllowAll } -> PrivacyValue.Everybody
+                        rules.any { it is UserPrivacySettingRuleAllowContacts } -> PrivacyValue.Contacts
+                        else -> PrivacyValue.Nobody
+                    }
+                }
+            }
+        }
+    }
+
+    override fun setPrivacy(key: PrivacyKey, value: PrivacyValue) {
+        val rules: Array<UserPrivacySettingRule> = when (value) {
+            PrivacyValue.Everybody -> arrayOf(UserPrivacySettingRuleAllowAll())
+            PrivacyValue.Contacts -> arrayOf(UserPrivacySettingRuleAllowContacts(), UserPrivacySettingRuleRestrictAll())
+            PrivacyValue.Nobody -> arrayOf(UserPrivacySettingRuleRestrictAll())
+        }
+        val previous = privacyValues[key]
+        privacyValues[key] = value
+        scope.launch {
+            val r = client.setUserPrivacySettingRules(privacySetting(key), UserPrivacySettingRules(rules))
+            if (r is TdlResult.Failure) {
+                if (previous != null) privacyValues[key] = previous
+                _errors.tryEmit(humanize(r.message))
+            }
         }
     }
 
