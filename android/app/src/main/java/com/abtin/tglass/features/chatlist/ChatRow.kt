@@ -227,6 +227,15 @@ private fun PreviewLine(m: com.abtin.tglass.data.Message, style: androidx.compos
             Spacer(Modifier.width(3.dp))
             T("Voice message", style, c.secondaryText, maxLines = 1)
         }
+        is MessageContent.VideoNote -> Row(verticalAlignment = Alignment.CenterVertically) {
+            if (content.thumb != null) {
+                Box(Modifier.size(20.dp).clip(androidx.compose.foundation.shape.CircleShape)) {
+                    com.abtin.tglass.ui.components.TgImage(content.thumb, Modifier.matchParentSize(), maxPx = 96)
+                }
+                Spacer(Modifier.width(5.dp))
+            }
+            T("Video message", style, c.secondaryText, maxLines = 1)
+        }
         else -> T(m.preview, style, c.secondaryText, maxLines = lines)
     }
 }

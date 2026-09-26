@@ -75,6 +75,9 @@ interface TelegramRepository {
     /** Starts downloading the file behind [image]; [filePath] turns non-null once it is done. */
     fun requestImage(image: ImageRef) {}
 
+    /** Tells the server the user played a message's media (marks a video/voice message as viewed). */
+    fun openMessageContent(chatId: Long, messageId: Long) {}
+
     /** Download progress 0..1 of a file started with [requestImage]. */
     fun fileProgress(image: ImageRef): Float = if (filePath(image) != null) 1f else 0f
 
@@ -107,7 +110,7 @@ interface TelegramRepository {
             MediaKind.Gifs -> (m.content as? MessageContent.Photo)?.loop == true
             MediaKind.Files -> m.content is MessageContent.File
             MediaKind.Links -> m.content is MessageContent.Link
-            MediaKind.Voice -> m.content is MessageContent.Voice
+            MediaKind.Voice -> m.content is MessageContent.Voice || m.content is MessageContent.VideoNote
         }
     }
 

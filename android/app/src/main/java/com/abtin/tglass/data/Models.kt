@@ -63,6 +63,11 @@ sealed interface MessageContent {
         val loop: Boolean = false,
     ) : MessageContent
     data class Voice(val seconds: Int, val waveform: List<Float>, val media: ImageRef? = null) : MessageContent
+    /**
+     * A round video message ("video note"): [video] is the square MP4, [thumb] its cover (with Telegram's blurred minithumbnail),
+     * [viewed] whether the recipient has played it.
+     */
+    data class VideoNote(val seconds: Int, val video: ImageRef? = null, val thumb: ImageRef? = null, val viewed: Boolean = false) : MessageContent
     /** [animation] is a Telegram animated sticker (gzipped Lottie, .tgs). */
     data class Sticker(val emoji: String, val image: ImageRef? = null, val animation: ImageRef? = null) : MessageContent
     /** A document; [music] files play inline like Telegram's audio player. */
@@ -124,6 +129,7 @@ data class Message(
             is MessageContent.Text -> c.text
             is MessageContent.Photo -> c.caption?.let { "🖼 $it" } ?: if (c.video) "Video" else "Photo"
             is MessageContent.Voice -> "Voice message"
+            is MessageContent.VideoNote -> "Video message"
             is MessageContent.Sticker -> "${c.emoji} Sticker"
             is MessageContent.File -> "📄 ${c.name}"
             is MessageContent.Location -> "📍 Location"
