@@ -62,6 +62,10 @@ sealed interface Route {
     data class AddMembers(val chatId: Long) : Route
     /** Settings → Chat Folders editor; [folderId] null creates a new folder. */
     data class FolderEdit(val folderId: Int?) : Route
+
+    // ---- Contacts, media, calls ----
+    /** iOS New Contact form (first / last name, phone). */
+    data object NewContact : Route
 }
 
 /** Routes presented modally (slide up) instead of pushed (slide from right). */

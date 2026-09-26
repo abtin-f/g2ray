@@ -87,6 +87,7 @@ fun ProfileScreen(chatId: Long) {
     val nav = LocalNavigator.current
     val sheet = LocalActionSheet.current
     val toast = LocalToast.current
+    val callContext = androidx.compose.ui.platform.LocalContext.current
     val c = TgTheme.colors
     val chat = repo.chat(chatId) ?: return
     val user = chat.peerUserId?.let { repo.user(it) }
@@ -151,8 +152,8 @@ fun ProfileScreen(chatId: Long) {
                         HeroAction(if (chat.muted) TgIcons.PiUnmute else TgIcons.PiMute, if (chat.muted) "Unmute" else "Mute") { com.abtin.tglass.features.groups.toggleMuteWithOptions(sheet, repo, chat.id) }
                         when (chat.type) {
                             ChatType.Private, ChatType.Saved -> {
-                                HeroAction(TgIcons.PiCall, "Call") { user?.let { nav.push(Route.ActiveCall(it.id, false)) } }
-                                HeroAction(TgIcons.PiVideo, "Video") { user?.let { nav.push(Route.ActiveCall(it.id, true)) } }
+                                HeroAction(TgIcons.PiCall, "Call") { user?.let { com.abtin.tglass.features.calls.requestCall(callContext, repo, nav, sheet, toast, it.id, video = false) } }
+                                HeroAction(TgIcons.PiVideo, "Video") { user?.let { com.abtin.tglass.features.calls.requestCall(callContext, repo, nav, sheet, toast, it.id, video = true) } }
                             }
                             else -> {
                                 HeroAction(TgIcons.PiSearch, "Search") { searchInChat() }

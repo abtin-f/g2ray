@@ -253,6 +253,33 @@ interface TelegramRepository {
     /** Deletes a folder (its chats stay where they are); [onDone] gets an error message or null. */
     fun deleteFolder(folderId: Int, onDone: (String?) -> Unit) = onDone(null)
     // ---- end Polls, contacts, folders ----
+
+    // ---- Contacts, media, calls ----
+
+    /**
+     * Adds a phone contact. [onDone] gets the Telegram user id of the person (null when the number is not on
+     * Telegram) or an error message. The demo adds a local sample user.
+     */
+    fun addContact(firstName: String, lastName: String, phone: String, onDone: (userId: Long?, error: String?) -> Unit) {
+        val map = users as? MutableMap<Long, User>
+        if (map == null) {
+            onDone(null, "Not available in the demo")
+            return
+        }
+        val id = (users.keys.maxOrNull() ?: 0L) + 1
+        map[id] = User(id, firstName.trim(), lastName.trim(), phone = phone.trim(), lastSeen = "last seen recently")
+        onDone(id, null)
+    }
+
+    /** Removes a user from the contacts; [onDone] gets an error message or null. */
+    fun removeContact(userId: Long, onDone: (String?) -> Unit) = onDone("Not available in the demo")
+
+    /** Sort key for "sort by last seen": higher = seen more recently (online users first). */
+    fun lastSeenOrder(userId: Long): Long = if (user(userId)?.online == true) Long.MAX_VALUE else 0L
+
+    /** Deletes entries from the call history (the call messages themselves, for the current user only). */
+    fun deleteCallRecords(records: List<CallRecord>) {}
+    // ---- end Contacts, media, calls ----
 }
 
 class DemoRepository(private val scope: CoroutineScope) : TelegramRepository {
@@ -304,7 +331,7 @@ class DemoRepository(private val scope: CoroutineScope) : TelegramRepository {
     private val messageStore = mutableStateMapOf<Long, SnapshotStateList<Message>>()
     private var nextId = 10_000L
 
-    override val calls: List<CallRecord> = listOf(
+    override val calls: SnapshotStateList<CallRecord> = mutableStateListOf(
         CallRecord(1, 1, ago(35), outgoing = true, missed = false, video = false, durationSec = 312),
         CallRecord(2, 2, ago(160), outgoing = false, missed = true, video = false, durationSec = 0),
         CallRecord(3, 4, ago(60 * 5), outgoing = false, missed = false, video = true, durationSec = 1240),
@@ -615,6 +642,33 @@ class DemoRepository(private val scope: CoroutineScope) : TelegramRepository {
         updateChat(chatId) { it.copy(members = (it.members - 1).coerceAtLeast(0)) }
         onDone(null)
     }
+
+    // ---- Contacts, media, calls (demo) ----
+    private val removedContacts = mutableStateListOf<Long>()
+
+    override val contacts: List<User>
+        get() = users.values.filter { it.id != me.id && it.id != 10L && it.id !in removedContacts }
+
+    override fun removeContact(userId: Long, onDone: (String?) -> Unit) {
+        if (userId !in removedContacts) removedContacts.add(userId)
+        onDone(null)
+    }
+
+    override fun addContact(firstName: String, lastName: String, phone: String, onDone: (userId: Long?, error: String?) -> Unit) {
+        // Re-adding someone who was removed brings them back instead of creating a duplicate.
+        val digits = phone.filter { it.isDigit() }
+        val existing = users.values.firstOrNull { digits.isNotEmpty() && it.phone.filter { ch -> ch.isDigit() } == digits }
+        if (existing != null) {
+            removedContacts.remove(existing.id)
+            onDone(existing.id, null)
+        } else super.addContact(firstName, lastName, phone, onDone)
+    }
+
+    override fun deleteCallRecords(records: List<CallRecord>) {
+        val ids = records.map { it.id }.toSet()
+        calls.removeAll { it.id in ids }
+    }
+    // ---- end Contacts, media, calls (demo) ----
 }
 
 /** Sender label for a message in group chats. */
