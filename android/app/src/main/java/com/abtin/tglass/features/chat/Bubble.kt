@@ -210,6 +210,10 @@ fun MessageBubble(
         StickerMessage(m, content, modifier)
         return
     }
+    if (content is MessageContent.VideoNote) {
+        VideoNoteMessage(m, content, replyTo, replyName, onReplyClick, modifier)
+        return
+    }
     val radius = LocalAppSettings.current.bubbleRadius.dp
     val shape = remember(m.outgoing, group, radius) {
         BubbleShape(m.outgoing, !group.groupedBottom, radius, (radius.value / 2f).coerceAtLeast(4f).dp, group.groupedTop, group.groupedBottom)

@@ -223,6 +223,10 @@ class TdRepository(context: Context) : TelegramRepository {
                 }
                 InputMessageVoiceNote(InputFileLocal(path), content.seconds, packWaveform(content.waveform), null, null)
             }
+            is UiContent.VideoNote -> videoNoteInput(content) ?: run {
+                _errors.tryEmit("This kind of message can't be sent yet")
+                return
+            }
             else -> {
                 _errors.tryEmit("This kind of message can't be sent yet")
                 return
@@ -908,6 +912,7 @@ class TdRepository(context: Context) : TelegramRepository {
             }
             is UpdateMessageContent -> updateMessage(u.chatId, u.messageId) { it.copy(content = mapContent(u.newContent, u.chatId)) }
             is UpdateMessageEdited -> updateMessage(u.chatId, u.messageId) { it.copy(edited = true) }
+            is UpdateMessageContentOpened -> onContentOpened(u.chatId, u.messageId)
             is UpdateMessageIsPinned -> {
                 updateMessage(u.chatId, u.messageId) { it.copy(pinned = u.isPinned) }
                 if (u.chatId in openChats) loadPinned(u.chatId)
@@ -1273,11 +1278,7 @@ class TdRepository(context: Context) : TelegramRepository {
                 loop = true,
             )
         }
-        is MessageVideoNote -> UiContent.Photo(
-            seed = c.videoNote.video.id, aspect = 1f, emoji = "📹",
-            image = c.videoNote.thumbnail?.let { imageOf(it.file, c.videoNote.minithumbnail) }, video = true,
-            videoFile = imageOf(c.videoNote.video, null, c.videoNote.length, c.videoNote.length), duration = c.videoNote.duration,
-        )
+        is MessageVideoNote -> videoNoteContent(c)
         is MessageVoiceNote -> UiContent.Voice(c.voiceNote.duration, waveform(c.voiceNote.waveform), imageOf(c.voiceNote.voice, null))
         is MessageAudio -> UiContent.File(
             name = c.audio.title.ifBlank { c.audio.fileName.ifBlank { "Audio" } },
@@ -1435,7 +1436,7 @@ class TdRepository(context: Context) : TelegramRepository {
             MediaKind.Media -> SearchMessagesFilterPhotoAndVideo()
             MediaKind.Files -> SearchMessagesFilterDocument()
             MediaKind.Links -> SearchMessagesFilterUrl()
-            MediaKind.Voice -> SearchMessagesFilterVoiceNote()
+            MediaKind.Voice -> SearchMessagesFilterVoiceAndVideoNote()
             MediaKind.Gifs -> SearchMessagesFilterAnimation()
         }
         scope.launch {
@@ -2361,6 +2362,43 @@ class TdRepository(context: Context) : TelegramRepository {
 
     override fun onlineMemberCount(chatId: Long): Int? = onlineCounts[chatId]?.takeIf { it > 0 }
     // ---- end Chat features ----
+
+    // ---- Video messages ----
+    /** A received round video message. */
+    private fun videoNoteContent(c: MessageVideoNote): UiContent.VideoNote {
+        val n = c.videoNote
+        return UiContent.VideoNote(
+            seconds = n.duration,
+            video = imageOf(n.video, null, n.length, n.length),
+            thumb = n.thumbnail?.let { imageOf(it.file, n.minithumbnail, it.width, it.height) }
+                ?: n.minithumbnail?.let { ImageRef(-n.video.id, null, it.data, n.length, n.length) },
+            viewed = c.isViewed,
+        )
+    }
+
+    /** A freshly recorded video message (local square MP4, see VideoNoteRecorder) as TDLib input. */
+    private fun videoNoteInput(v: UiContent.VideoNote): InputMessageContent? {
+        val ref = v.video?.takeIf { it.fileId == 0 } ?: return null
+        val path = ref.path ?: return null
+        val thumb = v.thumb?.let { t ->
+            t.path?.takeIf { t.fileId == 0 && t.width > 0 && t.height > 0 }?.let { p -> InputThumbnail(InputFileLocal(p), t.width, t.height) }
+        }
+        // Width = height of the square video; Telegram allows at most 640.
+        val length = (if (ref.width > 0) minOf(ref.width, if (ref.height > 0) ref.height else ref.width) else 384).coerceIn(1, 640)
+        return InputMessageVideoNote(InputFileLocal(path), thumb, v.seconds.coerceIn(1, 60), length, null)
+    }
+
+    /** A video message was played (by us or on another device): drop its "not viewed" dot. */
+    private fun onContentOpened(chatId: Long, messageId: Long) = updateMessage(chatId, messageId) { m ->
+        val c = m.content
+        if (c is UiContent.VideoNote && !c.viewed) m.copy(content = c.copy(viewed = true)) else m
+    }
+
+    override fun openMessageContent(chatId: Long, messageId: Long) {
+        if (messageId <= 0) return
+        scope.launch { client.openMessageContent(chatId, messageId) }
+    }
+    // ---- end Video messages ----
 }
 
 /** Process-wide TDLib instance (TDLib must not be created twice for the same database). */

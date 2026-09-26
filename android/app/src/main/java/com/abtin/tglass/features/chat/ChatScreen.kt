@@ -92,6 +92,7 @@ import com.abtin.tglass.core.design.TgTheme
 import com.abtin.tglass.core.glass.GlassBox
 import com.abtin.tglass.core.glass.GlassIconButton
 import com.abtin.tglass.core.glass.LocalBackdrop
+import com.abtin.tglass.core.media.toContent
 import com.abtin.tglass.core.navigation.LocalNavigator
 import com.abtin.tglass.core.navigation.Route
 import com.abtin.tglass.data.Chat
@@ -459,6 +460,8 @@ fun ChatScreen(chatId: Long) {
         )
     }
 
+    val videoNoteRecorder = com.abtin.tglass.core.media.rememberVideoNoteRecorder()
+
     androidx.compose.runtime.CompositionLocalProvider(LocalBackdrop provides backdrop, LocalLinkHandler provides linkHandler) {
         Box(Modifier.fillMaxSize()) {
             // Z0: wallpaper + messages (the glass source)
@@ -521,6 +524,9 @@ fun ChatScreen(chatId: Long) {
                     }
                 }
             }
+
+            // Camera circle while a video message is recorded (under the header and composer)
+            VideoNoteRecordingOverlay(videoNoteRecorder)
 
             // Header (spec §11)
             Column(
@@ -684,6 +690,11 @@ fun ChatScreen(chatId: Long) {
                             onSendLongPress = if (editingId == null) ({
                                 sheet.show(SheetRequest(actions = listOf(SheetAction("Send Without Sound") { sendSilently() })))
                             }) else null,
+                            videoRecorder = videoNoteRecorder,
+                            onVideoNote = { note ->
+                                repo.sendContent(chatId, note.toContent(), replyToId)
+                                replyToId = null
+                            },
                         )
                         AnimatedVisibility(replyKb != null && hiddenKeyboardId != replyKb.messageId && !panelOpen && !imeVisible) {
                             if (replyKb != null) ReplyKeyboardPanel(

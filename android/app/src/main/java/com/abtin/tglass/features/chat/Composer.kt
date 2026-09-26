@@ -120,6 +120,9 @@ fun Composer(
     modifier: Modifier = Modifier,
     /** Long-press on the send button (e.g. "Send Without Sound"); null disables it. */
     onSendLongPress: (() -> Unit)? = null,
+    /** Camera for round video messages; when set, a tap on the mic switches it to the camera (Telegram). */
+    videoRecorder: com.abtin.tglass.core.media.VideoNoteRecorder? = null,
+    onVideoNote: (com.abtin.tglass.core.media.RecordedVideoNote) -> Unit = {},
 ) {
     val c = TgTheme.colors
     val view = LocalView.current
@@ -136,16 +139,51 @@ fun Composer(
     var elapsed by remember { mutableLongStateOf(0L) }
     val dragX = remember { Animatable(0f) }
     val dragY = remember { Animatable(0f) }
+    // Mic / camera toggle and whether the current recording is a video message.
+    var videoMode by remember { mutableStateOf(false) }
+    var recordingVideo by remember { mutableStateOf(false) }
+    val currentOnVideoNote by androidx.compose.runtime.rememberUpdatedState(onVideoNote)
+    val cameraPermission = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()) {}
+    fun hasCamera() = hasMic() &&
+        androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.CAMERA) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+    fun stopVideo(send: Boolean) {
+        recording = false
+        locked = false
+        recordingVideo = false
+        scope.launch { dragX.animateTo(0f); dragY.animateTo(0f) }
+        videoRecorder?.stop(send) { note ->
+            if (note != null) {
+                Haptics.confirm(view)
+                currentOnVideoNote(note)
+            } else if (send) {
+                Haptics.reject(view)
+            }
+        }
+    }
 
     LaunchedEffect(recording) {
         while (recording) {
-            elapsed = System.currentTimeMillis() - startedAt
-            recorder.sample()
+            if (recordingVideo) {
+                val vr = videoRecorder
+                if (vr == null || !vr.active) { stopVideo(false); break }
+                elapsed = vr.elapsedMs()
+                if (elapsed >= com.abtin.tglass.core.media.VideoNoteRecorder.MaxMs) { stopVideo(true); break }
+            } else {
+                elapsed = System.currentTimeMillis() - startedAt
+                recorder.sample()
+            }
             delay(60)
         }
     }
 
     fun stopRecording(send: Boolean) {
+        // Already finished (a video message stops by itself at the time limit while the button is still held).
+        if (!recording) return
+        if (recordingVideo) {
+            stopVideo(send)
+            return
+        }
         val secs = ((System.currentTimeMillis() - startedAt) / 1000).toInt()
         val voice = recorder.stop(discard = !send)
         recording = false
@@ -267,7 +305,34 @@ fun Composer(
                             awaitEachGesture {
                                 val down = awaitFirstDown()
                                 down.consume()
-                                if (!hasMic()) {
+                                if (videoRecorder != null) {
+                                    // Telegram: a short tap switches between voice and video messages, holding records.
+                                    val released = withTimeoutOrNull(HoldToRecordMs) {
+                                        var up = false
+                                        while (!up) {
+                                            val ev = awaitPointerEvent()
+                                            val ch = ev.changes.firstOrNull { it.id == down.id }
+                                            if (ch == null || !ch.pressed) up = true else ch.consume()
+                                        }
+                                        up
+                                    } ?: false
+                                    if (released) {
+                                        videoMode = !videoMode
+                                        Haptics.tap(view)
+                                        return@awaitEachGesture
+                                    }
+                                }
+                                val video = videoRecorder != null && videoMode
+                                if (video && !hasCamera()) {
+                                    // Ask once; the next hold records.
+                                    cameraPermission.launch(arrayOf(android.Manifest.permission.CAMERA, android.Manifest.permission.RECORD_AUDIO))
+                                    do {
+                                        val ev = awaitPointerEvent()
+                                        ev.changes.forEach { it.consume() }
+                                    } while (ev.changes.any { it.pressed })
+                                    return@awaitEachGesture
+                                }
+                                if (!video && !hasMic()) {
                                     // Ask once; the next press records.
                                     micPermission.launch(android.Manifest.permission.RECORD_AUDIO)
                                     do {
@@ -276,7 +341,12 @@ fun Composer(
                                     } while (ev.changes.any { it.pressed })
                                     return@awaitEachGesture
                                 }
-                                recorder.start()
+                                if (video) {
+                                    videoRecorder?.open()
+                                    recordingVideo = true
+                                } else {
+                                    recorder.start()
+                                }
                                 startedAt = System.currentTimeMillis()
                                 elapsed = 0
                                 recording = true
@@ -287,6 +357,7 @@ fun Composer(
                                     val ch = ev.changes.firstOrNull { it.id == down.id } ?: break
                                     if (!ch.pressed) break
                                     ch.consume()
+                                    if (!recording) break
                                     val dx = (ch.position.x - down.position.x).coerceAtMost(0f)
                                     val dy = (ch.position.y - down.position.y).coerceAtMost(0f)
                                     scope.launch { dragX.snapTo(dx); dragY.snapTo(dy) }
@@ -307,11 +378,15 @@ fun Composer(
                         Box(Modifier.size(44.dp).then(micModifier), contentAlignment = Alignment.Center) {
                             if (recording) {
                                 Box(Modifier.graphicsLayer { translationX = dragX.value; translationY = dragY.value }) {
-                                    Icon(IosIcons.Mic, Color.White, 28.dp)
+                                    Icon(if (recordingVideo) IosIcons.Video else IosIcons.Mic, Color.White, 28.dp)
                                 }
                             } else {
                                 GlassBox(onClick = null, shape = Capsule(), modifier = Modifier.size(44.dp)) {
-                                    Icon(IosIcons.Mic, c.text, 24.dp)
+                                    androidx.compose.animation.Crossfade(videoMode, label = "micMode") { v ->
+                                        Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
+                                            Icon(if (v) IosIcons.Video else IosIcons.Mic, c.text, if (v) 26.dp else 24.dp)
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -321,6 +396,9 @@ fun Composer(
         }
     }
 }
+
+/** How long the mic / camera button must be held before recording starts (a shorter tap switches the mode). */
+private const val HoldToRecordMs = 250L
 
 @Composable
 private fun RecordingStatus(elapsedMs: Long, locked: Boolean, dragX: Float, onCancel: () -> Unit) {

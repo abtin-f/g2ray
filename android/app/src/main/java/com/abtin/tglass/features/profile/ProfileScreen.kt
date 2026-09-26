@@ -399,6 +399,7 @@ private fun SharedRow(m: com.abtin.tglass.data.Message, divider: Boolean) {
     val ref = when (content) {
         is MessageContent.File -> content.file
         is MessageContent.Voice -> content.media
+        is MessageContent.VideoNote -> content.video
         else -> null
     }
     val path = ref?.let { repo.filePath(it) }
@@ -408,6 +409,7 @@ private fun SharedRow(m: com.abtin.tglass.data.Message, divider: Boolean) {
             is MessageContent.File -> if (content.music) player.toggle(context, key, p, content.duration)
                 else if (!com.abtin.tglass.core.media.Files.open(context, p, content.mime)) toast.show("No app can open this file")
             is MessageContent.Voice -> player.toggle(context, key, p, content.seconds)
+            is MessageContent.VideoNote -> player.toggle(context, key, p, content.seconds)
             else -> {}
         }
     }
@@ -415,6 +417,7 @@ private fun SharedRow(m: com.abtin.tglass.data.Message, divider: Boolean) {
     val (title, subtitle) = when (content) {
         is MessageContent.File -> content.name to listOfNotNull(content.performer, content.size).joinToString(" · ")
         is MessageContent.Voice -> repo.senderName(m) to com.abtin.tglass.ui.components.formatDuration(content.seconds)
+        is MessageContent.VideoNote -> repo.senderName(m) to "Video message · ${com.abtin.tglass.ui.components.formatDuration(content.seconds)}"
         is MessageContent.Link -> content.title.ifBlank { content.site } to content.text
         else -> m.preview to ""
     }
@@ -428,7 +431,7 @@ private fun SharedRow(m: com.abtin.tglass.data.Message, divider: Boolean) {
                 val playing = player.currentKey == key && player.playing
                 when {
                     pending && path == null -> com.abtin.tglass.ui.components.ActivityIndicator(18.dp, androidx.compose.ui.graphics.Color.White)
-                    content is MessageContent.Voice || (content is MessageContent.File && content.music) ->
+                    content is MessageContent.Voice || content is MessageContent.VideoNote || (content is MessageContent.File && content.music) ->
                         Icon(if (playing) com.abtin.tglass.ui.components.IosIcons.Pause else com.abtin.tglass.ui.components.IosIcons.Play, androidx.compose.ui.graphics.Color.White, 20.dp)
                     content is MessageContent.Link -> T(content.site.take(1).uppercase(), TgTheme.type.headline, androidx.compose.ui.graphics.Color.White)
                     else -> Icon(TgIcons.AttFile, androidx.compose.ui.graphics.Color.White, 22.dp)
