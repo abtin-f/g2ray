@@ -523,7 +523,8 @@ private fun LazyListScope.folders() {
             T("📁", TgTheme.type.largeTitle.copy(fontSize = 64.sp, lineHeight = 72.sp))
             T("Create folders for different groups of chats and quickly switch between them.", TgTheme.type.subheadline, c.secondaryText, align = TextAlign.Center, modifier = Modifier.padding(horizontal = 32.dp))
         }
-        Section(header = "Chat Folders") {
+        if (repo.isLive) LiveFolderList()
+        else Section(header = "Chat Folders") {
             Cell("Create New Folder", icon = TgIcons.SetFolders, iconColor = c.accent, titleColor = c.accent, chevron = false, onClick = {})
             repo.folders.drop(1).forEachIndexed { i, f ->
                 Cell(f, subtitle = when (f) { "Personal" -> "Private chats"; "Work" -> "2 chats"; else -> "Unread chats" }, divider = i != repo.folders.size - 2, onClick = {})

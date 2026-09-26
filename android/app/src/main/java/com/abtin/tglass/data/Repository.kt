@@ -181,6 +181,22 @@ interface TelegramRepository {
     fun setPrivacy(key: PrivacyKey, value: PrivacyValue) {}
 
     fun logOut() {}
+
+    // ---- Polls, contacts, folders ----
+    // Polls and shared contacts go through sendContent (MessageContent.Poll / MessageContent.Contact).
+
+    /** Folders editable in Settings → Chat Folders. Empty in the demo, which shows static samples instead. */
+    val editableFolders: List<FolderSummary> get() = emptyList()
+
+    /** Loads a folder's settings for the editor; [onResult] gets null if it could not be loaded. */
+    fun loadFolder(folderId: Int, onResult: (FolderDraft?) -> Unit) = onResult(null)
+
+    /** Creates a folder ([folderId] null) or saves changes to one; [onDone] gets an error message or null. */
+    fun saveFolder(folderId: Int?, draft: FolderDraft, onDone: (String?) -> Unit) = onDone(null)
+
+    /** Deletes a folder (its chats stay where they are); [onDone] gets an error message or null. */
+    fun deleteFolder(folderId: Int, onDone: (String?) -> Unit) = onDone(null)
+    // ---- end Polls, contacts, folders ----
 }
 
 class DemoRepository(private val scope: CoroutineScope) : TelegramRepository {

@@ -241,5 +241,6 @@ private fun Screen(route: Route) {
         is Route.Media -> MediaViewer(route.chatId, route.messageId)
         is Route.SettingsPage -> SettingsPageScreen(route.page)
         Route.Calls -> CallsPage()
+        is Route.FolderEdit -> com.abtin.tglass.features.settings.FolderEditScreen(route.folderId)
     }
 }

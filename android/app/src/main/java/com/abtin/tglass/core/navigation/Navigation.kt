@@ -51,6 +51,8 @@ sealed interface Route {
     data class Media(val chatId: Long, val messageId: Long) : Route
     data class SettingsPage(val page: com.abtin.tglass.features.settings.Page) : Route
     data object Calls : Route
+    /** Settings → Chat Folders editor; [folderId] null creates a new folder. */
+    data class FolderEdit(val folderId: Int?) : Route
 }
 
 /** Routes presented modally (slide up) instead of pushed (slide from right). */

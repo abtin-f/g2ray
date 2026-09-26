@@ -76,8 +76,20 @@ sealed interface MessageContent {
         val performer: String? = null,
     ) : MessageContent
     data class Location(val title: String, val address: String) : MessageContent
-    data class Contact(val name: String, val phone: String) : MessageContent
-    data class Poll(val question: String, val options: List<String>, val votes: List<Int>, val voted: Int? = null, val quiz: Boolean = false) : MessageContent
+    /** [userId] is the Telegram user behind the contact (0 if not on Telegram / unknown). */
+    data class Contact(val name: String, val phone: String, val userId: Long = 0) : MessageContent
+    /** [correctOption] / [explanation] are only set for quizzes being sent from the New Poll screen. */
+    data class Poll(
+        val question: String,
+        val options: List<String>,
+        val votes: List<Int>,
+        val voted: Int? = null,
+        val quiz: Boolean = false,
+        val anonymous: Boolean = true,
+        val multiple: Boolean = false,
+        val correctOption: Int? = null,
+        val explanation: String? = null,
+    ) : MessageContent
     data class Link(val text: String, val site: String, val title: String, val description: String, val entities: List<Entity> = emptyList()) : MessageContent
     data class Service(val text: String) : MessageContent
 }
