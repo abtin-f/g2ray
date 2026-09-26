@@ -25,15 +25,25 @@ data class User(
     val status: String get() = if (online) "online" else lastSeen
 }
 
+/**
+ * A picture that may live in a local file ([path]) or still need downloading ([fileId], via the repository).
+ * [mini] is Telegram's tiny inline JPEG preview, shown blurred until the real file is ready.
+ */
+@Immutable
+class ImageRef(val fileId: Int, val path: String? = null, val mini: ByteArray? = null, val width: Int = 0, val height: Int = 0) {
+    override fun equals(other: Any?) = other is ImageRef && other.fileId == fileId && other.path == path
+    override fun hashCode() = fileId * 31 + (path?.hashCode() ?: 0)
+}
+
 @Immutable
 data class Reaction(val emoji: String, val count: Int, val chosen: Boolean)
 
 @Immutable
 sealed interface MessageContent {
     data class Text(val text: String) : MessageContent
-    data class Photo(val seed: Int, val aspect: Float, val caption: String? = null, val emoji: String = "🏞") : MessageContent
+    data class Photo(val seed: Int, val aspect: Float, val caption: String? = null, val emoji: String = "🏞", val image: ImageRef? = null, val video: Boolean = false) : MessageContent
     data class Voice(val seconds: Int, val waveform: List<Float>) : MessageContent
-    data class Sticker(val emoji: String) : MessageContent
+    data class Sticker(val emoji: String, val image: ImageRef? = null) : MessageContent
     data class File(val name: String, val size: String) : MessageContent
     data class Location(val title: String, val address: String) : MessageContent
     data class Contact(val name: String, val phone: String) : MessageContent
@@ -70,7 +80,7 @@ data class Message(
     val preview: String
         get() = when (val c = content) {
             is MessageContent.Text -> c.text
-            is MessageContent.Photo -> c.caption?.let { "🖼 $it" } ?: "Photo"
+            is MessageContent.Photo -> c.caption?.let { "🖼 $it" } ?: if (c.video) "Video" else "Photo"
             is MessageContent.Voice -> "Voice message"
             is MessageContent.Sticker -> "${c.emoji} Sticker"
             is MessageContent.File -> "📄 ${c.name}"
@@ -101,6 +111,10 @@ data class Chat(
     val description: String? = null,
     val username: String? = null,
     val folder: String? = null,
+    /** Sort key inside its list (TDLib chat position order); 0 for the local demo data. */
+    val order: Long = 0,
+    /** TDLib chat folders this chat is in. */
+    val folderIds: Set<Int> = emptySet(),
 )
 
 @Immutable
@@ -118,7 +132,7 @@ data class CallRecord(
 data class Story(val userId: Long, val emoji: String, val colors: List<Long>, val caption: String, val date: Long)
 
 @Immutable
-data class Session(val device: String, val app: String, val location: String, val lastActive: String, val current: Boolean = false)
+data class Session(val device: String, val app: String, val location: String, val lastActive: String, val current: Boolean = false, val id: Long = 0)
 
 /** Sample bubbles for the Appearance preview. */
 object BubbleDemo {

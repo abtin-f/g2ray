@@ -13,8 +13,19 @@ android {
         applicationId = "com.abtin.tglass"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 4
+        versionName = "0.4.0"
+
+        // Optional: bake Telegram API credentials into the build (otherwise they are entered in the app).
+        val apiId = (project.findProperty("TG_API_ID") as String?) ?: System.getenv("TG_API_ID")
+        val apiHash = (project.findProperty("TG_API_HASH") as String?) ?: System.getenv("TG_API_HASH")
+        buildConfigField("int", "TG_API_ID", apiId?.toIntOrNull()?.toString() ?: "0")
+        buildConfigField("String", "TG_API_HASH", "\"${apiHash.orEmpty()}\"")
+
+        ndk {
+            // TDLib natives: phones (arm64/armv7) and the x86_64 emulator used for screenshots.
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+        }
     }
 
     buildTypes {
@@ -28,8 +39,11 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     packaging {
+        // Compress TDLib's large .so files inside the APK (smaller download).
+        jniLibs.useLegacyPackaging = true
         resources {
             excludes += arrayOf("META-INF/*.version", "META-INF/**/LICENSE.txt", "kotlin-tooling-metadata.json")
         }
@@ -54,4 +68,5 @@ dependencies {
     implementation(libs.kyant.backdrop)
     implementation(libs.kyant.shapes)
     implementation(libs.lottie.compose)
+    implementation(libs.tdl.coroutines)
 }

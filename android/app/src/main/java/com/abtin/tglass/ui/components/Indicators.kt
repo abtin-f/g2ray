@@ -65,3 +65,30 @@ fun TypingText(text: String, style: TextStyle, color: Color, modifier: Modifier 
         T(text, style, color, maxLines = 1)
     }
 }
+
+/** UIActivityIndicatorView: 8 rounded spokes whose opacity chases around the circle. */
+@Composable
+fun ActivityIndicator(size: Dp = 20.dp, color: Color = TgTheme.colors.secondaryText, modifier: Modifier = Modifier) {
+    val t = rememberInfiniteTransition(label = "spinner")
+    val step by t.animateFloat(0f, 8f, infiniteRepeatable(tween(800, easing = androidx.compose.animation.core.LinearEasing)), label = "spin")
+    androidx.compose.foundation.Canvas(modifier.size(size)) {
+        val head = step.toInt()
+        val w = this.size.minDimension
+        val stroke = w * 0.09f
+        for (i in 0 until 8) {
+            val age = ((head - i) % 8 + 8) % 8
+            val angle = Math.toRadians(i * 45.0 - 90.0)
+            val cx = center.x
+            val cy = center.y
+            val r0 = w * 0.24f
+            val r1 = w * 0.46f
+            drawLine(
+                color.copy(alpha = 1f - age * 0.1f),
+                androidx.compose.ui.geometry.Offset(cx + (r0 * kotlin.math.cos(angle)).toFloat(), cy + (r0 * kotlin.math.sin(angle)).toFloat()),
+                androidx.compose.ui.geometry.Offset(cx + (r1 * kotlin.math.cos(angle)).toFloat(), cy + (r1 * kotlin.math.sin(angle)).toFloat()),
+                strokeWidth = stroke,
+                cap = androidx.compose.ui.graphics.StrokeCap.Round,
+            )
+        }
+    }
+}

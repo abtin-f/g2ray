@@ -144,7 +144,8 @@ fun SettingsScreen(backdrop: LayerBackdrop) {
                 ProfileHero(
                     name = me.name,
                     seed = 3,
-                    subtitle = "${me.phone} • @${me.username}",
+                    photoPeer = me.id,
+                    subtitle = listOfNotNull(me.phone.takeIf { it.isNotBlank() }, me.username?.let { "@$it" }).joinToString(" • "),
                     collapse = collapse,
                     badge = { if (me.premium) Icon(TgIcons.IcPremiumPeer, Color(0xFFAF52DE), 22.dp) },
                 )
@@ -197,20 +198,22 @@ fun SettingsScreen(backdrop: LayerBackdrop) {
                 Section {
                     Cell("Log Out", titleColor = c.destructive, chevron = false, divider = false, onClick = {
                         sheet.show(SheetRequest(title = "Log out?", message = "You will return to the welcome screen.", alert = true, actions = listOf(SheetAction("Log Out", destructive = true) {
+                            repo.logOut()
                             settings.updateLoggedIn(false)
+                            settings.updateDemoMode(false)
                             nav.resetTo(Route.Welcome)
                         })))
                     })
                 }
                 Spacer(Modifier.height(12.dp))
-                T("TGlass for Android v0.2.0", TgTheme.type.footnote, c.secondaryText, align = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                T("TGlass for Android v${com.abtin.tglass.BuildConfig.VERSION_NAME}", TgTheme.type.footnote, c.secondaryText, align = TextAlign.Center, modifier = Modifier.fillMaxWidth())
             }
         }
         GlassTopBar(
             title = null,
             fade = c.groupedBackground,
             left = { GlassIconButton(IosIcons.QrCode, { toast.show("QR code") }, iconSize = 22.dp) },
-            center = { CollapsedTitle(me.name, 3, collapse) },
+            center = { CollapsedTitle(me.name, 3, collapse, photoPeer = me.id) },
             right = { GlassTextButton("Edit", { open(Page.EditProfile) }) },
         )
     }
@@ -533,7 +536,7 @@ private fun LazyListScope.editProfile() {
         val c = TgTheme.colors
         val me = repo.me
         Column(Modifier.fillMaxWidth().padding(bottom = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Avatar(me.name, 3, 100.dp)
+            Avatar(me.name, 3, 100.dp, photoPeer = me.id)
             Spacer(Modifier.height(8.dp))
             T("Set New Photo", TgTheme.type.body, c.accent)
         }

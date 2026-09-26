@@ -54,6 +54,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalContext
+import com.abtin.tglass.data.td.TdConfig
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -110,6 +112,8 @@ fun PlaneLogo(size: androidx.compose.ui.unit.Dp) {
 @Composable
 fun WelcomeScreen() {
     val nav = LocalNavigator.current
+    val settings = LocalAppSettings.current
+    val context = LocalContext.current
     val c = TgTheme.colors
     val t = rememberInfiniteTransition(label = "logo")
     val bob by t.animateFloat(-6f, 6f, infiniteRepeatable(tween(1800), RepeatMode.Reverse), label = "bob")
@@ -160,7 +164,7 @@ fun WelcomeScreen() {
                 Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .fillMaxHeight(0.42f)
+                    .fillMaxHeight(0.44f)
                     .clip(RoundedRectangle(34.dp))
                     .background(c.background)
                     .navigationBarsPadding()
@@ -186,100 +190,18 @@ fun WelcomeScreen() {
                     }
                 }
                 Spacer(Modifier.weight(1f))
-                PrimaryButton("Start Messaging", { nav.push(Route.Phone) })
+                PrimaryButton("Start Messaging", {
+                    settings.updateDemoMode(false)
+                    nav.push(if (TdConfig(context).hasCredentials) Route.Phone else Route.ApiSetup)
+                })
+                Spacer(Modifier.height(4.dp))
+                TextButton("Explore the Demo", {
+                    settings.updateDemoMode(true)
+                    settings.updateLoggedIn(true)
+                    nav.resetTo(Route.Main)
+                }, modifier = Modifier.padding(8.dp))
             }
         }
     }
 }
 
-/** Spec §47 Phone number. */
-@Composable
-fun PhoneScreen() {
-    val nav = LocalNavigator.current
-    val c = TgTheme.colors
-    var code by rememberSaveable { mutableStateOf("98") }
-    var number by rememberSaveable { mutableStateOf("") }
-    val focus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { focus.requestFocus() }
-    Box(Modifier.fillMaxSize().background(c.background)) {
-        Column(Modifier.fillMaxSize().statusBarsPadding().imePadding().padding(top = 70.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            T("Your Phone", TgTheme.type.title1, c.text)
-            Spacer(Modifier.height(10.dp))
-            T("Please confirm your country code\nand enter your phone number.", TgTheme.type.body, c.secondaryText, align = TextAlign.Center)
-            Spacer(Modifier.height(30.dp))
-            Separator()
-            Row(Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
-                T("🇮🇷  Iran", TgTheme.type.body, c.accent, modifier = Modifier.weight(1f))
-            }
-            Separator(startPadding = 20.dp)
-            Row(Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
-                T("+", TgTheme.type.body.copy(fontSize = 20.sp), c.text)
-                BasicTextField(code, { code = it.filter(Char::isDigit).take(4) }, Modifier.width(48.dp), textStyle = TgTheme.type.body.copy(fontSize = 20.sp, color = c.text), singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone), cursorBrush = SolidColor(c.accent))
-                Box(Modifier.width(0.5.dp).height(30.dp).background(c.separator))
-                Spacer(Modifier.width(14.dp))
-                Box(Modifier.weight(1f)) {
-                    if (number.isEmpty()) T("Phone number", TgTheme.type.body.copy(fontSize = 20.sp), c.tertiaryText)
-                    BasicTextField(number, { number = it.filter(Char::isDigit).take(12) }, Modifier.fillMaxWidth().focusRequester(focus),
-                        textStyle = TgTheme.type.body.copy(fontSize = 20.sp, color = c.text), singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone), cursorBrush = SolidColor(c.accent))
-                }
-            }
-            Separator()
-            Spacer(Modifier.weight(1f))
-            PrimaryButton("Continue", { nav.push(Route.Code("+$code $number")) }, Modifier.padding(horizontal = 24.dp, vertical = 16.dp), enabled = number.length >= 7)
-        }
-        GlassTopBar(title = null, fade = Color.Transparent)
-    }
-}
-
-/** Spec §47 verification code. Demo mode accepts any 5 digits. */
-@Composable
-fun CodeScreen(phone: String) {
-    val nav = LocalNavigator.current
-    val settings = LocalAppSettings.current
-    val c = TgTheme.colors
-    var code by rememberSaveable { mutableStateOf("") }
-    val focus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { focus.requestFocus() }
-    LaunchedEffect(code) {
-        if (code.length == 5) {
-            delay(300)
-            settings.updateLoggedIn(true)
-            nav.resetTo(Route.Main)
-        }
-    }
-    Box(Modifier.fillMaxSize().background(c.background)) {
-        Column(Modifier.fillMaxSize().statusBarsPadding().padding(top = 70.dp, start = 24.dp, end = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            T("💬", TgTheme.type.largeTitle.copy(fontSize = 70.sp, lineHeight = 80.sp))
-            Spacer(Modifier.height(12.dp))
-            T(phone, TgTheme.type.title1, c.text)
-            Spacer(Modifier.height(10.dp))
-            T("We've sent the code to the Telegram app\non your other device.\n(Demo mode: enter any 5 digits.)", TgTheme.type.body, c.secondaryText, align = TextAlign.Center)
-            Spacer(Modifier.height(30.dp))
-            Box {
-                BasicTextField(code, { code = it.filter(Char::isDigit).take(5) }, Modifier.size(1.dp).focusRequester(focus),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    repeat(5) { i ->
-                        val ch = code.getOrNull(i)
-                        Box(
-                            Modifier
-                                .size(48.dp, 56.dp)
-                                .clip(RoundedRectangle(12.dp))
-                                .background(c.searchField)
-                                .border(if (i == code.length) 2.dp else 0.dp, if (i == code.length) c.accent else Color.Transparent, RoundedRectangle(12.dp)),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            T(ch?.toString() ?: "", TgTheme.type.title2, c.text, weight = FontWeight.SemiBold)
-                        }
-                    }
-                }
-                Box(Modifier.matchParentSize().fadeClickable { focus.requestFocus() })
-            }
-            Spacer(Modifier.height(24.dp))
-            TextButton("Didn't get the code?", {})
-        }
-        GlassTopBar(title = null, fade = Color.Transparent)
-    }
-}

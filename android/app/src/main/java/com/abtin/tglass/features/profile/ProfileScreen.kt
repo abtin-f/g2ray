@@ -141,7 +141,7 @@ fun ProfileScreen(chatId: Long) {
                 item {
                     Section {
                         if (user != null) {
-                            InfoRow("mobile", user.phone, accent = true)
+                            if (user.phone.isNotBlank()) InfoRow("mobile", user.phone, accent = true)
                             if (user.username != null) {
                                 InfoRow("username", "@${user.username}", accent = true)
                             }
@@ -159,7 +159,7 @@ fun ProfileScreen(chatId: Long) {
                 }
                 val tabName = tabs[tab]
                 if (tabName == "Members") {
-                    val members = repo.users.values.filter { it.id != 0L }.take(8)
+                    val members = if (repo.isLive) emptyList() else repo.users.values.filter { it.id != 0L }.take(8)
                     item {
                         Section {
                             Cell("Add Members", icon = TgIcons.PiAddMember, iconColor = c.accent, titleColor = c.accent, chevron = false, onClick = { toast.show("Invite link copied") })
@@ -178,16 +178,20 @@ fun ProfileScreen(chatId: Long) {
                     }
                 } else if (tabName == "Media" || tabName == "GIFs") {
                     val photos = repo.messages(chat.id).mapNotNull { it.content as? MessageContent.Photo }
-                    val tiles = (photos.map { it.seed to it.emoji } + (0 until 14).map { (it + chat.id.toInt()) to listOf("🏔", "🌅", "🐈", "🍜", "🌸", "🎨", "🌊")[it % 7] })
+                    val fillers = if (repo.isLive) emptyList() else (0 until 14).map { MessageContent.Photo(it + chat.id.toInt(), 1f, emoji = listOf("🏔", "🌅", "🐈", "🍜", "🌸", "🎨", "🌊")[it % 7]) }
+                    val tiles = photos.asReversed() + fillers
                     tiles.chunked(3).forEachIndexed { r, row ->
                         item(key = "row$r") {
                             Row(Modifier.fillMaxWidth().padding(horizontal = 1.dp), horizontalArrangement = Arrangement.spacedBy(1.dp)) {
-                                row.forEach { (seed, emoji) ->
-                                    val (a, b) = avatarColors(seed.toLong())
+                                row.forEach { p ->
+                                    val (a, b) = avatarColors(p.seed.toLong())
                                     Box(
                                         Modifier.weight(1f).aspectRatio(1f).background(Brush.linearGradient(listOf(a, b))),
                                         contentAlignment = Alignment.Center,
-                                    ) { T(emoji, TgTheme.type.body.copy(fontSize = 34.sp, lineHeight = 40.sp)) }
+                                    ) {
+                                        if (p.image != null) com.abtin.tglass.ui.components.TgImage(p.image, Modifier.matchParentSize(), maxPx = 360)
+                                        else T(p.emoji, TgTheme.type.body.copy(fontSize = 34.sp, lineHeight = 40.sp))
+                                    }
                                 }
                                 repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
                             }

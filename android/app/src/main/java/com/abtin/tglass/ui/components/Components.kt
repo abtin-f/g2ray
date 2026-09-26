@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -90,7 +91,10 @@ fun Avatar(
     iconColors: Pair<Color, Color>? = null,
     online: Boolean = false,
     storyRing: StoryRing = StoryRing.None,
+    /** Whose profile photo to show (user id or chat id); defaults to [seed]. */
+    photoPeer: Long = seed,
 ) {
+    val photo = if (saved || icon != null || iconRes != null) null else com.abtin.tglass.features.main.LocalRepository.current.avatar(photoPeer)
     val colors = when {
         saved -> Color(0xFF72D5FD) to Color(0xFF2A9EF1)
         iconColors != null -> iconColors
@@ -125,6 +129,10 @@ fun Avatar(
                     Color.White,
                     weight = FontWeight.SemiBold,
                 )
+            }
+            if (photo != null) {
+                val px = with(androidx.compose.ui.platform.LocalDensity.current) { inner.roundToPx() }
+                TgImage(photo, Modifier.fillMaxSize(), maxPx = px)
             }
         }
         if (online) {
@@ -407,18 +415,20 @@ fun ChipTabs(
 
 /** Primary filled button (Start Messaging, Continue...). */
 @Composable
-fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
+fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, loading: Boolean = false) {
     val c = TgTheme.colors
+    val active = enabled && !loading
     Box(
         modifier
             .fillMaxWidth()
             .height(52.dp)
             .clip(Capsule())
             .background(if (enabled) c.accent else c.accent.copy(alpha = 0.4f))
-            .then(if (enabled) Modifier.bounceClickable(onClick) else Modifier),
+            .then(if (active) Modifier.bounceClickable(onClick) else Modifier),
         contentAlignment = Alignment.Center,
     ) {
-        T(text, TgTheme.type.headline, Color.White, align = TextAlign.Center)
+        if (loading) ActivityIndicator(22.dp, Color.White)
+        else T(text, TgTheme.type.headline, Color.White, align = TextAlign.Center)
     }
 }
 

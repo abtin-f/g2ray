@@ -35,6 +35,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -67,6 +68,7 @@ import com.abtin.tglass.ui.components.Avatar
 import com.abtin.tglass.ui.components.Icon
 import com.abtin.tglass.ui.components.Separator
 import com.abtin.tglass.ui.components.T
+import com.abtin.tglass.ui.components.TgImage
 import com.abtin.tglass.ui.components.IosIcons
 import com.abtin.tglass.ui.components.TgIcons
 import com.abtin.tglass.ui.components.avatarColors
@@ -371,11 +373,17 @@ private fun PhotoBody(m: Message, p: MessageContent.Photo, colors: BubbleColors,
             .width(250.dp)
             .aspectRatio(p.aspect.coerceIn(0.6f, 1.8f))
             .clip(RoundedRectangle((r - 2f).coerceAtLeast(4f).dp))
-            .background(Brush.linearGradient(listOf(a, b)))
+            .background(if (p.image != null) Brush.linearGradient(listOf(colors.meta.copy(0.25f), colors.meta.copy(0.15f))) else Brush.linearGradient(listOf(a, b)))
             .iosClickable(highlight = Color.Black.copy(0.1f), onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        T(p.emoji, TgTheme.type.body.copy(fontSize = 64.sp, lineHeight = 72.sp))
+        if (p.image != null) TgImage(p.image, Modifier.matchParentSize(), maxPx = 900)
+        else T(p.emoji, TgTheme.type.body.copy(fontSize = 64.sp, lineHeight = 72.sp))
+        if (p.video) {
+            Box(Modifier.size(48.dp).clip(CircleShape).background(Color.Black.copy(0.45f)), contentAlignment = Alignment.Center) {
+                Icon(IosIcons.Play, Color.White, 26.dp)
+            }
+        }
         if (mediaOnly || p.caption == null) {
             Box(Modifier.align(Alignment.BottomEnd).padding(6.dp)) { MetaRow(m, Color.White, overlay = true) }
         }
@@ -388,7 +396,8 @@ private fun PhotoBody(m: Message, p: MessageContent.Photo, colors: BubbleColors,
 @Composable
 private fun StickerMessage(m: Message, s: MessageContent.Sticker, modifier: Modifier) {
     Column(modifier.padding(horizontal = 4.dp), horizontalAlignment = if (m.outgoing) Alignment.End else Alignment.Start) {
-        BasicText(s.emoji, style = TextStyle(fontSize = 110.sp, lineHeight = 124.sp))
+        if (s.image != null) TgImage(s.image, Modifier.size(160.dp), maxPx = 512, contentScale = ContentScale.Fit)
+        else BasicText(s.emoji, style = TextStyle(fontSize = 110.sp, lineHeight = 124.sp))
         MetaRow(m, Color.White, overlay = true)
     }
 }

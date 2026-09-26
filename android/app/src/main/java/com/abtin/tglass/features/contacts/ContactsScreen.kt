@@ -66,8 +66,8 @@ fun ContactsScreen(backdrop: LayerBackdrop, isTab: Boolean) {
     var byName by remember { mutableStateOf(false) }
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val contacts = repo.users.values
-        .filter { it.id != 0L && it.id != 10L && (query.isBlank() || it.name.contains(query, true)) }
+    val contacts = repo.contacts
+        .filter { query.isBlank() || it.name.contains(query, true) }
         .let { list -> if (byName) list.sortedBy { it.name } else list.sortedWith(compareByDescending<User> { it.online }.thenBy { it.name }) }
 
     Box(Modifier.fillMaxSize().background(c.background)) {
@@ -133,7 +133,7 @@ fun NewMessageScreen() {
     val backdrop = rememberLayerBackdrop()
     var query by remember { mutableStateOf("") }
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val contacts = repo.users.values.filter { it.id != 0L && (query.isBlank() || it.name.contains(query, true)) }.sortedBy { it.name }
+    val contacts = repo.contacts.filter { query.isBlank() || it.name.contains(query, true) }.sortedBy { it.name }
     CompositionLocalProvider(LocalBackdrop provides backdrop) {
         Box(Modifier.fillMaxSize().background(c.background)) {
             LazyColumn(Modifier.fillMaxSize().layerBackdrop(backdrop), contentPadding = PaddingValues(top = top + 62.dp, bottom = 30.dp)) {
@@ -143,7 +143,7 @@ fun NewMessageScreen() {
                 item { ActionRow(TgIcons.CtCreateChannel, "New Channel") { toast.show("New channel") } }
                 var letter = ' '
                 contacts.forEach { u ->
-                    val l = u.name.first().uppercaseChar()
+                    val l = u.name.firstOrNull()?.uppercaseChar() ?: '#' 
                     if (l != letter) {
                         letter = l
                         item(key = "h$l") {

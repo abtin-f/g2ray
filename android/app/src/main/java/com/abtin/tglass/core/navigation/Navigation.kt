@@ -37,6 +37,9 @@ sealed interface Route {
     data object Welcome : Route
     data object Phone : Route
     data class Code(val phone: String) : Route
+    data object ApiSetup : Route
+    data object Password : Route
+    data object Register : Route
     data object Main : Route
     data class Chat(val chatId: Long) : Route
     data class Profile(val chatId: Long) : Route

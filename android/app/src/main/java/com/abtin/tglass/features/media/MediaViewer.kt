@@ -108,9 +108,12 @@ fun MediaViewer(chatId: Long, messageId: Long) {
                         translationX = offset.x
                         translationY = offset.y + dismiss.value
                     }
-                    .background(Brush.linearGradient(listOf(a, b))),
+                    .then(if (photo.image == null) Modifier.background(Brush.linearGradient(listOf(a, b))) else Modifier),
                 contentAlignment = Alignment.Center,
-            ) { T(photo.emoji, TgTheme.type.body.copy(fontSize = 120.sp, lineHeight = 140.sp)) }
+            ) {
+                if (photo.image != null) com.abtin.tglass.ui.components.TgImage(photo.image, Modifier.matchParentSize(), maxPx = 2048, contentScale = androidx.compose.ui.layout.ContentScale.Fit)
+                else T(photo.emoji, TgTheme.type.body.copy(fontSize = 120.sp, lineHeight = 140.sp))
+            }
         }
         if (chrome) {
             Row(Modifier.fillMaxWidth().statusBarsPadding().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {

@@ -165,7 +165,12 @@ fun ChatScreen(chatId: Long) {
     val scope = rememberCoroutineScope()
     val chat = repo.chat(chatId)
     if (chat == null) {
-        LaunchedEffect(Unit) { nav.pop() }
+        // A live chat may still be on its way from the server (e.g. just created); give it a moment.
+        LaunchedEffect(Unit) {
+            kotlinx.coroutines.delay(if (repo.isLive) 4_000L else 0L)
+            nav.pop()
+        }
+        Box(Modifier.fillMaxSize().background(c.background))
         return
     }
     val backdrop = rememberLayerBackdrop()
@@ -194,7 +199,15 @@ fun ChatScreen(chatId: Long) {
     val pinned = messages.lastOrNull { it.pinned }
 
     LaunchedEffect(Unit) { repo.openChat(chatId) }
-    DisposableEffect(Unit) { onDispose { repo.setDraft(chatId, text.takeIf { editingId == null }) } }
+    DisposableEffect(Unit) {
+        onDispose {
+            repo.setDraft(chatId, text.takeIf { editingId == null })
+            repo.closeChat(chatId)
+        }
+    }
+    // Reverse layout: the oldest loaded message is the last item, so near-the-end means "load older".
+    val nearTop by remember { derivedStateOf { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index?.let { it >= listState.layoutInfo.totalItemsCount - 6 } == true } }
+    LaunchedEffect(nearTop, messages.size) { if (nearTop && messages.isNotEmpty()) repo.loadOlderMessages(chatId) }
     LaunchedEffect(messages.size) {
         val last = messages.lastOrNull()
         if (last != null && last.outgoing && last.date > openedAt) wallpaperPhase++
@@ -234,9 +247,7 @@ fun ChatScreen(chatId: Long) {
         val targets = repo.chats.filter { !it.archived && it.type != ChatType.Channel }.take(6)
         sheet.show(SheetRequest(title = "Forward to…", actions = targets.map { t ->
             SheetAction(t.title) {
-                messages.filter { it.id in ids }.forEach { m ->
-                    repo.sendContent(t.id, m.content)
-                }
+                repo.forward(chatId, ids, t.id)
                 toast.show("Forwarded to ${t.title}")
             }
         }))
@@ -260,7 +271,7 @@ fun ChatScreen(chatId: Long) {
             if (m.outgoing && hasText) MenuAction("Edit", TgIcons.CtxEdit) { editingId = m.id; replyToId = null; text = m.text ?: ""; focusRequester.requestFocus() } else null,
             MenuAction(if (m.pinned) "Unpin" else "Pin", if (m.pinned) TgIcons.CtxUnpin else TgIcons.CtxPin) { repo.togglePinMessage(chatId, m.id) },
             MenuAction("Forward", TgIcons.CtxForward) { forward(listOf(m.id)) },
-            if (chat.type != ChatType.Saved) MenuAction("Save to Saved Messages", TgIcons.CtxSave) { repo.sendContent(100, m.content); toast.show("Saved to Saved Messages") } else null,
+            if (chat.type != ChatType.Saved) MenuAction("Save to Saved Messages", TgIcons.CtxSave) { repo.forward(chatId, listOf(m.id), repo.savedChatId); toast.show("Saved to Saved Messages") } else null,
             MenuAction("Select", TgIcons.CtxSelect) { selecting = true; selected.clear(); selected.add(m.id) },
             MenuAction("Delete", TgIcons.CtxDelete, destructive = true, groupStart = true) { confirmDelete(listOf(m.id)) },
         )

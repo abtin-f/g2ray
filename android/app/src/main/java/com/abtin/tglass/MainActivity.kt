@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -27,6 +29,13 @@ import com.abtin.tglass.core.navigation.Navigator
 import com.abtin.tglass.core.navigation.Route
 import com.abtin.tglass.core.navigation.isDarkChrome
 import com.abtin.tglass.data.DemoRepository
+import com.abtin.tglass.data.TelegramRepository
+import com.abtin.tglass.data.td.AuthStep
+import com.abtin.tglass.data.td.Td
+import com.abtin.tglass.data.td.TdRepository
+import com.abtin.tglass.features.auth.ApiSetupScreen
+import com.abtin.tglass.features.auth.PasswordScreen
+import com.abtin.tglass.features.auth.RegisterScreen
 import com.abtin.tglass.features.auth.CodeScreen
 import com.abtin.tglass.features.auth.PhoneScreen
 import com.abtin.tglass.features.auth.WelcomeScreen
@@ -70,7 +79,7 @@ object DebugLaunch {
 }
 
 class MainActivity : ComponentActivity() {
-    private val repo by lazy { DemoRepository(lifecycleScope) }
+    private val demo by lazy { DemoRepository(lifecycleScope) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -85,6 +94,9 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun App(settings: AppSettings) {
         val scope = rememberCoroutineScope()
+        // Screenshot runs and "Explore the Demo" use local sample data; everything else is a real account.
+        val live: TdRepository? = if (DebugLaunch.screen != null || settings.demoMode) null else Td.get(this)
+        val repo: TelegramRepository = live ?: demo
         val nav = remember {
             val start = if (settings.loggedIn && DebugLaunch.screen != "welcome") Route.Main else Route.Welcome
             Navigator(start, scope).also { n ->
@@ -104,6 +116,30 @@ class MainActivity : ComponentActivity() {
         val menu = remember { ContextMenuState() }
         val sheet = remember { ActionSheetState() }
         val toast = remember { ToastState() }
+
+        if (live != null) {
+            // The login flow follows TDLib's authorization state.
+            val auth = live.auth
+            LaunchedEffect(auth) {
+                when (auth) {
+                    is AuthStep.WaitCode -> if (nav.top !is Route.Code) nav.push(Route.Code(auth.phone))
+                    is AuthStep.WaitPassword -> if (nav.top != Route.Password) nav.push(Route.Password)
+                    AuthStep.WaitRegistration -> if (nav.top != Route.Register) nav.push(Route.Register)
+                    AuthStep.Ready -> if (!settings.loggedIn || nav.top in AuthRoutes || nav.top is Route.Code) {
+                        settings.updateLoggedIn(true)
+                        nav.resetTo(Route.Main)
+                    }
+                    AuthStep.WaitPhone, AuthStep.NeedCredentials -> if (settings.loggedIn) {
+                        // Session ended (logged out here or terminated from another device).
+                        settings.updateLoggedIn(false)
+                        nav.resetTo(Route.Welcome)
+                    }
+                    is AuthStep.Unsupported -> toast.show(auth.what, androidx.compose.material.icons.Icons.Rounded.ErrorOutline)
+                    else -> {}
+                }
+            }
+            LaunchedEffect(live) { live.errors.collect { toast.show(it, androidx.compose.material.icons.Icons.Rounded.ErrorOutline) } }
+        }
 
         CompositionLocalProvider(LocalAppSettings provides settings) {
             TgThemeProvider(settings) {
@@ -136,12 +172,17 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private val AuthRoutes = setOf(Route.Welcome, Route.Phone, Route.ApiSetup, Route.Password, Route.Register)
+
 @Composable
 private fun Screen(route: Route) {
     when (route) {
         Route.Welcome -> WelcomeScreen()
         Route.Phone -> PhoneScreen()
         is Route.Code -> CodeScreen(route.phone)
+        Route.ApiSetup -> ApiSetupScreen()
+        Route.Password -> PasswordScreen()
+        Route.Register -> RegisterScreen()
         Route.Main -> MainScreen()
         is Route.Chat -> ChatScreen(route.chatId)
         is Route.Profile -> ProfileScreen(route.chatId)

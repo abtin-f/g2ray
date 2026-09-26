@@ -14,15 +14,24 @@ A Kotlin + Jetpack Compose Android client whose UI mirrors Telegram for iOS, bui
 | Chat | Wallpaper with doodles, iOS bubbles with tails and grouping, inline time + ✓✓, replies, reactions, date pills, pinned bar, swipe-to-reply, double-tap 👍, **long-press → haptic → blur + dim → sharp message → reactions + context menu** (spec §6/§67), multi-select, forward, copy, edit, delete. |
 | Composer | Glass field, send/mic morph, hold-to-record voice with *slide to cancel* and *slide up to lock*, emoji / stickers / GIF panel, attachment sheet (gallery multi-select, file, location, poll, contact, music). |
 | Content types | Text, photo, voice, sticker, file, location, contact, poll (voting), link preview, service messages, channel posts with views. |
-| Other screens | Profile (user/group/channel + shared media), Contacts, Calls + active call, New Message, Stories viewer, Media viewer (pinch/double-tap zoom, swipe-down), Settings and sub-pages (Appearance with live preview/text size/corners/wallpaper, Power Saving, Notifications, Privacy, Data, Language, Devices, Folders, Premium, Edit Profile), Welcome → Phone → Code login. |
+| Other screens | Profile (user/group/channel + shared media), Contacts, Calls + active call, New Message, Stories viewer, Media viewer (pinch/double-tap zoom, swipe-down), Settings and sub-pages (Appearance with live preview/text size/corners/wallpaper, Power Saving, Notifications, Privacy, Data, Language, Devices, Folders, Premium, Edit Profile), Welcome → API setup → Phone → Code → Password login. |
 | System | Light/Dark/System theme, action sheets & alerts, toasts, haptics, edge-to-edge insets, keyboard handling. |
 
 ## Data
 
-The UI only talks to `TelegramRepository`. Right now `DemoRepository` provides local sample data
-(messages you send get simulated read receipts, typing and replies). To connect a real account,
-implement `TelegramRepository` on top of [TDLib](https://core.telegram.org/tdlib) with your own
-`api_id`/`api_hash` from <https://my.telegram.org>.
+The UI only talks to `TelegramRepository`, which has two implementations:
+
+- **`TdRepository`** (`data/td/`) — a real Telegram account through [TDLib](https://core.telegram.org/tdlib)
+  (via the prebuilt Android build in [tdl-coroutines](https://github.com/g000sha256/tdl-coroutines)).
+  TDLib updates are folded into Compose state, so every screen updates live: chat list with folders,
+  archive, pins, unread/mentions, drafts, typing; message history with paging, sending, replies, edits,
+  reactions, pins, polls, forwarding; profile photos, photos, stickers; contacts, calls, active sessions.
+  Sign-in: phone → code → two-step password (or registration).
+- **`DemoRepository`** — local sample data ("Explore the Demo" on the welcome screen, and CI screenshots).
+
+To sign in you need your own `api_id` / `api_hash` from <https://my.telegram.org> → *API development tools*.
+They are entered once in the app, or baked into a build with `-PTG_API_ID=… -PTG_API_HASH=…`
+(or the environment variables of the same name).
 
 ## Build
 

@@ -9,6 +9,8 @@ composeIcons = "1.7.8"
 backdrop = "1.0.6"
 kyantShapes = "1.2.0"
 lottie = "6.7.1"
+# TDLib 1.8.65 with prebuilt Android natives (newer releases need compileSdk 37)
+tdl = "13.0.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "core" }
@@ -20,6 +22,7 @@ androidx-compose-icons-extended = { group = "androidx.compose.material", name = 
 kyant-backdrop = { group = "io.github.kyant0", name = "backdrop", version.ref = "backdrop" }
 kyant-shapes = { group = "io.github.kyant0", name = "shapes", version.ref = "kyantShapes" }
 lottie-compose = { group = "com.airbnb.android", name = "lottie-compose", version.ref = "lottie" }
+tdl-coroutines = { group = "dev.g000sha256", name = "tdl-coroutines", version.ref = "tdl" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

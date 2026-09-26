@@ -72,6 +72,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -156,6 +157,7 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
 
     // Stories: collapsed into the title; pulling the list down expands them (Telegram-iOS behaviour).
     val storyUsers = repo.users.values.filter { it.hasStory }.sortedBy { it.storySeen }
+    val hasStories = rememberUpdatedState(storyUsers.isNotEmpty())
     val storiesMax = with(density) { 104.dp.toPx() }
     var storiesPx by rememberSaveable { mutableFloatStateOf(0f) }
     val storiesFraction = (storiesPx / storiesMax).coerceIn(0f, 1f)
@@ -171,6 +173,7 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
             }
 
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                if (!hasStories.value) return Offset.Zero
                 if (available.y > 0f && source == NestedScrollSource.UserInput && storiesPx < storiesMax) {
                     val d = minOf(available.y * 0.6f, storiesMax - storiesPx)
                     storiesPx += d
@@ -192,13 +195,9 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
 
     val all = repo.chats.filter { !it.archived }
     val folders = repo.folders
-    fun inFolder(chat: Chat, f: String?) = when (f) {
-        "Personal" -> chat.folder == "Personal" || chat.type == ChatType.Private
-        "Work" -> chat.folder == "Work"
-        "Unread" -> chat.unread > 0 || chat.markedUnread
-        else -> true
-    }
-    val chats = all.filter { inFolder(it, folders.getOrNull(folder)) }
+    if (folder >= folders.size) folder = 0
+    fun inFolder(chat: Chat, f: Int) = repo.isInFolder(chat, f)
+    val chats = all.filter { inFolder(it, folder) }
     val archived = repo.chats.filter { it.archived }
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -227,13 +226,19 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
                 searchResults(repo, query, onOpen = { focus.clearFocus(); nav.push(Route.Chat(it)) })
             } else {
                 item(key = "folders") {
-                    FolderTabs(folders, folder, { folder = it }, unreadFor = { f -> all.count { ch -> inFolder(ch, f) && (ch.unread > 0 || ch.markedUnread) && !ch.muted } })
+                    if (folders.size > 1) FolderTabs(folders, folder, { folder = it }, unreadFor = { f -> all.count { ch -> inFolder(ch, f) && (ch.unread > 0 || ch.markedUnread) && !ch.muted } })
                 }
                 if (archived.isNotEmpty() && folder == 0 && !editing) {
                     item(key = "archive") { ArchiveRow(archived, repo) { nav.push(Route.Archive) } }
                 }
                 if (chats.isEmpty()) {
-                    item(key = "empty") { EmptyState("💬", "No Chats", "There are no chats in this folder yet.", animation = com.abtin.tglass.ui.components.TgAnimations.ChatListEmpty) }
+                    item(key = "empty") {
+                        if (repo.isLive && all.isEmpty()) {
+                            Box(Modifier.fillMaxWidth().padding(top = 120.dp), contentAlignment = Alignment.Center) { com.abtin.tglass.ui.components.ActivityIndicator(28.dp) }
+                        } else {
+                            EmptyState("💬", "No Chats", "There are no chats in this folder yet.", animation = com.abtin.tglass.ui.components.TgAnimations.ChatListEmpty)
+                        }
+                    }
                 }
                 items(chats, key = { it.id }) { chat ->
                     ChatListItem(
@@ -281,6 +286,7 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
                         }, bold = editing, modifier = Modifier.align(Alignment.CenterStart))
                         ChatsTitle(
                             storyUsers.take(3).map { it.id to it.name },
+                            status = repo.connectionStatus,
                             collapsed = 1f - storiesFraction,
                             modifier = Modifier.align(Alignment.Center),
                             onStories = {
@@ -344,7 +350,7 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
 
 /** "Chats" title with the stacked story avatars that Telegram shows when stories are collapsed. */
 @Composable
-private fun ChatsTitle(stories: List<Pair<Long, String>>, collapsed: Float, modifier: Modifier, onStories: () -> Unit) {
+private fun ChatsTitle(stories: List<Pair<Long, String>>, status: String?, collapsed: Float, modifier: Modifier, onStories: () -> Unit) {
     val c = TgTheme.colors
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         if (stories.isNotEmpty() && collapsed > 0.01f) {
@@ -370,13 +376,21 @@ private fun ChatsTitle(stories: List<Pair<Long, String>>, collapsed: Float, modi
                 }
             }
         }
-        T("Chats", TgTheme.type.headline, c.text)
+        // Telegram shows the connection state in place of the title until it is online.
+        androidx.compose.animation.AnimatedContent(status, label = "chatsTitle") { st ->
+            if (st == null) T("Chats", TgTheme.type.headline, c.text)
+            else Row(verticalAlignment = Alignment.CenterVertically) {
+                com.abtin.tglass.ui.components.ActivityIndicator(16.dp)
+                Spacer(Modifier.width(6.dp))
+                T(st, TgTheme.type.headline, c.text)
+            }
+        }
     }
 }
 
 /** Folder tabs: text tabs with a glass pill under the selected one and unread counters. */
 @Composable
-private fun FolderTabs(folders: List<String>, selected: Int, onSelect: (Int) -> Unit, unreadFor: (String?) -> Int) {
+private fun FolderTabs(folders: List<String>, selected: Int, onSelect: (Int) -> Unit, unreadFor: (Int) -> Int) {
     val c = TgTheme.colors
     Row(
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 6.dp),
@@ -396,7 +410,7 @@ private fun FolderTabs(folders: List<String>, selected: Int, onSelect: (Int) -> 
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 T(f, TgTheme.type.subheadline, if (sel) c.text else c.secondaryText, weight = FontWeight.SemiBold, maxLines = 1)
-                val count = unreadFor(if (i == 0) null else f)
+                val count = unreadFor(i)
                 if (count > 0 && f != "Unread") {
                     Spacer(Modifier.width(6.dp))
                     Box(
@@ -503,7 +517,7 @@ private fun StoriesRow(repo: TelegramRepository, fraction: Float, modifier: Modi
         item(key = "me") {
             Column(Modifier.width(68.dp).fadeClickable { }, horizontalAlignment = Alignment.CenterHorizontally) {
                 Box {
-                    Avatar(repo.me.name, 3, 64.dp)
+                    Avatar(repo.me.name, 3, 64.dp, photoPeer = repo.me.id)
                     Box(
                         Modifier
                             .align(Alignment.BottomEnd)

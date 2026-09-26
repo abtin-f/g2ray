@@ -64,6 +64,7 @@ fun ProfileHero(
     saved: Boolean = false,
     subtitleAccent: Boolean = false,
     badge: (@Composable () -> Unit)? = null,
+    photoPeer: Long = seed,
     actions: (@Composable RowScope.() -> Unit)? = null,
 ) {
     val c = TgTheme.colors
@@ -93,7 +94,7 @@ fun ProfileHero(
                 }
             ) {
                 Box(Modifier.shadow(24.dp, CircleShape, clip = false, ambientColor = bottom, spotColor = bottom)) {
-                    Avatar(name, seed, 112.dp, saved = saved)
+                    Avatar(name, seed, 112.dp, saved = saved, photoPeer = photoPeer)
                 }
             }
             Spacer(Modifier.height(14.dp))
@@ -142,10 +143,10 @@ fun RowScope.HeroAction(icon: Int, label: String, onClick: () -> Unit) {
 
 /** Compact title shown in the nav bar once the hero has collapsed. */
 @Composable
-fun CollapsedTitle(name: String, seed: Long, collapse: Float, saved: Boolean = false) {
+fun CollapsedTitle(name: String, seed: Long, collapse: Float, saved: Boolean = false, photoPeer: Long = seed) {
     val a = ((collapse - 0.55f) / 0.45f).coerceIn(0f, 1f)
     Row(Modifier.graphicsLayer { alpha = a; translationY = (1f - a) * 12.dp.toPx() }, verticalAlignment = Alignment.CenterVertically) {
-        Avatar(name, seed, 26.dp, saved = saved)
+        Avatar(name, seed, 26.dp, saved = saved, photoPeer = photoPeer)
         Spacer(Modifier.width(8.dp))
         T(name, TgTheme.type.headline, TgTheme.colors.text, maxLines = 1)
     }

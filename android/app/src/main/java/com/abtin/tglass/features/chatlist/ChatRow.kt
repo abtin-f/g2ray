@@ -215,9 +215,12 @@ private fun PreviewLine(m: com.abtin.tglass.data.Message, style: androidx.compos
                     .clip(com.kyant.shapes.RoundedRectangle(4.dp))
                     .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(a, b))),
                 contentAlignment = Alignment.Center,
-            ) { T(content.emoji, style.copy(fontSize = 11.sp, lineHeight = 12.sp)) }
+            ) {
+                if (content.image != null) com.abtin.tglass.ui.components.TgImage(content.image, Modifier.matchParentSize(), maxPx = 96)
+                else T(content.emoji, style.copy(fontSize = 11.sp, lineHeight = 12.sp))
+            }
             Spacer(Modifier.width(5.dp))
-            T(content.caption ?: "Photo", style, c.secondaryText, maxLines = 1)
+            T(content.caption ?: if (content.video) "Video" else "Photo", style, c.secondaryText, maxLines = 1)
         }
         is MessageContent.Voice -> Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(TgIcons.IcVoiceSmall, c.secondaryText, 18.dp)

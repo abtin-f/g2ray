@@ -62,7 +62,10 @@ fun StoryViewer(startUserId: Long) {
     var index by remember { mutableIntStateOf(stories.indexOfFirst { it.userId == startUserId }.coerceAtLeast(0)) }
     var paused by remember { mutableStateOf(false) }
     val progress = remember { Animatable(0f) }
-    val story = stories.getOrNull(index) ?: return
+    val story = stories.getOrNull(index) ?: run {
+        LaunchedEffect(Unit) { nav.pop() }
+        return
+    }
     val user = repo.user(story.userId)
 
     val animatedFor = remember { intArrayOf(-1) }

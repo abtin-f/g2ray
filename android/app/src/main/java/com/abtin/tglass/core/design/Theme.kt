@@ -220,6 +220,9 @@ class AppSettings(context: Context) {
         private set
     var loggedIn by mutableStateOf(prefs.getBoolean("loggedIn", false))
         private set
+    /** Local sample data instead of a real account. */
+    var demoMode by mutableStateOf(prefs.getBoolean("demoMode", false))
+        private set
     var autoplayVideo by mutableStateOf(prefs.getBoolean("autoplayVideo", true))
         private set
     var autoplayGif by mutableStateOf(prefs.getBoolean("autoplayGif", true))
@@ -232,6 +235,7 @@ class AppSettings(context: Context) {
     fun updateBubbleRadius(v: Float) { bubbleRadius = v; prefs.edit().putFloat("bubbleRadius", v).apply() }
     fun updateWallpaper(v: Int) { wallpaperIndex = v; prefs.edit().putInt("wallpaper", v).apply() }
     fun updateLoggedIn(v: Boolean) { loggedIn = v; prefs.edit().putBoolean("loggedIn", v).apply() }
+    fun updateDemoMode(v: Boolean) { demoMode = v; prefs.edit().putBoolean("demoMode", v).apply() }
     fun updateAutoplayVideo(v: Boolean) { autoplayVideo = v; prefs.edit().putBoolean("autoplayVideo", v).apply() }
     fun updateAutoplayGif(v: Boolean) { autoplayGif = v; prefs.edit().putBoolean("autoplayGif", v).apply() }
 }

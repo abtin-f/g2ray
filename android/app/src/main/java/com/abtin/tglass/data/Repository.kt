@@ -8,10 +8,19 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * The UI talks only to this interface (spec §61). [DemoRepository] backs it with local sample data;
- * a TDLib-backed implementation can replace it without touching any screen.
+ * The UI talks only to this interface (spec §61). [DemoRepository] backs it with local sample data,
+ * [com.abtin.tglass.data.td.TdRepository] with a real account through TDLib.
  */
 interface TelegramRepository {
+    /** True when backed by a real Telegram account. */
+    val isLive: Boolean get() = false
+
+    /** "Connecting…", "Updating…" etc. while the connection is not ready; null when online. */
+    val connectionStatus: String? get() = null
+
+    /** Chat that holds Saved Messages. */
+    val savedChatId: Long get() = 100
+
     val me: User
     val users: Map<Long, User>
     val chats: List<Chat>
@@ -44,6 +53,38 @@ interface TelegramRepository {
     fun markStorySeen(userId: Long)
     fun terminateSession(session: Session)
     fun terminateOtherSessions()
+
+    /** People shown on the Contacts tab and in New Message. */
+    val contacts: List<User>
+        get() = users.values.filter { it.id != me.id && it.id != 10L }
+
+    /** Whether [chat] belongs to the folder at [index] of [folders] (0 = All Chats). */
+    fun isInFolder(chat: Chat, index: Int): Boolean = when (folders.getOrNull(index)) {
+        "Personal" -> chat.folder == "Personal" || chat.type == ChatType.Private
+        "Work" -> chat.folder == "Work"
+        "Unread" -> chat.unread > 0 || chat.markedUnread
+        else -> true
+    }
+
+    /** Profile photo of a user or chat (keyed by user id / chat id), if it has one. */
+    fun avatar(peerId: Long): ImageRef? = null
+
+    /** Local path of a downloaded file, or null while it is not available yet. */
+    fun filePath(image: ImageRef): String? = image.path
+
+    /** Starts downloading the file behind [image]; [filePath] turns non-null once it is done. */
+    fun requestImage(image: ImageRef) {}
+
+    /** Loads older messages of a chat when the user scrolls to the top of the history. */
+    fun loadOlderMessages(chatId: Long) {}
+
+    fun closeChat(chatId: Long) {}
+
+    fun forward(fromChatId: Long, messageIds: List<Long>, toChatId: Long) {
+        messageIds.mapNotNull { id -> messages(fromChatId).firstOrNull { it.id == id } }.forEach { sendContent(toChatId, it.content) }
+    }
+
+    fun logOut() {}
 }
 
 class DemoRepository(private val scope: CoroutineScope) : TelegramRepository {
@@ -343,6 +384,6 @@ class DemoRepository(private val scope: CoroutineScope) : TelegramRepository {
 /** Sender label for a message in group chats. */
 fun TelegramRepository.senderName(m: Message): String = when {
     m.outgoing -> "You"
-    m.senderId < 0 -> chat(m.chatId)?.title ?: ""
+    m.senderId < 0 -> (chat(m.senderId) ?: chat(m.chatId))?.title ?: ""
     else -> user(m.senderId)?.name ?: ""
 }

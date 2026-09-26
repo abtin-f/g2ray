@@ -8,6 +8,8 @@ includes artwork from Telegram for iOS.
 | Icons in `app/src/main/res/drawable/tg_*.xml` | Converted from [TelegramMessenger/Telegram-iOS](https://github.com/TelegramMessenger/Telegram-iOS) `submodules/TelegramUI/Images.xcassets` | GPL-2.0 |
 | Lottie animations in `app/src/main/res/raw/lottie_*.json` (tab icons, swipe actions, intro, empty chat list) | Telegram-iOS `submodules/TelegramUI/Resources/Animations`, `Telegram/Telegram-iOS/Resources` | GPL-2.0 |
 | Lottie runtime | [airbnb/lottie-android](https://github.com/airbnb/lottie-android) | Apache-2.0 |
+| TDLib (Telegram Database Library) | [tdlib/td](https://github.com/tdlib/td) | BSL-1.0 |
+| Kotlin coroutines client + prebuilt Android TDLib | [g000sha256/tdl-coroutines](https://github.com/g000sha256/tdl-coroutines) | Apache-2.0 |
 | Wallpaper gradient algorithm (`features/chat/Wallpaper.kt`) | Ported from Telegram-iOS `SoftwareGradientBackground.swift` | GPL-2.0 |
 | Glass components in `core/glass/` | Adapted from [Kyant0/AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass) | Apache-2.0 |
 | Inter font (`app/src/main/res/font/inter.ttf`) | [rsms/inter](https://github.com/rsms/inter) | SIL OFL 1.1 (`INTER_OFL.txt`) |
