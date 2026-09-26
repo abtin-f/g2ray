@@ -63,13 +63,17 @@ import com.abtin.tglass.ui.components.Icon
 import com.abtin.tglass.ui.components.Separator
 import com.abtin.tglass.ui.components.StoryRing
 import com.abtin.tglass.ui.components.T
+import com.abtin.tglass.ui.components.IosIcons
+import com.abtin.tglass.ui.components.TgIcons
+import com.abtin.tglass.ui.components.TypingText
+import com.abtin.tglass.ui.components.VerifiedBadge
 import com.abtin.tglass.ui.components.formatListDate
 import com.abtin.tglass.ui.components.iosClickable
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-class SwipeAction(val label: String, val icon: ImageVector, val color: Color, val onClick: () -> Unit)
+class SwipeAction(val label: String, val icon: Int, val color: Color, val onClick: () -> Unit)
 
 fun chatIcon(chat: Chat): ImageVector? = when (chat.type) {
     ChatType.Group -> Icons.Rounded.Group
@@ -122,32 +126,27 @@ fun ChatRow(
                         .clip(CircleShape)
                         .then(if (selected) Modifier.background(c.accent) else Modifier.border(1.5.dp, c.tertiaryText, CircleShape)),
                     contentAlignment = Alignment.Center,
-                ) { if (selected) Icon(Icons.Rounded.Check, Color.White, 16.dp) }
+                ) { if (selected) Icon(IosIcons.Checkmark, Color.White, 15.dp) }
             }
             ChatAvatar(chat, repo, 60.dp)
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f).fillMaxHeight().padding(top = 8.dp, bottom = 6.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    val typeIcon = chatIcon(chat)
-                    if (typeIcon != null && chat.type != ChatType.Bot) {
-                        Icon(typeIcon, c.text, 16.dp)
-                        Spacer(Modifier.width(3.dp))
-                    }
                     T(chat.title, TgTheme.type.headline.copy(fontSize = TgTheme.type.headline.fontSize * (16f / 17f)), c.text, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
                     if (chat.verified) {
                         Spacer(Modifier.width(3.dp))
-                        Icon(Icons.Rounded.Verified, c.accent, 16.dp)
+                        VerifiedBadge(16.dp)
                     }
                     if (chat.muted) {
-                        Spacer(Modifier.width(3.dp))
-                        Icon(Icons.Rounded.VolumeOff, c.secondaryText, 15.dp)
+                        Spacer(Modifier.width(2.dp))
+                        Icon(TgIcons.IcMutedPeer, c.secondaryText.copy(alpha = 0.8f), 16.dp)
                     }
                     Spacer(Modifier.weight(1f))
                     if (last != null && last.outgoing && chat.type != ChatType.Saved) {
                         val (icon, tint) = when (last.status) {
-                            MessageStatus.Sending -> Icons.Rounded.Schedule to c.secondaryText
-                            MessageStatus.Sent -> Icons.Rounded.Check to c.listCheckmark
-                            MessageStatus.Read -> Icons.Rounded.DoneAll to c.listCheckmark
+                            MessageStatus.Sending -> IosIcons.Clock to c.secondaryText
+                            MessageStatus.Sent -> IosIcons.CheckSingle to c.listCheckmark
+                            MessageStatus.Read -> IosIcons.CheckDouble to c.listCheckmark
                             MessageStatus.Failed -> Icons.Rounded.ErrorOutline to c.destructive
                         }
                         Icon(icon, tint, 17.dp)
@@ -169,7 +168,7 @@ fun ChatRow(
                             }
                             chat.unread > 0 -> Badge(chat.unread, muted = chat.muted)
                             chat.markedUnread -> Box(Modifier.size(20.dp).clip(CircleShape).background(if (chat.muted) c.mutedBadge else c.accent))
-                            chat.pinned -> Icon(Icons.Rounded.PushPin, c.tertiaryText.copy(alpha = 1f), 18.dp, Modifier.graphicsLayer { rotationZ = 45f })
+                            chat.pinned -> Icon(TgIcons.MsgPinned, c.mutedBadge, 16.dp)
                         }
                     }
                 }
@@ -185,7 +184,7 @@ private fun ChatPreviewText(chat: Chat, repo: TelegramRepository) {
     val last = repo.lastMessage(chat.id)
     val style = TgTheme.type.subheadline
     when {
-        chat.typing != null -> T("${chat.typing}…", style, c.accent, maxLines = 2)
+        chat.typing != null -> TypingText(chat.typing, style, c.accent, Modifier.padding(top = 2.dp))
         chat.draft != null -> Row {
             T("Draft: ", style, c.destructive, maxLines = 1)
             T(chat.draft ?: "", style, c.secondaryText, maxLines = 2)
@@ -279,7 +278,7 @@ private fun ActionButton(a: SwipeAction, width: androidx.compose.ui.unit.Dp, onC
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
     ) {
-        Icon(a.icon, Color.White, 26.dp)
+        Icon(a.icon, Color.White, 28.dp)
         Spacer(Modifier.height(4.dp))
         T(a.label, TgTheme.type.caption1.copy(fontSize = 13.sp), Color.White, maxLines = 1, weight = FontWeight.Medium)
     }
@@ -291,13 +290,13 @@ fun chatSwipeActions(chat: Chat, repo: TelegramRepository, onDelete: () -> Unit)
     val c = TgTheme.colors
     val unread = chat.unread > 0 || chat.markedUnread
     val leading = listOf(
-        SwipeAction(if (unread) "Read" else "Unread", if (unread) Icons.Rounded.MarkChatRead else Icons.Rounded.MarkChatUnread, c.accent) { repo.toggleRead(chat.id) },
-        SwipeAction(if (chat.pinned) "Unpin" else "Pin", Icons.Rounded.PushPin, c.green) { repo.togglePin(chat.id) },
+        SwipeAction(if (unread) "Read" else "Unread", TgIcons.CtxRead, if (unread) Color(0xFFAAAAAF) else c.accent) { repo.toggleRead(chat.id) },
+        SwipeAction(if (chat.pinned) "Unpin" else "Pin", if (chat.pinned) TgIcons.CtxUnpin else TgIcons.CtxPin, c.green) { repo.togglePin(chat.id) },
     )
     val trailing = listOf(
-        SwipeAction(if (chat.muted) "Unmute" else "Mute", if (chat.muted) Icons.Rounded.VolumeUp else Icons.Rounded.VolumeOff, c.orange) { repo.toggleMute(chat.id) },
-        SwipeAction("Delete", Icons.Outlined.Delete, c.destructive, onDelete),
-        SwipeAction(if (chat.archived) "Unarchive" else "Archive", if (chat.archived) Icons.Rounded.Unarchive else Icons.Rounded.Archive, Color(0xFFAAAAAF)) { repo.toggleArchive(chat.id) },
+        SwipeAction(if (chat.muted) "Unmute" else "Mute", if (chat.muted) TgIcons.CtxUnmute else TgIcons.CtxMuted, c.orange) { repo.toggleMute(chat.id) },
+        SwipeAction("Delete", TgIcons.CtxDelete, c.destructive, onDelete),
+        SwipeAction(if (chat.archived) "Unarchive" else "Archive", TgIcons.CtxArchive, Color(0xFFAAAAAF)) { repo.toggleArchive(chat.id) },
     )
     return leading to trailing
 }

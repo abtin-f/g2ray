@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -69,6 +70,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
@@ -110,6 +112,9 @@ import com.abtin.tglass.ui.components.MenuAction
 import com.abtin.tglass.ui.components.SheetAction
 import com.abtin.tglass.ui.components.SheetRequest
 import com.abtin.tglass.ui.components.T
+import com.abtin.tglass.ui.components.BackButton
+import com.abtin.tglass.ui.components.IosIcons
+import com.abtin.tglass.ui.components.TgIcons
 import com.abtin.tglass.ui.components.fadeClickable
 import com.abtin.tglass.ui.components.formatCount
 import com.abtin.tglass.ui.components.formatDay
@@ -176,6 +181,8 @@ fun ChatScreen(chatId: Long) {
     var highlightId by remember { mutableLongStateOf(-1L) }
     var headerHeight by remember { mutableIntStateOf(0) }
     var bottomHeight by remember { mutableIntStateOf(0) }
+    var wallpaperPhase by rememberSaveable { mutableIntStateOf(0) }
+    val openedAt = remember { System.currentTimeMillis() }
 
     val messages = repo.messages(chatId)
     val reversed = messages.asReversed()
@@ -188,6 +195,8 @@ fun ChatScreen(chatId: Long) {
     LaunchedEffect(Unit) { repo.openChat(chatId) }
     DisposableEffect(Unit) { onDispose { repo.setDraft(chatId, text.takeIf { editingId == null }) } }
     LaunchedEffect(messages.size) {
+        val last = messages.lastOrNull()
+        if (last != null && last.outgoing && last.date > openedAt) wallpaperPhase++
         if (listState.firstVisibleItemIndex <= 2) listState.animateScrollToItem(0)
     }
 
@@ -245,14 +254,14 @@ fun ChatScreen(chatId: Long) {
         keyboard?.hide()
         val hasText = m.text != null
         val actions = listOfNotNull(
-            if (!isChannel) MenuAction("Reply", Icons.AutoMirrored.Rounded.Reply) { replyToId = m.id; editingId = null; focusRequester.requestFocus() } else null,
-            if (hasText) MenuAction("Copy", Icons.Outlined.ContentCopy) { copy(m) } else null,
-            if (m.outgoing && hasText) MenuAction("Edit", Icons.Outlined.Edit) { editingId = m.id; replyToId = null; text = m.text ?: ""; focusRequester.requestFocus() } else null,
-            MenuAction(if (m.pinned) "Unpin" else "Pin", Icons.Outlined.PushPin) { repo.togglePinMessage(chatId, m.id) },
-            MenuAction("Forward", Icons.AutoMirrored.Rounded.Forward) { forward(listOf(m.id)) },
-            if (chat.type != ChatType.Saved) MenuAction("Save to Saved Messages", Icons.Outlined.BookmarkBorder) { repo.sendContent(100, m.content); toast.show("Saved to Saved Messages") } else null,
-            MenuAction("Select", Icons.Outlined.CheckCircle) { selecting = true; selected.clear(); selected.add(m.id) },
-            MenuAction("Delete", Icons.Outlined.Delete, destructive = true, groupStart = true) { confirmDelete(listOf(m.id)) },
+            if (!isChannel) MenuAction("Reply", TgIcons.CtxReply) { replyToId = m.id; editingId = null; focusRequester.requestFocus() } else null,
+            if (hasText) MenuAction("Copy", TgIcons.CtxCopy) { copy(m) } else null,
+            if (m.outgoing && hasText) MenuAction("Edit", TgIcons.CtxEdit) { editingId = m.id; replyToId = null; text = m.text ?: ""; focusRequester.requestFocus() } else null,
+            MenuAction(if (m.pinned) "Unpin" else "Pin", if (m.pinned) TgIcons.CtxUnpin else TgIcons.CtxPin) { repo.togglePinMessage(chatId, m.id) },
+            MenuAction("Forward", TgIcons.CtxForward) { forward(listOf(m.id)) },
+            if (chat.type != ChatType.Saved) MenuAction("Save to Saved Messages", TgIcons.CtxSave) { repo.sendContent(100, m.content); toast.show("Saved to Saved Messages") } else null,
+            MenuAction("Select", TgIcons.CtxSelect) { selecting = true; selected.clear(); selected.add(m.id) },
+            MenuAction("Delete", TgIcons.CtxDelete, destructive = true, groupStart = true) { confirmDelete(listOf(m.id)) },
         )
         menu.show(
             ContextMenuRequest(
@@ -281,7 +290,7 @@ fun ChatScreen(chatId: Long) {
         Box(Modifier.fillMaxSize()) {
             // Z0: wallpaper + messages (the glass source)
             Box(Modifier.fillMaxSize().layerBackdrop(backdrop)) {
-                ChatWallpaper()
+                ChatWallpaper(phase = wallpaperPhase)
                 LazyColumn(
                     state = listState,
                     reverseLayout = true,
@@ -301,6 +310,7 @@ fun ChatScreen(chatId: Long) {
                                 ServicePill((m.content as MessageContent.Service).text)
                             } else {
                                 MessageRow(
+                                    appear = m.date > openedAt,
                                     m = m,
                                     group = group,
                                     repo = repo,
@@ -349,7 +359,7 @@ fun ChatScreen(chatId: Long) {
                         }
                         Spacer(Modifier.width(80.dp))
                     } else {
-                        GlassIconButton(Icons.AutoMirrored.Rounded.ArrowBackIos, { nav.pop() }, iconSize = 20.dp)
+                        BackButton({ nav.pop() }, badge = repo.chats.filter { it.id != chatId && !it.archived && !it.muted }.sumOf { it.unread })
                         Box(Modifier.weight(1f).padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
                             val (subtitle, active) = chatSubtitle(chat, repo)
                             GlassBox(onClick = { nav.push(Route.Profile(chatId)) }, modifier = Modifier.height(48.dp)) {
@@ -375,7 +385,7 @@ fun ChatScreen(chatId: Long) {
                                 T("Pinned Message", TgTheme.type.footnote, c.accent, weight = FontWeight.SemiBold, maxLines = 1)
                                 T(pinned.preview, TgTheme.type.footnote, c.text, maxLines = 1)
                             }
-                            Icon(Icons.Rounded.PushPin, c.secondaryText, 18.dp)
+                            Icon(TgIcons.MsgPinned, c.secondaryText, 16.dp)
                         }
                     }
                 }
@@ -391,21 +401,21 @@ fun ChatScreen(chatId: Long) {
                 // Scroll-to-bottom
                 val showDown by remember { derivedStateOf { listState.firstVisibleItemIndex > 2 } }
                 AnimatedVisibility(showDown, enter = scaleIn() + fadeIn(), exit = scaleOut() + fadeOut(), modifier = Modifier.align(Alignment.End).padding(end = 12.dp)) {
-                    GlassIconButton(Icons.Rounded.KeyboardArrowDown, { scope.launch { listState.animateScrollToItem(0) } }, size = 42.dp, iconSize = 28.dp)
+                    GlassIconButton(IosIcons.ChevronDown, { scope.launch { listState.animateScrollToItem(0) } }, size = 44.dp, iconSize = 24.dp)
                 }
                 when {
                     selecting -> Row(
                         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        GlassIconButton(Icons.Outlined.Delete, { if (selected.isNotEmpty()) confirmDelete(selected.toList()) }, tint = c.destructive)
-                        GlassIconButton(Icons.Outlined.ContentCopy, {
+                        GlassIconButton(TgIcons.CtxDelete, { if (selected.isNotEmpty()) confirmDelete(selected.toList()) }, tint = c.destructive)
+                        GlassIconButton(TgIcons.CtxCopy, {
                             val t = messages.filter { it.id in selected }.joinToString("\n") { it.text ?: it.preview }
                             (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("messages", t))
                             toast.show("Copied ${selected.size} messages")
                             selecting = false; selected.clear()
                         })
-                        GlassIconButton(Icons.AutoMirrored.Rounded.Forward, { if (selected.isNotEmpty()) forward(selected.toList()) })
+                        GlassIconButton(TgIcons.CtxForward, { if (selected.isNotEmpty()) forward(selected.toList()) })
                     }
                     isChannel -> GlassBox(
                         onClick = { repo.toggleMute(chatId) },
@@ -481,6 +491,7 @@ private fun senderNameFor(repo: TelegramRepository, m: Message, group: BubbleGro
 /** One message line: selection check, avatar column, bubble, swipe-to-reply (spec §12, §19). */
 @Composable
 private fun MessageRow(
+    appear: Boolean,
     m: Message,
     group: BubbleGroup,
     repo: TelegramRepository,
@@ -508,6 +519,9 @@ private fun MessageRow(
     val swipe = remember { Animatable(0f) }
     val threshold = with(density) { 64.dp.toPx() }
     val key = "msg-${m.id}"
+    // New messages rise from the composer (outgoing) or pop in (incoming) with a spring.
+    val enter = remember { Animatable(if (appear) 0f else 1f) }
+    LaunchedEffect(Unit) { if (enter.value < 1f) enter.animateTo(1f, spring(dampingRatio = 0.78f, stiffness = 380f)) }
 
     LaunchedEffect(m.id) {
         if (com.abtin.tglass.DebugLaunch.autoMenuMessageId == m.id) {
@@ -520,6 +534,16 @@ private fun MessageRow(
     Box(
         Modifier
             .fillMaxWidth()
+            .graphicsLayer {
+                val p = enter.value
+                if (p < 1f) {
+                    alpha = p.coerceIn(0f, 1f)
+                    translationY = (1f - p) * (if (m.outgoing) 90.dp.toPx() else 24.dp.toPx())
+                    val sc = 0.86f + 0.14f * p
+                    scaleX = sc; scaleY = sc
+                    transformOrigin = TransformOrigin(if (m.outgoing) 1f else 0f, 1f)
+                }
+            }
             .background(if (highlighted) c.accent.copy(alpha = 0.18f) else if (selected) c.accent.copy(alpha = 0.10f) else Color.Transparent)
             .pointerInput(selecting) {
                 if (selecting) return@pointerInput
@@ -554,7 +578,7 @@ private fun MessageRow(
                     .clip(CircleShape)
                     .background(c.serviceBubble),
                 contentAlignment = Alignment.Center,
-            ) { Icon(Icons.AutoMirrored.Rounded.Reply, Color.White, 18.dp) }
+            ) { Icon(TgIcons.CtxReply, Color.White, 20.dp) }
         }
         Row(
             Modifier.fillMaxWidth().offset { IntOffset(swipe.value.roundToInt(), 0) },
@@ -568,7 +592,7 @@ private fun MessageRow(
                         .clip(CircleShape)
                         .then(if (selected) Modifier.background(c.accent) else Modifier.border(1.5.dp, Color.White.copy(0.9f), CircleShape).background(Color.Black.copy(0.1f))),
                     contentAlignment = Alignment.Center,
-                ) { if (selected) Icon(Icons.Rounded.Check, Color.White, 16.dp) }
+                ) { if (selected) Icon(IosIcons.Checkmark, Color.White, 15.dp) }
             }
             if (isGroup && !m.outgoing) {
                 Box(Modifier.width(38.dp)) { // Telegram-iOS avatarInset = 34 + 4

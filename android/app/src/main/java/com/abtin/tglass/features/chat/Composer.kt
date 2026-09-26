@@ -89,6 +89,8 @@ import com.abtin.tglass.ui.components.Haptics
 import com.abtin.tglass.ui.components.Icon
 import com.abtin.tglass.ui.components.SegmentedControl
 import com.abtin.tglass.ui.components.T
+import com.abtin.tglass.ui.components.IosIcons
+import com.abtin.tglass.ui.components.TgIcons
 import com.abtin.tglass.ui.components.avatarColors
 import com.abtin.tglass.ui.components.bounceClickable
 import com.abtin.tglass.ui.components.fadeClickable
@@ -152,7 +154,7 @@ fun Composer(
             val target = editing ?: replyTo
             GlassBox(onClick = null, shape = RoundedRectangle(20.dp), modifier = Modifier.padding(start = 54.dp, end = 54.dp, bottom = 6.dp).fillMaxWidth()) {
                 Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 6.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(if (editing != null) Icons.Rounded.Edit else Icons.AutoMirrored.Rounded.Reply, c.accent, 20.dp)
+                    Icon(if (editing != null) TgIcons.CtxEdit else TgIcons.CtxReply, c.accent, 22.dp)
                     Spacer(Modifier.width(8.dp))
                     Box(Modifier.width(2.dp).height(32.dp).clip(Capsule()).background(c.accent))
                     Spacer(Modifier.width(8.dp))
@@ -161,7 +163,7 @@ fun Composer(
                         T(target?.preview ?: "", TgTheme.type.footnote.copy(fontSize = 14.sp), c.text, maxLines = 1)
                     }
                     Box(Modifier.size(32.dp).fadeClickable(onClick = onCancelContext), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Rounded.Close, c.secondaryText, 20.dp)
+                        Icon(IosIcons.Close, c.secondaryText, 18.dp)
                     }
                 }
             }
@@ -170,7 +172,7 @@ fun Composer(
         Row(verticalAlignment = Alignment.Bottom) {
             // Attach
             AnimatedVisibility(!recording, enter = fadeIn(), exit = fadeOut()) {
-                GlassIconButton(Icons.Rounded.AttachFile, onAttach, size = 44.dp, iconSize = 24.dp, tint = c.text, modifier = Modifier.graphicsLayer { rotationZ = 45f })
+                GlassIconButton(IosIcons.Paperclip, onAttach, size = 44.dp, iconSize = 24.dp, tint = c.text)
             }
             Spacer(Modifier.width(if (recording) 0.dp else 8.dp))
 
@@ -193,7 +195,7 @@ fun Composer(
                             )
                         }
                         Box(Modifier.size(34.dp).padding(bottom = 5.dp).fadeClickable(onClick = onTogglePanel), contentAlignment = Alignment.Center) {
-                            Icon(if (panelOpen) Icons.Rounded.Keyboard else Icons.Outlined.EmojiEmotions, c.secondaryText, 25.dp)
+                            if (panelOpen) Icon(IosIcons.Keyboard, c.secondaryText, 26.dp) else Icon(TgIcons.InStickers, c.secondaryText, 26.dp)
                         }
                     }
                 }
@@ -215,8 +217,8 @@ fun Composer(
                             .graphicsLayer { alpha = lockAlpha },
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Rounded.Lock, c.secondaryText, 18.dp)
-                            Icon(Icons.Rounded.KeyboardArrowUp, c.secondaryText, 18.dp)
+                            Icon(IosIcons.Lock, c.secondaryText, 18.dp)
+                            Icon(IosIcons.ChevronDown, c.secondaryText, 16.dp, Modifier.graphicsLayer { rotationZ = 180f })
                         }
                     }
                     Box(
@@ -243,7 +245,7 @@ fun Composer(
                             },
                             contentAlignment = Alignment.Center,
                         ) {
-                            Icon(if (editing != null) Icons.Rounded.Check else Icons.Rounded.ArrowUpward, Color.White, 24.dp)
+                            Icon(if (editing != null) IosIcons.Checkmark else IosIcons.ArrowUp, Color.White, 22.dp)
                         }
                     } else {
                         val micModifier = Modifier.pointerInput(Unit) {
@@ -282,11 +284,11 @@ fun Composer(
                         Box(Modifier.size(44.dp).then(micModifier), contentAlignment = Alignment.Center) {
                             if (recording) {
                                 Box(Modifier.graphicsLayer { translationX = dragX.value; translationY = dragY.value }) {
-                                    Icon(Icons.Rounded.Mic, Color.White, 28.dp)
+                                    Icon(IosIcons.Mic, Color.White, 28.dp)
                                 }
                             } else {
                                 GlassBox(onClick = null, shape = Capsule(), modifier = Modifier.size(44.dp)) {
-                                    Icon(Icons.Rounded.Mic, c.text, 24.dp)
+                                    Icon(IosIcons.Mic, c.text, 24.dp)
                                 }
                             }
                         }
@@ -316,7 +318,7 @@ private fun RecordingStatus(elapsedMs: Long, locked: Boolean, dragX: Float, onCa
                     Modifier.graphicsLayer { translationX = dragX * 0.6f; this.alpha = (1f + dragX / 400f).coerceIn(0f, 1f) },
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, c.secondaryText, 18.dp)
+                    Icon(IosIcons.ChevronLeft, c.secondaryText, 16.dp)
                     T("Slide to cancel", TgTheme.type.subheadline, c.secondaryText, maxLines = 1)
                 }
             }

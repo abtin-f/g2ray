@@ -1,6 +1,28 @@
 package com.abtin.tglass.features.chatlist
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Velocity
+import androidx.compose.ui.zIndex
+import com.abtin.tglass.core.glass.LocalBackdrop
+import com.abtin.tglass.ui.components.GlassButtonGroup
+import com.abtin.tglass.ui.components.IosIcons
+import com.abtin.tglass.ui.components.ScrollEdgeBlur
+import com.abtin.tglass.ui.components.TgIcons
+import kotlinx.coroutines.launch
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -107,10 +129,11 @@ import com.kyant.shapes.Capsule
 fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
     val repo = LocalRepository.current
     val nav = LocalNavigator.current
-    val menu = LocalContextMenu.current
     val sheet = LocalActionSheet.current
     val c = TgTheme.colors
     val focus = LocalFocusManager.current
+    val density = LocalDensity.current
+    val scope = rememberCoroutineScope()
     val searchFocus = remember { FocusRequester() }
 
     var folder by rememberSaveable { mutableIntStateOf(0) }
@@ -131,16 +154,56 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
         }
     }
 
-    val all = repo.chats.filter { !it.archived }
-    val chats = when (repo.folders.getOrNull(folder)) {
-        "Personal" -> all.filter { it.folder == "Personal" || it.type == ChatType.Private }
-        "Work" -> all.filter { it.folder == "Work" }
-        "Unread" -> all.filter { it.unread > 0 || it.markedUnread }
-        else -> all
+    // Stories: collapsed into the title; pulling the list down expands them (Telegram-iOS behaviour).
+    val storyUsers = repo.users.values.filter { it.hasStory }.sortedBy { it.storySeen }
+    val storiesMax = with(density) { 104.dp.toPx() }
+    var storiesPx by rememberSaveable { mutableFloatStateOf(0f) }
+    val storiesFraction = (storiesPx / storiesMax).coerceIn(0f, 1f)
+    val storiesConnection = remember(storiesMax) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (available.y < 0f && storiesPx > 0f) {
+                    val d = maxOf(available.y, -storiesPx)
+                    storiesPx += d
+                    return Offset(0f, d)
+                }
+                return Offset.Zero
+            }
+
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                if (available.y > 0f && source == NestedScrollSource.UserInput && storiesPx < storiesMax) {
+                    val d = minOf(available.y * 0.6f, storiesMax - storiesPx)
+                    storiesPx += d
+                    return Offset(0f, available.y)
+                }
+                return Offset.Zero
+            }
+
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                if (storiesPx in 0.5f..(storiesMax - 0.5f)) {
+                    val target = if (available.y > 600f || (available.y > -600f && storiesPx > storiesMax * 0.45f)) storiesMax else 0f
+                    animate(storiesPx, target, animationSpec = spring(dampingRatio = 0.82f, stiffness = 420f)) { v, _ -> storiesPx = v }
+                    return available
+                }
+                return Velocity.Zero
+            }
+        }
     }
+
+    val all = repo.chats.filter { !it.archived }
+    val folders = repo.folders
+    fun inFolder(chat: Chat, f: String?) = when (f) {
+        "Personal" -> chat.folder == "Personal" || chat.type == ChatType.Private
+        "Work" -> chat.folder == "Work"
+        "Unread" -> chat.unread > 0 || chat.markedUnread
+        else -> true
+    }
+    val chats = all.filter { inFolder(it, folders.getOrNull(folder)) }
     val archived = repo.chats.filter { it.archived }
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val headerHeight = 56.dp
+    val storiesHeight = with(density) { storiesPx.toDp() }
 
     fun confirmDelete(chat: Chat) {
         val what = when (chat.type) {
@@ -154,22 +217,17 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
     Box(Modifier.fillMaxSize().background(c.background)) {
         LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize().layerBackdrop(backdrop),
-            contentPadding = PaddingValues(top = top + 62.dp, bottom = bottom + 110.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .nestedScroll(storiesConnection)
+                .layerBackdrop(backdrop),
+            contentPadding = PaddingValues(top = top + headerHeight + 4.dp + if (searching) 0.dp else storiesHeight, bottom = bottom + 112.dp),
         ) {
             if (searching) {
                 searchResults(repo, query, onOpen = { focus.clearFocus(); nav.push(Route.Chat(it)) })
             } else {
-                item(key = "search") {
-                    Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-                        SearchField("", {}, Modifier.fillMaxWidth())
-                        Box(Modifier.matchParentSize().fadeClickable { searching = true })
-                    }
-                }
-                item(key = "stories") { StoriesRow(repo) { nav.push(Route.Stories(it)) } }
                 item(key = "folders") {
-                    ChipTabs(repo.folders, folder, { folder = it }, Modifier.fillMaxWidth().padding(vertical = 6.dp))
-                    Separator()
+                    FolderTabs(folders, folder, { folder = it }, unreadFor = { f -> all.count { ch -> inFolder(ch, f) && (ch.unread > 0 || ch.markedUnread) && !ch.muted } })
                 }
                 if (archived.isNotEmpty() && folder == 0 && !editing) {
                     item(key = "archive") { ArchiveRow(archived, repo) { nav.push(Route.Archive) } }
@@ -195,38 +253,53 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
             }
         }
 
-        // Top bar
+        // Header
         if (searching) {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .background(c.background)
-                    .statusBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                SearchField(query, { query = it }, Modifier.weight(1f), focusRequester = searchFocus)
-                Spacer(Modifier.width(12.dp))
-                TextButton("Cancel", { searching = false; query = ""; focus.clearFocus() })
+            Column(Modifier.fillMaxWidth()) {
+                Box {
+                    ScrollEdgeBlur(top + 80.dp)
+                    Row(
+                        Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        GlassBox(onClick = null, shape = Capsule(), modifier = Modifier.weight(1f).height(48.dp), contentAlignment = Alignment.CenterStart) {
+                            SearchField(query, { query = it }, Modifier.fillMaxWidth().padding(horizontal = 6.dp), focusRequester = searchFocus, background = Color.Transparent)
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        GlassIconButton(IosIcons.Close, { searching = false; query = ""; focus.clearFocus() }, size = 48.dp)
+                    }
+                }
             }
         } else {
-            GlassTopBar(
-                title = null,
-                left = {
-                    GlassTextButton(if (editing) "Done" else "Edit", {
-                        editing = !editing
-                        selected.clear()
-                    }, bold = editing)
-                },
-                center = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        T("Chats", TgTheme.type.headline, c.text)
+            Box(Modifier.fillMaxWidth()) {
+                ScrollEdgeBlur(top + headerHeight + 24.dp + storiesHeight)
+                Column(Modifier.fillMaxWidth().statusBarsPadding()) {
+                    Box(Modifier.fillMaxWidth().height(headerHeight).padding(horizontal = 12.dp)) {
+                        GlassTextButton(if (editing) "Done" else "Edit", {
+                            editing = !editing
+                            selected.clear()
+                        }, bold = editing, modifier = Modifier.align(Alignment.CenterStart))
+                        ChatsTitle(
+                            storyUsers.take(3).map { it.id to it.name },
+                            collapsed = 1f - storiesFraction,
+                            modifier = Modifier.align(Alignment.Center),
+                            onStories = {
+                                scope.launch {
+                                    animate(storiesPx, storiesMax, animationSpec = spring(0.82f, 420f)) { v, _ -> storiesPx = v }
+                                }
+                            },
+                        )
+                        GlassButtonGroup(
+                            TgIcons.IcAddStory to { nav.push(Route.Stories(storyUsers.firstOrNull()?.id ?: 1L)) },
+                            TgIcons.IcCompose to { nav.push(Route.NewMessage) },
+                            modifier = Modifier.align(Alignment.CenterEnd),
+                        )
                     }
-                },
-                right = {
-                    GlassIconButton(Icons.Outlined.Edit, { nav.push(Route.NewMessage) }, tint = c.text, iconSize = 21.dp)
-                },
-            )
+                    if (storiesFraction > 0.01f) {
+                        StoriesRow(repo, storiesFraction, Modifier.height(storiesHeight)) { nav.push(Route.Stories(it)) }
+                    }
+                }
+            }
         }
 
         // Edit-mode toolbar (spec §19 style)
@@ -263,6 +336,73 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
                             selected.clear()
                         })))
                     }, color = c.destructive, enabled = any)
+                }
+            }
+        }
+    }
+}
+
+/** "Chats" title with the stacked story avatars that Telegram shows when stories are collapsed. */
+@Composable
+private fun ChatsTitle(stories: List<Pair<Long, String>>, collapsed: Float, modifier: Modifier, onStories: () -> Unit) {
+    val c = TgTheme.colors
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        if (stories.isNotEmpty() && collapsed > 0.01f) {
+            Box(
+                Modifier
+                    .graphicsLayer { alpha = collapsed; scaleX = 0.6f + 0.4f * collapsed; scaleY = 0.6f + 0.4f * collapsed }
+                    .fadeClickable(onClick = onStories)
+                    .padding(end = 8.dp)
+            ) {
+                stories.forEachIndexed { i, (id, name) ->
+                    Box(Modifier.padding(start = (i * 14).dp).zIndex((stories.size - i).toFloat())) {
+                        Box(
+                            Modifier
+                                .size(30.dp)
+                                .clip(CircleShape)
+                                .background(Brush.linearGradient(listOf(Color(0xFF34C76F), Color(0xFF3DA1FD))))
+                                .padding(1.5.dp)
+                                .clip(CircleShape)
+                                .background(c.background)
+                                .padding(1.5.dp)
+                        ) { Avatar(name, id, 24.dp) }
+                    }
+                }
+            }
+        }
+        T("Chats", TgTheme.type.headline, c.text)
+    }
+}
+
+/** Folder tabs: text tabs with a glass pill under the selected one and unread counters. */
+@Composable
+private fun FolderTabs(folders: List<String>, selected: Int, onSelect: (Int) -> Unit, unreadFor: (String?) -> Int) {
+    val c = TgTheme.colors
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        folders.forEachIndexed { i, f ->
+            val sel = i == selected
+            val bg by animateColorAsState(if (sel) c.text.copy(alpha = if (c.isDark) 0.14f else 0.07f) else Color.Transparent, label = "folderBg")
+            Row(
+                Modifier
+                    .height(34.dp)
+                    .clip(Capsule())
+                    .background(bg)
+                    .fadeClickable { onSelect(i) }
+                    .padding(horizontal = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                T(f, TgTheme.type.subheadline, if (sel) c.text else c.secondaryText, weight = FontWeight.SemiBold, maxLines = 1)
+                val count = unreadFor(if (i == 0) null else f)
+                if (count > 0 && f != "Unread") {
+                    Spacer(Modifier.width(6.dp))
+                    Box(
+                        Modifier.height(18.dp).clip(Capsule()).background(if (sel) c.accent else c.mutedBadge).padding(horizontal = 6.dp),
+                        contentAlignment = Alignment.Center,
+                    ) { T("$count", TgTheme.type.caption1, Color.White, weight = FontWeight.SemiBold) }
                 }
             }
         }
@@ -308,11 +448,11 @@ fun ChatListItem(
                             alignEnd = false,
                             previewSize = (screenWidth - 24.dp) to 420.dp,
                             actions = listOfNotNull(
-                                MenuAction(if (unread) "Mark as Read" else "Mark as Unread", if (unread) Icons.Outlined.MarkChatRead else Icons.Outlined.MarkChatUnread) { repo.toggleRead(chat.id) },
-                                if (!chat.archived) MenuAction(if (chat.pinned) "Unpin" else "Pin", Icons.Outlined.PushPin) { repo.togglePin(chat.id) } else null,
-                                MenuAction(if (chat.muted) "Unmute" else "Mute", if (chat.muted) Icons.Rounded.VolumeUp else Icons.Rounded.VolumeOff) { repo.toggleMute(chat.id) },
-                                MenuAction(if (chat.archived) "Unarchive" else "Archive", if (chat.archived) Icons.Outlined.Unarchive else Icons.Outlined.Archive) { repo.toggleArchive(chat.id) },
-                                MenuAction("Delete", Icons.Outlined.Delete, destructive = true, groupStart = true, onClick = onDelete),
+                                MenuAction(if (unread) "Mark as Read" else "Mark as Unread", TgIcons.CtxRead) { repo.toggleRead(chat.id) },
+                                if (!chat.archived) MenuAction(if (chat.pinned) "Unpin" else "Pin", if (chat.pinned) TgIcons.CtxUnpin else TgIcons.CtxPin) { repo.togglePin(chat.id) } else null,
+                                MenuAction(if (chat.muted) "Unmute" else "Mute", if (chat.muted) TgIcons.CtxUnmute else TgIcons.CtxMuted) { repo.toggleMute(chat.id) },
+                                MenuAction(if (chat.archived) "Unarchive" else "Archive", TgIcons.CtxArchive) { repo.toggleArchive(chat.id) },
+                                MenuAction("Delete", TgIcons.CtxDelete, destructive = true, groupStart = true, onClick = onDelete),
                             ),
                         ) {
                             ChatPeek(chat.id, onOpen = { menu.dismiss(); nav.push(Route.Chat(chat.id)) })
@@ -336,7 +476,7 @@ private fun ArchiveRow(archived: List<Chat>, repo: TelegramRepository, onClick: 
                 .padding(start = 16.dp, end = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Avatar("Archive", 0, 60.dp, icon = Icons.Rounded.Archive, iconColors = Color(0xFFDEDEE5) to Color(0xFFC5C6CC))
+            Avatar("Archive", 0, 60.dp, iconRes = TgIcons.IcArchiveLarge, iconColors = Color(0xFFDEDEE5) to Color(0xFFC5C6CC))
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -351,22 +491,22 @@ private fun ArchiveRow(archived: List<Chat>, repo: TelegramRepository, onClick: 
 }
 
 @Composable
-private fun StoriesRow(repo: TelegramRepository, onOpen: (Long) -> Unit) {
+private fun StoriesRow(repo: TelegramRepository, fraction: Float, modifier: Modifier, onOpen: (Long) -> Unit) {
     val c = TgTheme.colors
     val withStories = repo.users.values.filter { it.hasStory }.sortedBy { it.storySeen }
     LazyRow(
-        Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 2.dp),
-        contentPadding = PaddingValues(horizontal = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        modifier.fillMaxWidth().graphicsLayer { alpha = fraction; scaleX = 0.85f + 0.15f * fraction; scaleY = 0.85f + 0.15f * fraction; transformOrigin = TransformOrigin(0.5f, 0f) },
+        contentPadding = PaddingValues(horizontal = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         item(key = "me") {
-            Column(Modifier.width(70.dp).fadeClickable { }, horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(Modifier.width(68.dp).fadeClickable { }, horizontalAlignment = Alignment.CenterHorizontally) {
                 Box {
-                    Avatar(repo.me.name, repo.me.id, 62.dp)
+                    Avatar(repo.me.name, 3, 64.dp)
                     Box(
                         Modifier
                             .align(Alignment.BottomEnd)
-                            .offset(x = 2.dp, y = 2.dp)
                             .size(22.dp)
                             .clip(CircleShape)
                             .background(c.background)
@@ -374,16 +514,16 @@ private fun StoriesRow(repo: TelegramRepository, onOpen: (Long) -> Unit) {
                             .clip(CircleShape)
                             .background(c.accent),
                         contentAlignment = Alignment.Center,
-                    ) { Icon(Icons.Rounded.Add, Color.White, 16.dp) }
+                    ) { Icon(IosIcons.Plus, Color.White, 14.dp) }
                 }
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(5.dp))
                 T("My Story", TgTheme.type.caption1, c.secondaryText, maxLines = 1, align = TextAlign.Center)
             }
         }
         items(withStories, key = { it.id }) { u ->
-            Column(Modifier.width(70.dp).fadeClickable { onOpen(u.id) }, horizontalAlignment = Alignment.CenterHorizontally) {
-                Avatar(u.name, u.id, 66.dp, storyRing = if (u.storySeen) StoryRing.Seen else StoryRing.Unseen)
-                Spacer(Modifier.height(2.dp))
+            Column(Modifier.width(68.dp).fadeClickable { onOpen(u.id) }, horizontalAlignment = Alignment.CenterHorizontally) {
+                Avatar(u.name, u.id, 68.dp, storyRing = if (u.storySeen) StoryRing.Seen else StoryRing.Unseen)
+                Spacer(Modifier.height(3.dp))
                 T(u.firstName, TgTheme.type.caption1, if (u.storySeen) c.secondaryText else c.text, maxLines = 1, align = TextAlign.Center)
             }
         }

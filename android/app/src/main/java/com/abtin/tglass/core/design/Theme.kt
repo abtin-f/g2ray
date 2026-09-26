@@ -13,7 +13,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
+import com.abtin.tglass.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.TextUnit
@@ -145,8 +150,27 @@ data class TgTypography(
     val caption2: TextStyle,
 )
 
+/**
+ * Inter (variable, SIL OFL) with optical sizing — the closest open equivalent of SF Pro Text / Display.
+ * Each weight is pinned via font variations so the system never fakes bold.
+ */
+@OptIn(ExperimentalTextApi::class)
+private fun interFamily(opticalSize: Float) = FontFamily(
+    listOf(400, 500, 600, 700).map { w ->
+        Font(
+            R.font.inter,
+            weight = FontWeight(w),
+            variationSettings = FontVariation.Settings(FontVariation.weight(w), FontVariation.Setting("opsz", opticalSize)),
+        )
+    }
+)
+
+val InterText = interFamily(14f)
+val InterDisplay = interFamily(32f)
+
 private fun ios(size: Float, weight: FontWeight = FontWeight.Normal, tracking: TextUnit = 0.sp, lineHeight: Float = size * 1.2f) =
     TextStyle(
+        fontFamily = if (size >= 20f) InterDisplay else InterText,
         fontSize = size.sp,
         fontWeight = weight,
         letterSpacing = tracking,
@@ -160,7 +184,7 @@ fun typography(scale: Float) = TgTypography(
     title2 = ios(22f * scale, FontWeight.Bold, (-0.01).em),
     title3 = ios(20f * scale, FontWeight.SemiBold, (-0.02).em),
     headline = ios(17f * scale, FontWeight.SemiBold, (-0.025).em, 22f * scale),
-    body = ios(17f * scale, FontWeight.Normal, (-0.025).em, 22f * scale),
+    body = ios(17f * scale, FontWeight.Normal, (-0.022).em, 22f * scale),
     callout = ios(16f * scale, FontWeight.Normal, (-0.02).em, 21f * scale),
     subheadline = ios(15f * scale, FontWeight.Normal, (-0.015).em, 20f * scale),
     footnote = ios(13f * scale, FontWeight.Normal, (-0.005).em, 18f * scale),

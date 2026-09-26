@@ -50,6 +50,7 @@ import com.abtin.tglass.features.settings.SettingsScreen
 import com.abtin.tglass.ui.components.Badge
 import com.abtin.tglass.ui.components.Icon
 import com.abtin.tglass.ui.components.T
+import com.abtin.tglass.ui.components.TgIcons
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 
 val LocalRepository = staticCompositionLocalOf<TelegramRepository> { error("Repository not provided") }
@@ -112,14 +113,14 @@ fun MainScreen() {
                         tabsCount = 4,
                         modifier = Modifier.weight(1f),
                     ) {
-                        TabItem(Icons.Rounded.AccountCircle, "Contacts") { tab = 0 }
-                        TabItem(Icons.Rounded.Call, "Calls") { tab = 1 }
-                        TabItem(Icons.Rounded.Forum, "Chats", badge = unread) { tab = 2 }
-                        TabItem(Icons.Rounded.Settings, "Settings") { tab = 3 }
+                        TabItem(TgIcons.TabContacts, "Contacts") { tab = 0 }
+                        TabItem(TgIcons.TabCalls, "Calls") { tab = 1 }
+                        TabItem(TgIcons.TabChats, "Chats", badge = unread) { tab = 2 }
+                        TabItem(TgIcons.TabSettings, "Settings") { tab = 3 }
                     }
                     Spacer(Modifier.width(8.dp))
                     GlassIconButton(
-                        Icons.Rounded.Search,
+                        TgIcons.IcSearch,
                         onClick = { tab = 2; tabBar.searchRequests++ },
                         size = 64.dp,
                         iconSize = 26.dp,
@@ -131,11 +132,11 @@ fun MainScreen() {
 }
 
 @Composable
-private fun androidx.compose.foundation.layout.RowScope.TabItem(icon: ImageVector, label: String, badge: Int = 0, onClick: () -> Unit) {
+private fun androidx.compose.foundation.layout.RowScope.TabItem(icon: Int, label: String, badge: Int = 0, onClick: () -> Unit) {
     val c = TgTheme.colors
     LiquidBottomTab(onClick = onClick) {
         Box {
-            Icon(icon, c.text, 26.dp)
+            Icon(icon, c.text, 28.dp)
             if (badge > 0) {
                 Badge(badge, modifier = Modifier.align(Alignment.TopEnd).offset(x = 12.dp, y = (-4).dp).size(width = 26.dp, height = 18.dp))
             }

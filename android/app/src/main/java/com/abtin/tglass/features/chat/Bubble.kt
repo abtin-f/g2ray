@@ -64,6 +64,8 @@ import com.abtin.tglass.ui.components.Avatar
 import com.abtin.tglass.ui.components.Icon
 import com.abtin.tglass.ui.components.Separator
 import com.abtin.tglass.ui.components.T
+import com.abtin.tglass.ui.components.IosIcons
+import com.abtin.tglass.ui.components.TgIcons
 import com.abtin.tglass.ui.components.avatarColors
 import com.abtin.tglass.ui.components.bounceClickable
 import com.abtin.tglass.ui.components.fadeClickable
@@ -258,11 +260,11 @@ fun MetaRow(m: Message, color: Color, overlay: Boolean = false) {
     val row = @Composable {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (m.pinned) {
-                Icon(Icons.Rounded.PushPin, color, 11.dp)
+                Icon(TgIcons.MsgPinned, color, 11.dp)
                 Spacer(Modifier.width(2.dp))
             }
             if (m.views != null) {
-                Icon(Icons.Rounded.Visibility, color, 13.dp)
+                Icon(IosIcons.Eye, color, 13.dp)
                 Spacer(Modifier.width(2.dp))
                 T(formatCount(m.views), TgTheme.type.caption1, color, maxLines = 1)
                 Spacer(Modifier.width(5.dp))
@@ -274,9 +276,9 @@ fun MetaRow(m: Message, color: Color, overlay: Boolean = false) {
             if (m.outgoing) {
                 Spacer(Modifier.width(2.dp))
                 when (m.status) {
-                    MessageStatus.Sending -> Icon(Icons.Rounded.Schedule, color, 14.dp)
-                    MessageStatus.Sent -> Icon(Icons.Rounded.Check, color, 16.dp)
-                    MessageStatus.Read -> Icon(Icons.Rounded.DoneAll, color, 16.dp)
+                    MessageStatus.Sending -> Icon(IosIcons.Clock, color, 13.dp)
+                    MessageStatus.Sent -> Icon(IosIcons.CheckSingle, color, 15.dp)
+                    MessageStatus.Read -> Icon(IosIcons.CheckDouble, color, 15.dp)
                     MessageStatus.Failed -> Icon(Icons.Rounded.ErrorOutline, c.destructive, 16.dp)
                 }
             }
@@ -378,7 +380,7 @@ private fun StickerMessage(m: Message, s: MessageContent.Sticker, modifier: Modi
 private fun VoiceBody(m: Message, v: MessageContent.Voice, colors: BubbleColors) {
     Row(Modifier.padding(start = 8.dp, end = 10.dp, top = 8.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(44.dp).clip(CircleShape).background(colors.accent).bounceClickable { }, contentAlignment = Alignment.Center) {
-            Icon(Icons.Rounded.PlayArrow, colors.onAccent, 30.dp)
+            Icon(IosIcons.Play, colors.onAccent, 24.dp)
         }
         Spacer(Modifier.width(10.dp))
         Column {
@@ -411,7 +413,7 @@ private fun VoiceBody(m: Message, v: MessageContent.Voice, colors: BubbleColors)
 private fun FileBody(m: Message, f: MessageContent.File, colors: BubbleColors) {
     Row(Modifier.padding(start = 8.dp, end = 10.dp, top = 8.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(48.dp).clip(RoundedRectangle(10.dp)).background(colors.accent), contentAlignment = Alignment.Center) {
-            Icon(Icons.AutoMirrored.Rounded.InsertDriveFile, colors.onAccent, 26.dp)
+            Icon(TgIcons.AttFile, colors.onAccent, 26.dp)
         }
         Spacer(Modifier.width(10.dp))
         Column(Modifier.widthIn(max = 190.dp)) {
@@ -445,7 +447,7 @@ private fun LocationBody(m: Message, l: MessageContent.Location, colors: BubbleC
             }
             drawCircle(if (dark) Color(0xFF3B6C8C) else Color(0xFFA8D5F2), 40f, Offset(size.width * 0.8f, size.height * 0.25f))
         }
-        Icon(Icons.Rounded.LocationOn, TgTheme.colors.destructive, 40.dp)
+        Icon(TgIcons.AttLocation, TgTheme.colors.destructive, 40.dp)
     }
     Column(Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
         T(l.title, TgTheme.type.subheadline, colors.text, weight = FontWeight.SemiBold)
@@ -501,7 +503,7 @@ private fun PollBody(m: Message, p: MessageContent.Poll, colors: BubbleColors, o
                 }
                 if (p.voted == i) {
                     Spacer(Modifier.width(4.dp))
-                    Icon(Icons.Rounded.Check, colors.accent, 16.dp)
+                    Icon(IosIcons.Checkmark, colors.accent, 16.dp)
                 }
             }
         }

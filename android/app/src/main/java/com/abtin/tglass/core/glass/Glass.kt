@@ -104,6 +104,27 @@ fun GlassIconButton(
     }
 }
 
+/** Circular glass button with a drawable icon (e.g. [com.abtin.tglass.ui.components.TgIcons]). */
+@Composable
+fun GlassIconButton(
+    @androidx.annotation.DrawableRes icon: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    size: Dp = 44.dp,
+    iconSize: Dp = 26.dp,
+    tint: Color = TgTheme.colors.text,
+    contentDescription: String? = null,
+) {
+    GlassBox(onClick = onClick, modifier = modifier.size(size), shape = Capsule()) {
+        Image(
+            painter = androidx.compose.ui.res.painterResource(icon),
+            contentDescription = contentDescription,
+            colorFilter = ColorFilter.tint(tint),
+            modifier = Modifier.size(iconSize),
+        )
+    }
+}
+
 /** Generic interactive glass container. */
 @Composable
 fun GlassBox(

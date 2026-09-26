@@ -3,6 +3,7 @@ package com.abtin.tglass.ui.components
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -24,6 +25,7 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -69,6 +71,22 @@ fun Icon(
 ) {
     Image(
         imageVector = icon,
+        contentDescription = contentDescription,
+        colorFilter = ColorFilter.tint(tint),
+        modifier = modifier.size(size),
+    )
+}
+
+@Composable
+fun Icon(
+    @DrawableRes res: Int,
+    tint: Color = TgTheme.colors.text,
+    size: Dp = 24.dp,
+    modifier: Modifier = Modifier,
+    contentDescription: String? = null,
+) {
+    Image(
+        painter = painterResource(res),
         contentDescription = contentDescription,
         colorFilter = ColorFilter.tint(tint),
         modifier = modifier.size(size),

@@ -85,6 +85,12 @@ import com.abtin.tglass.ui.components.Section
 import com.abtin.tglass.ui.components.SheetAction
 import com.abtin.tglass.ui.components.SheetRequest
 import com.abtin.tglass.ui.components.T
+import com.abtin.tglass.ui.components.CollapsedTitle
+import com.abtin.tglass.ui.components.IosIcons
+import com.abtin.tglass.ui.components.ProfileHero
+import com.abtin.tglass.ui.components.TgIcons
+import com.abtin.tglass.ui.components.rememberHeroCollapse
+import androidx.compose.foundation.lazy.rememberLazyListState
 import com.abtin.tglass.ui.components.fadeClickable
 import com.kyant.backdrop.backdrops.LayerBackdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
@@ -123,67 +129,67 @@ fun SettingsScreen(backdrop: LayerBackdrop) {
     val settings = LocalAppSettings.current
     val c = TgTheme.colors
     val me = repo.me
-    val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val listState = rememberLazyListState()
+    val collapse = rememberHeroCollapse(listState)
     fun open(p: Page) = nav.push(Route.SettingsPage(p))
 
     Box(Modifier.fillMaxSize().background(c.groupedBackground)) {
         LazyColumn(
-            Modifier.fillMaxSize().layerBackdrop(backdrop),
-            contentPadding = PaddingValues(top = top + 56.dp, bottom = bottom + 110.dp),
+            state = listState,
+            modifier = Modifier.fillMaxSize().layerBackdrop(backdrop),
+            contentPadding = PaddingValues(bottom = bottom + 112.dp),
         ) {
             item {
-                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Avatar(me.name, 3, 104.dp)
-                    Spacer(Modifier.height(12.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        T(me.name, TgTheme.type.title2.copy(fontWeight = FontWeight.SemiBold), c.text)
-                        if (me.premium) { Spacer(Modifier.width(4.dp)); Icon(Icons.Rounded.Star, Purple, 20.dp) }
-                    }
-                    Spacer(Modifier.height(2.dp))
-                    T("${me.phone} • @${me.username}", TgTheme.type.subheadline, c.secondaryText)
-                    Spacer(Modifier.height(22.dp))
-                }
+                ProfileHero(
+                    name = me.name,
+                    seed = 3,
+                    subtitle = "${me.phone} • @${me.username}",
+                    collapse = collapse,
+                    badge = { if (me.premium) Icon(TgIcons.IcPremiumPeer, Color(0xFFAF52DE), 22.dp) },
+                )
             }
             item {
                 Section {
-                    Cell("My Profile", icon = Icons.Rounded.AccountCircle, iconColor = Red, onClick = { open(Page.EditProfile) })
-                    Cell("Set Emoji Status", icon = Icons.Rounded.AutoAwesome, iconColor = Purple, divider = false, onClick = { toast.show("Emoji status set ✨") })
+                    Cell("Set Emoji Status", icon = TgIcons.SetStatus, iconColor = Purple, onClick = { toast.show("Emoji status set ✨") })
+                    Cell("My Profile", icon = TgIcons.SetProfile, iconColor = Red, divider = false, onClick = { open(Page.EditProfile) })
                 }
                 Spacer(Modifier.height(24.dp))
             }
             item {
                 Section {
-                    Cell("Saved Messages", icon = Icons.Rounded.Bookmark, iconColor = Blue, onClick = { nav.push(Route.Chat(100)) })
-                    Cell("Recent Calls", icon = Icons.Rounded.Call, iconColor = Green, onClick = { nav.push(Route.Calls) })
-                    Cell("Devices", icon = Icons.Rounded.Devices, iconColor = Orange, value = "${repo.sessions.size}", onClick = { open(Page.Devices) })
-                    Cell("Chat Folders", icon = Icons.Rounded.Folder, iconColor = Teal, divider = false, onClick = { open(Page.Folders) })
+                    Cell("Saved Messages", icon = TgIcons.SetSaved, iconColor = Blue, onClick = { nav.push(Route.Chat(100)) })
+                    Cell("Recent Calls", icon = TgIcons.SetCalls, iconColor = Green, onClick = { nav.push(Route.Calls) })
+                    Cell("Devices", icon = TgIcons.SetDevices, iconColor = Orange, value = "${repo.sessions.size}", onClick = { open(Page.Devices) })
+                    Cell("Chat Folders", icon = TgIcons.SetFolders, iconColor = Teal, divider = false, onClick = { open(Page.Folders) })
                 }
                 Spacer(Modifier.height(24.dp))
             }
             item {
                 Section {
-                    Cell("Notifications and Sounds", icon = Icons.Rounded.Notifications, iconColor = Red, onClick = { open(Page.Notifications) })
-                    Cell("Privacy and Security", icon = Icons.Rounded.Lock, iconColor = Gray, onClick = { open(Page.Privacy) })
-                    Cell("Data and Storage", icon = Icons.Rounded.Storage, iconColor = Green, onClick = { open(Page.Data) })
-                    Cell("Appearance", icon = Icons.Rounded.Brush, iconColor = Blue, onClick = { open(Page.Appearance) })
-                    Cell("Power Saving", icon = Icons.Rounded.Bolt, iconColor = Orange, value = settings.glassLevel.title, onClick = { open(Page.PowerSaving) })
-                    Cell("Language", icon = Icons.Rounded.Language, iconColor = Purple, value = "English", divider = false, onClick = { open(Page.Language) })
+                    Cell("Notifications and Sounds", icon = TgIcons.SetNotifications, iconColor = Red, onClick = { open(Page.Notifications) })
+                    Cell("Privacy and Security", icon = TgIcons.SetPrivacy, iconColor = Gray, onClick = { open(Page.Privacy) })
+                    Cell("Data and Storage", icon = TgIcons.SetData, iconColor = Green, onClick = { open(Page.Data) })
+                    Cell("Appearance", icon = TgIcons.SetAppearance, iconColor = Teal, onClick = { open(Page.Appearance) })
+                    Cell("Power Saving", icon = TgIcons.SetPower, iconColor = Orange, value = settings.glassLevel.title, onClick = { open(Page.PowerSaving) })
+                    Cell("Language", icon = TgIcons.SetLanguage, iconColor = Purple, value = "English", divider = false, onClick = { open(Page.Language) })
                 }
                 Spacer(Modifier.height(24.dp))
             }
             item {
                 Section {
-                    Cell("Telegram Premium", icon = Icons.Rounded.Star, iconColor = Purple, onClick = { open(Page.Premium) })
-                    Cell("Send a Gift", icon = Icons.Rounded.CardGiftcard, iconColor = Red, divider = false, onClick = { toast.show("Gifts are coming soon 🎁") })
+                    Cell("Telegram Premium", icon = TgIcons.SetPremium, iconColor = Color(0xFF8F68FF), onClick = { open(Page.Premium) })
+                    Cell("My Stars", icon = TgIcons.SetStars, iconColor = Color(0xFFFFB800), onClick = { toast.show("Stars ⭐️") })
+                    Cell("Telegram Business", icon = TgIcons.SetBusiness, iconColor = Color(0xFFFF6B3D), onClick = { toast.show("Business") })
+                    Cell("Send a Gift", icon = TgIcons.SetGift, iconColor = Color(0xFF32C1DE), divider = false, onClick = { toast.show("Gifts are coming soon 🎁") })
                 }
                 Spacer(Modifier.height(24.dp))
             }
             item {
                 Section {
-                    Cell("Ask a Question", icon = Icons.AutoMirrored.Rounded.Chat, iconColor = Orange, onClick = { toast.show("Opening support chat…") })
-                    Cell("Telegram FAQ", icon = Icons.AutoMirrored.Rounded.HelpOutline, iconColor = Teal, onClick = { toast.show("FAQ") })
-                    Cell("Telegram Features", icon = Icons.Rounded.Lightbulb, iconColor = Yellow, divider = false, onClick = { toast.show("Features") })
+                    Cell("Ask a Question", icon = TgIcons.CtxSmile, iconColor = Orange, onClick = { toast.show("Opening support chat…") })
+                    Cell("Telegram FAQ", icon = TgIcons.SetFaq, iconColor = Teal, onClick = { toast.show("FAQ") })
+                    Cell("Telegram Features", icon = TgIcons.SetTips, iconColor = Yellow, divider = false, onClick = { toast.show("Features") })
                 }
                 Spacer(Modifier.height(24.dp))
             }
@@ -196,14 +202,15 @@ fun SettingsScreen(backdrop: LayerBackdrop) {
                         })))
                     })
                 }
-                Spacer(Modifier.height(10.dp))
-                T("TGlass for Android v0.1.0 • iOS design", TgTheme.type.footnote, c.secondaryText, align = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(12.dp))
+                T("TGlass for Android v0.2.0", TgTheme.type.footnote, c.secondaryText, align = TextAlign.Center, modifier = Modifier.fillMaxWidth())
             }
         }
         GlassTopBar(
             title = null,
             fade = c.groupedBackground,
-            left = { GlassIconButton(Icons.Rounded.QrCode, { toast.show("QR code") }) },
+            left = { GlassIconButton(IosIcons.QrCode, { toast.show("QR code") }, iconSize = 22.dp) },
+            center = { CollapsedTitle(me.name, 3, collapse) },
             right = { GlassTextButton("Edit", { open(Page.EditProfile) }) },
         )
     }
@@ -370,9 +377,9 @@ private fun LazyListScope.notifications() {
 private fun LazyListScope.privacy() {
     item {
         Section {
-            Cell("Passcode Lock", icon = Icons.Rounded.Lock, iconColor = Orange, value = "Off", onClick = {})
-            Cell("Two-Step Verification", icon = Icons.Rounded.Lock, iconColor = Blue, value = "Off", onClick = {})
-            Cell("Blocked Users", icon = Icons.Rounded.Lock, iconColor = Red, value = "3", divider = false, onClick = {})
+            Cell("Passcode Lock", icon = TgIcons.SetPrivacy, iconColor = Orange, value = "Off", onClick = {})
+            Cell("Two-Step Verification", icon = IosIcons.Lock, iconColor = Blue, value = "Off", onClick = {})
+            Cell("Blocked Users", icon = IosIcons.Close, iconColor = Red, value = "3", divider = false, onClick = {})
         }
     }
     gap()
@@ -399,8 +406,8 @@ private fun LazyListScope.privacy() {
 private fun LazyListScope.dataStorage() {
     item {
         Section {
-            Cell("Storage Usage", icon = Icons.Rounded.Storage, iconColor = Blue, value = "1.2 GB", onClick = {})
-            Cell("Data Usage", icon = Icons.Rounded.Storage, iconColor = Green, value = "3.4 GB", divider = false, onClick = {})
+            Cell("Storage Usage", icon = TgIcons.SetData, iconColor = Blue, value = "1.2 GB", onClick = {})
+            Cell("Data Usage", icon = TgIcons.SetData, iconColor = Green, value = "3.4 GB", divider = false, onClick = {})
         }
     }
     gap()
@@ -442,7 +449,7 @@ private fun LazyListScope.devices() {
         val current = repo.sessions.firstOrNull { it.current }
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             Box(Modifier.size(90.dp).clip(RoundedRectangle(22.dp)).background(Brush.linearGradient(listOf(Color(0xFF72D5FD), Color(0xFF2A9EF1)))), contentAlignment = Alignment.Center) {
-                Icon(Icons.Rounded.Devices, Color.White, 52.dp)
+                Icon(TgIcons.SetDevices, Color.White, 64.dp)
             }
             Spacer(Modifier.height(12.dp))
             T("Link other devices to this account.", TgTheme.type.subheadline, c.secondaryText, align = TextAlign.Center)
@@ -473,7 +480,7 @@ private fun LazyListScope.devices() {
 @Composable
 private fun SessionIcon() {
     Box(Modifier.size(30.dp).clip(RoundedRectangle(8.dp)).background(Blue), contentAlignment = Alignment.Center) {
-        Icon(Icons.Rounded.PhoneAndroid, Color.White, 20.dp)
+        Icon(TgIcons.SetDevices, Color.White, 30.dp)
     }
 }
 
@@ -486,7 +493,7 @@ private fun LazyListScope.folders() {
             T("Create folders for different groups of chats and quickly switch between them.", TgTheme.type.subheadline, c.secondaryText, align = TextAlign.Center, modifier = Modifier.padding(horizontal = 32.dp))
         }
         Section(header = "Chat Folders") {
-            Cell("Create New Folder", icon = Icons.Rounded.Folder, iconColor = c.accent, titleColor = c.accent, chevron = false, onClick = {})
+            Cell("Create New Folder", icon = TgIcons.SetFolders, iconColor = c.accent, titleColor = c.accent, chevron = false, onClick = {})
             repo.folders.drop(1).forEachIndexed { i, f ->
                 Cell(f, subtitle = when (f) { "Personal" -> "Private chats"; "Work" -> "2 chats"; else -> "Unread chats" }, divider = i != repo.folders.size - 2, onClick = {})
             }
@@ -501,7 +508,7 @@ private fun LazyListScope.premium() {
             Box(
                 Modifier.size(110.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Color(0xFF6B93FF), Color(0xFFB36DF6), Color(0xFFFF7A9C)))),
                 contentAlignment = Alignment.Center,
-            ) { Icon(Icons.Rounded.Star, Color.White, 64.dp) }
+            ) { Icon(TgIcons.SetPremium, Color.White, 84.dp) }
             Spacer(Modifier.height(14.dp))
             T("Telegram Premium", TgTheme.type.title2, c.text)
             T("Go beyond the limits and unlock dozens of exclusive features.", TgTheme.type.subheadline, c.secondaryText, align = TextAlign.Center, modifier = Modifier.padding(horizontal = 32.dp, vertical = 6.dp))
@@ -514,7 +521,7 @@ private fun LazyListScope.premium() {
                 Triple("No Ads", "No more ads in public channels.", Blue),
                 Triple("Emoji Statuses", "Choose from 1000s of emoji to show next to your name.", Teal),
             ).forEachIndexed { i, (t, d, col) ->
-                Cell(t, subtitle = d, icon = Icons.Rounded.Star, iconColor = col, chevron = false, divider = i != 4)
+                Cell(t, subtitle = d, icon = TgIcons.SetPremium, iconColor = col, chevron = false, divider = i != 4)
             }
         }
     }

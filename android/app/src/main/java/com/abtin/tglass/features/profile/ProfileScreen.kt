@@ -65,6 +65,13 @@ import com.abtin.tglass.ui.components.Section
 import com.abtin.tglass.ui.components.SheetAction
 import com.abtin.tglass.ui.components.SheetRequest
 import com.abtin.tglass.ui.components.T
+import com.abtin.tglass.ui.components.CollapsedTitle
+import com.abtin.tglass.ui.components.HeroAction
+import com.abtin.tglass.ui.components.ProfileHero
+import com.abtin.tglass.ui.components.TgIcons
+import com.abtin.tglass.ui.components.VerifiedBadge
+import com.abtin.tglass.ui.components.rememberHeroCollapse
+import androidx.compose.foundation.lazy.rememberLazyListState
 import com.abtin.tglass.ui.components.avatarColors
 import com.abtin.tglass.ui.components.bounceClickable
 import com.kyant.backdrop.backdrops.layerBackdrop
@@ -84,6 +91,8 @@ fun ProfileScreen(chatId: Long) {
     val backdrop = rememberLayerBackdrop()
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     var tab by rememberSaveable { mutableIntStateOf(0) }
+    val listState = rememberLazyListState()
+    val collapse = rememberHeroCollapse(listState)
     val isGroup = chat.type == ChatType.Group
     val tabs = (if (isGroup) listOf("Members") else emptyList()) + listOf("Media", "Files", "Links", "Voice", "GIFs")
 
@@ -91,44 +100,42 @@ fun ProfileScreen(chatId: Long) {
         Box(Modifier.fillMaxSize().background(c.groupedBackground)) {
             LazyColumn(
                 Modifier.fillMaxSize().layerBackdrop(backdrop),
-                contentPadding = PaddingValues(top = top + 60.dp, bottom = 40.dp),
+                state = listState,
+                contentPadding = PaddingValues(bottom = 40.dp),
             ) {
                 item {
-                    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                        ChatAvatar(chat, repo, 110.dp, showOnline = false)
-                        Spacer(Modifier.height(12.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            T(chat.title, TgTheme.type.title2.copy(fontWeight = FontWeight.SemiBold), c.text, maxLines = 1)
-                            if (chat.verified) { Spacer(Modifier.width(4.dp)); Icon(Icons.Rounded.Verified, c.accent, 22.dp) }
-                        }
-                        val (sub, active) = chatSubtitle(chat, repo)
-                        if (sub != null) T(sub, TgTheme.type.subheadline, if (active || user?.online == true) c.accent else c.secondaryText)
-                        Spacer(Modifier.height(18.dp))
-                        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            ActionTile(Icons.Rounded.ChatBubble, "Message", Modifier.weight(1f)) { nav.pop() }
-                            ActionTile(if (chat.muted) Icons.Rounded.Notifications else Icons.Rounded.NotificationsOff, if (chat.muted) "Unmute" else "Mute", Modifier.weight(1f)) { repo.toggleMute(chat.id) }
-                            when (chat.type) {
-                                ChatType.Private, ChatType.Saved -> {
-                                    ActionTile(Icons.Rounded.Call, "Call", Modifier.weight(1f)) { user?.let { nav.push(Route.ActiveCall(it.id, false)) } }
-                                    ActionTile(Icons.Rounded.Videocam, "Video", Modifier.weight(1f)) { user?.let { nav.push(Route.ActiveCall(it.id, true)) } }
-                                }
-                                else -> {
-                                    ActionTile(Icons.Rounded.Search, "Search", Modifier.weight(1f)) { toast.show("Search in chat") }
-                                    ActionTile(Icons.AutoMirrored.Rounded.ExitToApp, "Leave", Modifier.weight(1f)) {
-                                        sheet.show(SheetRequest(actions = listOf(SheetAction(if (chat.type == ChatType.Channel) "Leave Channel" else "Leave Group", destructive = true) {
-                                            repo.deleteChat(chat.id); nav.resetTo(Route.Main)
-                                        })))
-                                    }
+                    val (sub, active) = chatSubtitle(chat, repo)
+                    ProfileHero(
+                        name = chat.title,
+                        seed = chat.id,
+                        subtitle = sub,
+                        collapse = collapse,
+                        saved = chat.type == ChatType.Saved,
+                        subtitleAccent = active || user?.online == true,
+                        badge = { if (chat.verified) VerifiedBadge(22.dp) },
+                    ) {
+                        HeroAction(TgIcons.PiMessage, "Message") { nav.pop() }
+                        HeroAction(if (chat.muted) TgIcons.PiUnmute else TgIcons.PiMute, if (chat.muted) "Unmute" else "Mute") { repo.toggleMute(chat.id) }
+                        when (chat.type) {
+                            ChatType.Private, ChatType.Saved -> {
+                                HeroAction(TgIcons.PiCall, "Call") { user?.let { nav.push(Route.ActiveCall(it.id, false)) } }
+                                HeroAction(TgIcons.PiVideo, "Video") { user?.let { nav.push(Route.ActiveCall(it.id, true)) } }
+                            }
+                            else -> {
+                                HeroAction(TgIcons.PiSearch, "Search") { toast.show("Search in chat") }
+                                HeroAction(TgIcons.PiLeave, "Leave") {
+                                    sheet.show(SheetRequest(actions = listOf(SheetAction(if (chat.type == ChatType.Channel) "Leave Channel" else "Leave Group", destructive = true) {
+                                        repo.deleteChat(chat.id); nav.resetTo(Route.Main)
+                                    })))
                                 }
                             }
-                            ActionTile(Icons.Rounded.MoreHoriz, "More", Modifier.weight(1f)) {
-                                sheet.show(SheetRequest(actions = listOf(
-                                    SheetAction("Share Contact") { toast.show("Link copied") },
-                                    SheetAction("Clear History", destructive = true) { repo.deleteMessages(chat.id, repo.messages(chat.id).map { it.id }.toSet()) },
-                                )))
-                            }
                         }
-                        Spacer(Modifier.height(18.dp))
+                        HeroAction(TgIcons.PiMore, "More") {
+                            sheet.show(SheetRequest(actions = listOf(
+                                SheetAction("Share Contact") { toast.show("Link copied") },
+                                SheetAction("Clear History", destructive = true) { repo.deleteMessages(chat.id, repo.messages(chat.id).map { it.id }.toSet()) },
+                            )))
+                        }
                     }
                 }
                 item {
@@ -155,7 +162,7 @@ fun ProfileScreen(chatId: Long) {
                     val members = repo.users.values.filter { it.id != 0L }.take(8)
                     item {
                         Section {
-                            Cell("Add Members", icon = Icons.Rounded.PersonAdd, titleColor = c.accent, chevron = false, onClick = { toast.show("Invite link copied") })
+                            Cell("Add Members", icon = TgIcons.PiAddMember, iconColor = c.accent, titleColor = c.accent, chevron = false, onClick = { toast.show("Invite link copied") })
                             members.forEachIndexed { i, u ->
                                 Cell(
                                     u.name,
@@ -196,7 +203,7 @@ fun ProfileScreen(chatId: Long) {
                     }
                 }
             }
-            GlassTopBar(title = null, fade = c.groupedBackground, right = { GlassTextButton("Edit", { toast.show("Edit profile") }) })
+            GlassTopBar(title = null, fade = c.groupedBackground, center = { CollapsedTitle(chat.title, chat.id, collapse, saved = chat.type == ChatType.Saved) }, right = { GlassTextButton("Edit", { toast.show("Edit profile") }) })
         }
     }
 }

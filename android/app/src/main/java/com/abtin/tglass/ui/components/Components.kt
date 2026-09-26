@@ -86,6 +86,7 @@ fun Avatar(
     modifier: Modifier = Modifier,
     saved: Boolean = false,
     icon: ImageVector? = null,
+    iconRes: Int? = null,
     iconColors: Pair<Color, Color>? = null,
     online: Boolean = false,
     storyRing: StoryRing = StoryRing.None,
@@ -115,8 +116,9 @@ fun Avatar(
             contentAlignment = Alignment.Center,
         ) {
             when {
-                saved -> Icon(Icons.Rounded.Bookmark, Color.White, inner * 0.5f)
+                saved -> Icon(TgIcons.SetSaved, Color.White, inner * 0.62f)
                 icon != null -> Icon(icon, Color.White, inner * 0.52f)
+                iconRes != null -> Icon(iconRes, Color.White, inner * 0.55f)
                 else -> T(
                     initials(name),
                     TgTheme.type.body.copy(fontSize = (inner.value * 0.4f).sp, lineHeight = (inner.value * 0.44f).sp),
@@ -193,7 +195,7 @@ fun SearchField(
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Rounded.Search, c.secondaryText, 20.dp)
+        Icon(TgIcons.IcSearch, c.secondaryText, 20.dp)
         Spacer(Modifier.width(6.dp))
         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
             if (value.isEmpty()) T(placeholder, TgTheme.type.body, c.secondaryText, maxLines = 1)
@@ -211,7 +213,7 @@ fun SearchField(
         }
         if (value.isNotEmpty()) {
             Icon(
-                Icons.Rounded.Cancel, c.secondaryText, 18.dp,
+                IosIcons.Close, c.secondaryText, 16.dp,
                 Modifier.clickable(remember { MutableInteractionSource() }, null) { onValueChange("") },
             )
         }
@@ -249,21 +251,35 @@ fun Section(
 
 /** Colored rounded-square settings icon. */
 @Composable
-fun SettingsIcon(icon: ImageVector, color: Color, size: Dp = 30.dp) {
+fun SettingsIcon(icon: Any, color: Color, size: Dp = 30.dp) {
     Box(
-        Modifier.size(size).clip(RoundedRectangle(8.dp)).background(color),
+        Modifier
+            .size(size)
+            .clip(RoundedRectangle(8.dp))
+            .background(Brush.verticalGradient(listOf(color.lighten(0.08f), color))),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, Color.White, size * 0.66f)
+        when (icon) {
+            is Int -> Icon(icon, Color.White, size)
+            is ImageVector -> Icon(icon, Color.White, size * 0.66f)
+        }
     }
 }
+
+/** Mix toward white by [amount] (0..1). */
+fun Color.lighten(amount: Float) = Color(
+    red + (1f - red) * amount,
+    green + (1f - green) * amount,
+    blue + (1f - blue) * amount,
+    alpha,
+)
 
 /** A row in a grouped section. */
 @Composable
 fun Cell(
     title: String,
     modifier: Modifier = Modifier,
-    icon: ImageVector? = null,
+    icon: Any? = null,
     iconColor: Color = TgTheme.colors.accent,
     value: String? = null,
     subtitle: String? = null,
@@ -304,10 +320,10 @@ fun Cell(
                 Spacer(Modifier.width(8.dp))
                 trailing()
             } else if (checked) {
-                Icon(Icons.Rounded.Check, c.accent, 22.dp)
+                Icon(IosIcons.Checkmark, c.accent, 20.dp)
             } else if (chevron && onClick != null) {
                 Spacer(Modifier.width(8.dp))
-                Icon(Icons.AutoMirrored.Rounded.ArrowForwardIos, c.tertiaryText, 14.dp)
+                Icon(IosIcons.ChevronRight, c.tertiaryText, 14.dp)
             }
         }
         if (divider) Separator(Modifier.align(Alignment.BottomStart), startPadding = textStart)

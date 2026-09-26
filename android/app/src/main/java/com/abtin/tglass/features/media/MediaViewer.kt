@@ -47,6 +47,8 @@ import com.abtin.tglass.data.senderName
 import com.abtin.tglass.features.main.LocalRepository
 import com.abtin.tglass.ui.components.LocalToast
 import com.abtin.tglass.ui.components.T
+import com.abtin.tglass.ui.components.IosIcons
+import com.abtin.tglass.ui.components.TgIcons
 import com.abtin.tglass.ui.components.avatarColors
 import com.abtin.tglass.ui.components.formatDay
 import com.abtin.tglass.ui.components.formatTime
@@ -112,17 +114,17 @@ fun MediaViewer(chatId: Long, messageId: Long) {
         }
         if (chrome) {
             Row(Modifier.fillMaxWidth().statusBarsPadding().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                GlassIconButton(Icons.Rounded.Close, { nav.pop() })
+                GlassIconButton(IosIcons.Close, { nav.pop() }, iconSize = 20.dp)
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                     T(repo.senderName(m), TgTheme.type.headline, Color.White, weight = FontWeight.SemiBold)
                     T("${formatDay(m.date)} at ${formatTime(m.date)}", TgTheme.type.footnote, Color.White.copy(0.7f))
                 }
-                GlassIconButton(Icons.Rounded.MoreHoriz, { toast.show("Saved to gallery") })
+                GlassIconButton(TgIcons.PiMore, { toast.show("Saved to gallery") })
             }
             Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().padding(16.dp)) {
                 photo.caption?.let { T(it, TgTheme.type.body, Color.White) }
                 Row(Modifier.fillMaxWidth().padding(top = 12.dp)) {
-                    GlassIconButton(Icons.Rounded.Share, { toast.show("Shared") })
+                    GlassIconButton(TgIcons.IcNavShare, { toast.show("Shared") })
                 }
             }
         }

@@ -57,7 +57,8 @@ import kotlin.math.roundToInt
 
 class MenuAction(
     val title: String,
-    val icon: ImageVector,
+    /** A [TgIcons] drawable id or an [ImageVector]. */
+    val icon: Any,
     val destructive: Boolean = false,
     val groupStart: Boolean = false,
     val onClick: () -> Unit,
@@ -269,7 +270,12 @@ private fun MenuList(actions: List<MenuAction>, onClick: (MenuAction) -> Unit) {
             ) {
                 // Telegram-iOS ContextControllerActionsStackNode: icon slot 32pt at x=20, title at x=60.
                 val color = if (a.destructive) c.destructive else c.text
-                Box(Modifier.width(32.dp), contentAlignment = Alignment.Center) { Icon(a.icon, color, 24.dp) }
+                Box(Modifier.width(32.dp), contentAlignment = Alignment.Center) {
+                    when (val i = a.icon) {
+                        is Int -> Icon(i, color, 24.dp)
+                        is ImageVector -> Icon(i, color, 24.dp)
+                    }
+                }
                 Spacer(Modifier.width(8.dp))
                 T(a.title, TgTheme.type.body, color, modifier = Modifier.weight(1f), maxLines = 1)
             }

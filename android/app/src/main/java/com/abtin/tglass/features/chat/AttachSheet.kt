@@ -56,6 +56,8 @@ import com.abtin.tglass.core.glass.GlassIconButton
 import com.abtin.tglass.data.MessageContent
 import com.abtin.tglass.ui.components.Icon
 import com.abtin.tglass.ui.components.T
+import com.abtin.tglass.ui.components.IosIcons
+import com.abtin.tglass.ui.components.TgIcons
 import com.abtin.tglass.ui.components.avatarColors
 import com.abtin.tglass.ui.components.bounceClickable
 import com.abtin.tglass.ui.components.fadeClickable
@@ -84,7 +86,7 @@ fun AttachSheet(visible: Boolean, onDismiss: () -> Unit, onSend: (List<MessageCo
             ) {
                 Column(Modifier.fillMaxSize()) {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        GlassIconButton(Icons.Rounded.Close, onDismiss, size = 40.dp, iconSize = 20.dp)
+                        GlassIconButton(IosIcons.Close, onDismiss, size = 40.dp, iconSize = 18.dp)
                         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                             T(if (selected.isEmpty()) "Recents" else "${selected.size} Selected", TgTheme.type.headline, c.text)
                         }
@@ -101,7 +103,7 @@ fun AttachSheet(visible: Boolean, onDismiss: () -> Unit, onSend: (List<MessageCo
                             Box(
                                 Modifier.aspectRatio(1f).clip(RoundedRectangle(6.dp)).background(Color(0xFF111111)),
                                 contentAlignment = Alignment.Center,
-                            ) { Icon(Icons.Rounded.PhotoCamera, Color.White, 34.dp) }
+                            ) { Icon(TgIcons.AttCamera, Color.White, 34.dp) }
                         }
                         items(GalleryEmojis.indices.toList()) { i ->
                             val (a, b) = avatarColors(i.toLong())
@@ -148,28 +150,16 @@ fun AttachSheet(visible: Boolean, onDismiss: () -> Unit, onSend: (List<MessageCo
                             ) { T("Send ${selected.size}", TgTheme.type.headline, Color.White) }
                         }
                     } else {
-                        Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 10.dp),
-                            horizontalArrangement = Arrangement.SpaceEvenly,
-                        ) {
-                            AttachType(Icons.Rounded.Photo, "Gallery", Color(0xFF2E9BF7)) {}
-                            AttachType(Icons.Rounded.CardGiftcard, "Gift", Color(0xFFF7A12E)) {
-                                onSend(listOf(MessageContent.Sticker("🎁")))
-                            }
-                            AttachType(Icons.AutoMirrored.Rounded.InsertDriveFile, "File", Color(0xFF3E88F7)) {
-                                onSend(listOf(MessageContent.File("Document.pdf", "2.4 MB")))
-                            }
-                            AttachType(Icons.Rounded.LocationOn, "Location", Color(0xFF34C759)) {
-                                onSend(listOf(MessageContent.Location("Current Location", "Azadi Tower, Tehran")))
-                            }
-                            AttachType(Icons.Rounded.Poll, "Poll", Color(0xFFF7C62E)) {
-                                onSend(listOf(MessageContent.Poll("What should we build next?", listOf("Stories editor", "Video calls", "Themes"), listOf(3, 5, 2))))
-                            }
-                            AttachType(Icons.Rounded.AccountCircle, "Contact", Color(0xFFF2994A)) {
-                                onSend(listOf(MessageContent.Contact("Sara Ahmadi", "+98 912 111 2233")))
-                            }
-                            AttachType(Icons.Rounded.MusicNote, "Music", Color(0xFFFF3B6B)) {
-                                onSend(listOf(MessageContent.File("Song.mp3", "4.8 MB")))
+                        // iOS 26: attachment types live in a glass capsule, the current one tinted with the accent.
+                        GlassBox(onClick = null, shape = Capsule(), modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp).fillMaxWidth().height(64.dp)) {
+                            Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                                AttachType(TgIcons.AttGallery, "Gallery", selected = true) {}
+                                AttachType(TgIcons.AttFile, "File") { onSend(listOf(MessageContent.File("Document.pdf", "2.4 MB"))) }
+                                AttachType(TgIcons.AttLocation, "Location") { onSend(listOf(MessageContent.Location("Current Location", "Azadi Tower, Tehran"))) }
+                                AttachType(TgIcons.AttPoll, "Poll") { onSend(listOf(MessageContent.Poll("What should we build next?", listOf("Stories editor", "Video calls", "Themes"), listOf(3, 5, 2)))) }
+                                AttachType(TgIcons.AttContact, "Contact") { onSend(listOf(MessageContent.Contact("Sara Ahmadi", "+98 912 111 2233"))) }
+                                AttachType(TgIcons.AttGift, "Gift") { onSend(listOf(MessageContent.Sticker("🎁"))) }
+                                AttachType(TgIcons.AttAudio, "Music") { onSend(listOf(MessageContent.File("Song.mp3", "4.8 MB"))) }
                             }
                         }
                     }
@@ -180,12 +170,12 @@ fun AttachSheet(visible: Boolean, onDismiss: () -> Unit, onSend: (List<MessageCo
 }
 
 @Composable
-private fun AttachType(icon: ImageVector, label: String, color: Color, onClick: () -> Unit) {
-    Column(Modifier.width(48.dp).fadeClickable(onClick = onClick), horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(Modifier.size(44.dp).clip(CircleShape).background(color), contentAlignment = Alignment.Center) {
-            Icon(icon, Color.White, 24.dp)
-        }
-        Spacer(Modifier.height(4.dp))
-        T(label, TgTheme.type.caption2, TgTheme.colors.secondaryText, maxLines = 1)
+private fun AttachType(icon: Int, label: String, selected: Boolean = false, onClick: () -> Unit) {
+    val c = TgTheme.colors
+    val tint = if (selected) c.accent else c.text
+    Column(Modifier.width(46.dp).fadeClickable(onClick = onClick), horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(icon, tint, 26.dp)
+        Spacer(Modifier.height(2.dp))
+        T(label, TgTheme.type.caption2.copy(fontSize = 10.sp), tint, maxLines = 1, weight = FontWeight.SemiBold)
     }
 }

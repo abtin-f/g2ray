@@ -47,6 +47,8 @@ import com.abtin.tglass.features.main.LocalRepository
 import com.abtin.tglass.ui.components.Avatar
 import com.abtin.tglass.ui.components.Icon
 import com.abtin.tglass.ui.components.T
+import com.abtin.tglass.ui.components.IosIcons
+import com.abtin.tglass.ui.components.TgIcons
 import com.abtin.tglass.ui.components.fadeClickable
 import com.abtin.tglass.ui.components.formatListDate
 import com.kyant.shapes.Capsule
@@ -134,7 +136,7 @@ fun StoryViewer(startUserId: Long) {
                         T(formatListDate(story.date), TgTheme.type.caption1, Color.White.copy(0.7f))
                     }
                     Box(Modifier.size(40.dp).fadeClickable { nav.pop() }, contentAlignment = Alignment.Center) {
-                        Icon(Icons.Rounded.Close, Color.White, 26.dp)
+                        Icon(IosIcons.Close, Color.White, 22.dp)
                     }
                 }
             }
@@ -149,7 +151,7 @@ fun StoryViewer(startUserId: Long) {
             ) { T("Reply privately…", TgTheme.type.body, Color.White.copy(0.7f)) }
             Spacer(Modifier.width(10.dp))
             Box(Modifier.size(44.dp).fadeClickable { }, contentAlignment = Alignment.Center) {
-                Icon(Icons.Rounded.FavoriteBorder, Color.White, 28.dp)
+                Icon(IosIcons.Heart, Color.White, 28.dp)
             }
         }
     }

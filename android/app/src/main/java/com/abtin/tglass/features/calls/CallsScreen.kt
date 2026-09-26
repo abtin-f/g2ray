@@ -71,6 +71,9 @@ import com.abtin.tglass.ui.components.Icon
 import com.abtin.tglass.ui.components.SegmentedControl
 import com.abtin.tglass.ui.components.Separator
 import com.abtin.tglass.ui.components.T
+import com.abtin.tglass.ui.components.BackButton
+import com.abtin.tglass.ui.components.IosIcons
+import com.abtin.tglass.ui.components.TgIcons
 import com.abtin.tglass.ui.components.bounceClickable
 import com.abtin.tglass.ui.components.fadeClickable
 import com.abtin.tglass.ui.components.formatDuration
@@ -110,7 +113,7 @@ fun CallsScreen(backdrop: LayerBackdrop, isTab: Boolean) {
                         Column(Modifier.weight(1f)) {
                             T(u.name, TgTheme.type.headline, if (call.missed) c.destructive else c.text, maxLines = 1)
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(if (call.outgoing) Icons.AutoMirrored.Rounded.CallMade else Icons.AutoMirrored.Rounded.CallReceived, c.secondaryText, 14.dp)
+                                Icon(if (call.video) TgIcons.ClOutgoingVideo else TgIcons.ClOutgoing, c.secondaryText, 16.dp, Modifier.graphicsLayer { if (!call.outgoing) rotationZ = 180f })
                                 Spacer(Modifier.width(4.dp))
                                 val kind = if (call.video) "Video" else if (call.outgoing) "Outgoing" else "Incoming"
                                 T(if (call.durationSec > 0) "$kind (${formatDuration(call.durationSec)})" else kind, TgTheme.type.subheadline, c.secondaryText, maxLines = 1)
@@ -118,7 +121,7 @@ fun CallsScreen(backdrop: LayerBackdrop, isTab: Boolean) {
                         }
                         T(formatListDate(call.date), TgTheme.type.subheadline, c.secondaryText)
                         Box(Modifier.size(40.dp).fadeClickable { nav.push(Route.UserProfile(u.id)) }, contentAlignment = Alignment.Center) {
-                            Icon(Icons.Outlined.Info, c.accent, 24.dp)
+                            Icon(TgIcons.ClInfo, c.accent, 26.dp)
                         }
                     }
                     Separator(Modifier.align(Alignment.BottomStart), startPadding = 68.dp)
@@ -129,10 +132,10 @@ fun CallsScreen(backdrop: LayerBackdrop, isTab: Boolean) {
             title = null,
             left = {
                 if (isTab) GlassTextButton("Edit", {})
-                else GlassIconButton(Icons.AutoMirrored.Rounded.ArrowBackIos, { nav.pop() }, iconSize = 20.dp)
+                else BackButton({ nav.pop() })
             },
             center = { SegmentedControl(listOf("All", "Missed"), filter, { filter = it }, Modifier.width(180.dp)) },
-            right = { GlassIconButton(Icons.Rounded.AddIcCall, {}) },
+            right = { GlassIconButton(TgIcons.ClNewCall, {}) },
         )
     }
 }
@@ -185,10 +188,10 @@ fun ActiveCallScreen(userId: Long, video: Boolean) {
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().padding(bottom = 40.dp, start = 24.dp, end = 24.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            CallButton(Icons.Rounded.VolumeUp, "speaker", speaker) { speaker = !speaker }
-            CallButton(if (camera) Icons.Rounded.Videocam else Icons.Rounded.VideocamOff, "video", camera) { camera = !camera }
-            CallButton(if (muted) Icons.Rounded.MicOff else Icons.Rounded.Mic, "mute", muted) { muted = !muted }
-            CallButton(Icons.Rounded.CallEnd, "end", false, end = true) { nav.pop() }
+            CallButton(IosIcons.Speaker, "speaker", speaker) { speaker = !speaker }
+            CallButton(IosIcons.Video, "video", camera) { camera = !camera }
+            CallButton(if (muted) IosIcons.MicSlash else IosIcons.Mic, "mute", muted) { muted = !muted }
+            CallButton(IosIcons.PhoneDown, "end", false, end = true) { nav.pop() }
         }
     }
 }

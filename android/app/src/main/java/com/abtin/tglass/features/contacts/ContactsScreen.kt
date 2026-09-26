@@ -48,6 +48,8 @@ import com.abtin.tglass.ui.components.LocalToast
 import com.abtin.tglass.ui.components.SearchField
 import com.abtin.tglass.ui.components.Separator
 import com.abtin.tglass.ui.components.T
+import com.abtin.tglass.ui.components.IosIcons
+import com.abtin.tglass.ui.components.TgIcons
 import com.abtin.tglass.ui.components.iosClickable
 import com.kyant.backdrop.backdrops.LayerBackdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
@@ -74,27 +76,27 @@ fun ContactsScreen(backdrop: LayerBackdrop, isTab: Boolean) {
             contentPadding = PaddingValues(top = top + 62.dp, bottom = bottom + if (isTab) 110.dp else 20.dp),
         ) {
             item { SearchField(query, { query = it }, Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) }
-            item { ActionRow(Icons.Rounded.Share, "Invite Friends") { toast.show("Invite link copied") } }
-            item { ActionRow(Icons.Rounded.PersonAdd, "Add Contact") { toast.show("Add contact") } }
+            item { ActionRow(TgIcons.CtInvite, "Invite Friends") { toast.show("Invite link copied") } }
+            item { ActionRow(TgIcons.CtAddMember, "Add Contact") { toast.show("Add contact") } }
             items(contacts, key = { it.id }) { u -> ContactRow(u) { nav.push(Route.Chat(repo.privateChatWith(u.id))) } }
         }
         GlassTopBar(
             title = "Contacts",
             left = { GlassTextButton("Sort", { byName = !byName; toast.show(if (byName) "Sorted by name" else "Sorted by last seen") }) },
-            right = { GlassIconButton(Icons.Rounded.Add, { toast.show("New contact") }) },
+            right = { GlassIconButton(IosIcons.Plus, { toast.show("New contact") }, iconSize = 22.dp) },
         )
     }
 }
 
 @Composable
-private fun ActionRow(icon: ImageVector, title: String, onClick: () -> Unit) {
+private fun ActionRow(icon: Int, title: String, onClick: () -> Unit) {
     val c = TgTheme.colors
     Box {
         Row(
             Modifier.fillMaxWidth().iosClickable(onClick = onClick).height(50.dp).padding(horizontal = 22.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(icon, c.accent, 26.dp)
+            Icon(icon, c.accent, 30.dp)
             Spacer(Modifier.width(22.dp))
             T(title, TgTheme.type.body, c.accent)
         }
@@ -136,9 +138,9 @@ fun NewMessageScreen() {
         Box(Modifier.fillMaxSize().background(c.background)) {
             LazyColumn(Modifier.fillMaxSize().layerBackdrop(backdrop), contentPadding = PaddingValues(top = top + 62.dp, bottom = 30.dp)) {
                 item { SearchField(query, { query = it }, Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) }
-                item { ActionRow(Icons.Rounded.Group, "New Group") { toast.show("New group") } }
-                item { ActionRow(Icons.Rounded.PersonAdd, "New Contact") { toast.show("New contact") } }
-                item { ActionRow(Icons.Rounded.Campaign, "New Channel") { toast.show("New channel") } }
+                item { ActionRow(TgIcons.CtCreateGroup, "New Group") { toast.show("New group") } }
+                item { ActionRow(TgIcons.CtAddMember, "New Contact") { toast.show("New contact") } }
+                item { ActionRow(TgIcons.CtCreateChannel, "New Channel") { toast.show("New channel") } }
                 var letter = ' '
                 contacts.forEach { u ->
                     val l = u.name.first().uppercaseChar()
