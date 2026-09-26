@@ -56,13 +56,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cp android/app/build/outputs/apk/release/app-release.apk TGlass.apk
-          gh release delete latest-build -y --cleanup-tag || true
-          gh release create latest-build TGlass.apk --prerelease --target "${{ github.sha }}" \
-            --title "TGlass latest build" --notes "Built from ${{ github.sha }} on ${{ github.ref_name }}"
-          mkdir -p /tmp/builds && cp TGlass.apk /tmp/builds/ && cd /tmp/builds
-          git init -q && git checkout -q -b builds && git add TGlass.apk
-          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -qm "TGlass APK from ${{ github.sha }}"
-          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" builds
+          mkdir -p /tmp/builds && cp TGlass.apk /tmp/builds/
+          (cd /tmp/builds && git init -q && git checkout -q -b builds && git add TGlass.apk \
+            && git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -qm "TGlass APK from ${{ github.sha }}" \
+            && git push -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" builds)
+          # The pre-release is a convenience download; the builds branch above is the source of truth.
+          notes="Built from ${{ github.sha }} on ${{ github.ref_name }}"
+          if gh release view latest-build >/dev/null 2>&1; then
+            gh release upload latest-build TGlass.apk --clobber && gh release edit latest-build --notes "$notes" \
+              || echo "::warning::Could not update the latest-build release"
+          else
+            gh release create latest-build TGlass.apk --prerelease --target "${{ github.sha }}" --title "TGlass latest build" --notes "$notes" \
+              || echo "::warning::Could not create the latest-build release"
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: tglass-apk
