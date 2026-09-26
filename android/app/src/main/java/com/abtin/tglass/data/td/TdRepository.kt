@@ -696,6 +696,7 @@ class TdRepository(context: Context) : TelegramRepository {
         packs.clear(); recents.clear(); gifs.clear(); stickersLoaded = false
         myId = 0
         resetStories()
+        resetChatFeatures()
     }
 
     private suspend fun loadContacts() {
@@ -809,6 +810,7 @@ class TdRepository(context: Context) : TelegramRepository {
     // =====================================================================================
 
     private fun handle(u: Update) {
+        onChatFeatureUpdate(u)
         when (u) {
             is UpdateAuthorizationState -> onAuth(u.authorizationState)
             is UpdateOption -> if (u.name == "my_id") (u.value as? OptionValueInteger)?.let { myId = it.value }
@@ -1189,6 +1191,7 @@ class TdRepository(context: Context) : TelegramRepository {
             else -> if (!m.isOutgoing || (st != null && m.id <= st.lastReadOutbox) || st?.type.let { it is ChatTypePrivate && it.userId == myId }) MessageStatus.Read else MessageStatus.Sent
         }
         val reply = (m.replyTo as? MessageReplyToMessage)?.takeIf { it.chatId == 0L || it.chatId == m.chatId }?.messageId
+        rememberInlineKeyboard(m.chatId, m.id, m.replyMarkup)
         return UiMessage(
             id = m.id,
             chatId = m.chatId,
@@ -1282,12 +1285,16 @@ class TdRepository(context: Context) : TelegramRepository {
             music = true,
             duration = c.audio.duration,
             performer = c.audio.performer.ifBlank { null },
+            caption = c.caption.text.ifBlank { null },
+            captionEntities = entities(c.caption),
         )
         is MessageDocument -> UiContent.File(
             name = c.document.fileName.ifBlank { "File" },
             size = Formats.size(c.document.document.size),
             file = imageOf(c.document.document, null),
             mime = c.document.mimeType,
+            caption = c.caption.text.ifBlank { null },
+            captionEntities = entities(c.caption),
         )
         is MessageSticker -> {
             val s = c.sticker
@@ -1976,6 +1983,248 @@ class TdRepository(context: Context) : TelegramRepository {
         else -> humanize(error)
     }
     // ---- end Polls, contacts, folders ----
+
+    // =====================================================================================
+    // ---- Chat features ----
+    // Bot keyboards, block / unblock, clear history, report spam, captions, silent send, online counts.
+    // =====================================================================================
+
+    /** Inline keyboards under messages, keyed "chatId:messageId" (filled by [mapMessage] and updateMessageEdited). */
+    private val inlineKeyboards = mutableStateMapOf<String, com.abtin.tglass.data.InlineKeyboard>()
+    /** Custom reply keyboards a bot currently shows, per chat. */
+    private val replyKeyboards = mutableStateMapOf<Long, com.abtin.tglass.data.ReplyKeyboard>()
+    /** chat.replyMarkupMessageId: the message whose reply keyboard is shown (0 = none). */
+    private val replyMarkupIds = HashMap<Long, Long>()
+    /** Chats whose sender (user / bot) is on the user's block list. */
+    private val blockedChats = mutableStateMapOf<Long, Boolean>()
+    private val clearOptions = HashMap<Long, com.abtin.tglass.data.ClearHistoryOptions>()
+    private val reportableChats = HashSet<Long>()
+    private val onlineCounts = mutableStateMapOf<Long, Int>()
+
+    /** Called for every update before the main handler; only reads what the chat features need. */
+    private fun onChatFeatureUpdate(u: Update) {
+        when (u) {
+            is UpdateNewChat -> recordChatFeatures(u.chat)
+            is UpdateChatBlockList -> setBlockedLocally(u.chatId, u.blockList != null)
+            is UpdateChatReplyMarkup -> {
+                val m = u.replyMarkupMessage
+                replyMarkupIds[u.chatId] = m?.id ?: 0L
+                val kb = m?.let { mapReplyKeyboard(it.id, it.replyMarkup) }
+                if (kb != null) replyKeyboards[u.chatId] = kb else replyKeyboards.remove(u.chatId)
+            }
+            is UpdateChatOnlineMemberCount -> onlineCounts[u.chatId] = u.onlineMemberCount
+            is UpdateMessageEdited -> rememberInlineKeyboard(u.chatId, u.messageId, u.replyMarkup)
+            else -> Unit
+        }
+    }
+
+    private fun recordChatFeatures(c: Chat) {
+        setBlockedLocally(c.id, c.blockList != null)
+        clearOptions[c.id] = com.abtin.tglass.data.ClearHistoryOptions(forMe = c.canBeDeletedOnlyForSelf, forEveryone = c.canBeDeletedForAllUsers)
+        if (c.canBeReported) reportableChats += c.id else reportableChats -= c.id
+        replyMarkupIds[c.id] = c.replyMarkupMessageId
+    }
+
+    private fun setBlockedLocally(chatId: Long, blocked: Boolean) {
+        if (blocked) blockedChats[chatId] = true else if (blockedChats.containsKey(chatId)) blockedChats.remove(chatId)
+    }
+
+    private fun resetChatFeatures() {
+        inlineKeyboards.clear(); replyKeyboards.clear(); replyMarkupIds.clear()
+        blockedChats.clear(); clearOptions.clear(); reportableChats.clear(); onlineCounts.clear()
+    }
+
+    /** Stores (or forgets) the inline keyboard of a message. */
+    private fun rememberInlineKeyboard(chatId: Long, messageId: Long, markup: ReplyMarkup?) {
+        val key = "$chatId:$messageId"
+        val kb = (markup as? ReplyMarkupInlineKeyboard)?.let { mapInlineKeyboard(it) }
+        if (kb != null) inlineKeyboards[key] = kb else if (inlineKeyboards.containsKey(key)) inlineKeyboards.remove(key)
+    }
+
+    private fun mapInlineKeyboard(k: ReplyMarkupInlineKeyboard): com.abtin.tglass.data.InlineKeyboard? {
+        val rows = k.rows.map { row ->
+            row.map { b ->
+                when (val t = b.type) {
+                    is InlineKeyboardButtonTypeUrl -> com.abtin.tglass.data.InlineButton(b.text, com.abtin.tglass.data.InlineButtonKind.Url, url = t.url)
+                    // Telegram would first ask the bot to authorize the user; opening the plain URL still works for most sites.
+                    is InlineKeyboardButtonTypeLoginUrl -> com.abtin.tglass.data.InlineButton(b.text, com.abtin.tglass.data.InlineButtonKind.Url, url = t.url)
+                    is InlineKeyboardButtonTypeCallback -> com.abtin.tglass.data.InlineButton(b.text, com.abtin.tglass.data.InlineButtonKind.Callback, data = t.data)
+                    is InlineKeyboardButtonTypeCopyText -> com.abtin.tglass.data.InlineButton(b.text, com.abtin.tglass.data.InlineButtonKind.Copy, copyText = t.text)
+                    else -> com.abtin.tglass.data.InlineButton(b.text, com.abtin.tglass.data.InlineButtonKind.Unsupported)
+                }
+            }
+        }.filter { it.isNotEmpty() }
+        return if (rows.isEmpty()) null else com.abtin.tglass.data.InlineKeyboard(rows)
+    }
+
+    private fun mapReplyKeyboard(messageId: Long, markup: ReplyMarkup?): com.abtin.tglass.data.ReplyKeyboard? {
+        val k = markup as? ReplyMarkupShowKeyboard ?: return null
+        val rows = k.rows.map { row ->
+            row.map { b -> com.abtin.tglass.data.ReplyButton(b.text, sendsText = b.type is KeyboardButtonTypeText) }
+        }.filter { it.isNotEmpty() }
+        if (rows.isEmpty()) return null
+        return com.abtin.tglass.data.ReplyKeyboard(
+            messageId = messageId,
+            rows = rows,
+            resize = k.resizeKeyboard,
+            oneTime = k.oneTime,
+            placeholder = k.inputFieldPlaceholder,
+        )
+    }
+
+    override fun loadChatExtras(chatId: Long) {
+        scope.launch {
+            val r = client.getChat(chatId)
+            if (r is TdlResult.Success) recordChatFeatures(r.result)
+            val markupId = replyMarkupIds[chatId] ?: 0L
+            if (markupId != 0L) {
+                val m = client.getMessage(chatId, markupId)
+                val kb = if (m is TdlResult.Success) mapReplyKeyboard(markupId, m.result.replyMarkup) else null
+                if (kb != null) replyKeyboards[chatId] = kb else replyKeyboards.remove(chatId)
+            } else if (replyKeyboards.containsKey(chatId)) {
+                replyKeyboards.remove(chatId)
+            }
+            // Member / subscriber counts for the header (supergroup.memberCount is often 0 until the full info is loaded).
+            val type = chatStates[chatId]?.type
+            if ((type is ChatTypeSupergroup || type is ChatTypeBasicGroup) && chatInfos[chatId] == null) loadChatInfo(chatId)
+        }
+    }
+
+    override fun inlineKeyboard(chatId: Long, messageId: Long): com.abtin.tglass.data.InlineKeyboard? = inlineKeyboards["$chatId:$messageId"]
+
+    override fun replyKeyboard(chatId: Long): com.abtin.tglass.data.ReplyKeyboard? = replyKeyboards[chatId]
+
+    override fun pressCallbackButton(chatId: Long, messageId: Long, data: ByteArray, onAnswer: (com.abtin.tglass.data.BotAnswer?) -> Unit) {
+        scope.launch {
+            when (val r = client.getCallbackQueryAnswer(chatId, messageId, CallbackQueryPayloadData(data))) {
+                is TdlResult.Success -> onAnswer(com.abtin.tglass.data.BotAnswer(r.result.text, r.result.showAlert, r.result.url))
+                is TdlResult.Failure -> {
+                    _errors.tryEmit(if (r.code == 502 || "TIMEOUT" in r.message) "The bot didn't respond. Please try again." else humanize(r.message))
+                    onAnswer(null)
+                }
+            }
+        }
+    }
+
+    override fun startBot(chatId: Long) {
+        val botId = (chatStates[chatId]?.type as? ChatTypePrivate)?.userId ?: return super.startBot(chatId)
+        scope.launch {
+            client.sendBotStartMessage(botId, chatId, "").also { r -> if (r is TdlResult.Success) addMessage(r.result) }.orReport()
+        }
+    }
+
+    override fun isBlocked(chatId: Long): Boolean = blockedChats[chatId] == true
+
+    override fun setBlocked(chatId: Long, blocked: Boolean, onDone: (String?) -> Unit) {
+        val userId = (chatStates[chatId]?.type as? ChatTypePrivate)?.userId ?: return onDone("Only users and bots can be blocked.")
+        val before = isBlocked(chatId)
+        setBlockedLocally(chatId, blocked)
+        scope.launch {
+            val r = client.setMessageSenderBlockList(MessageSenderUser(userId), if (blocked) BlockListMain() else null)
+            if (r is TdlResult.Failure) {
+                setBlockedLocally(chatId, before)
+                onDone(humanize(r.message))
+            } else {
+                onDone(null)
+            }
+        }
+    }
+
+    override fun clearHistoryOptions(chatId: Long): com.abtin.tglass.data.ClearHistoryOptions =
+        clearOptions[chatId] ?: com.abtin.tglass.data.ClearHistoryOptions(forMe = chatStates[chatId]?.type !is ChatTypeSupergroup, forEveryone = false)
+
+    override fun clearHistory(chatId: Long, forEveryone: Boolean) {
+        scope.launch {
+            val r = client.deleteChatHistory(chatId, false, forEveryone).orReport()
+            if (r is TdlResult.Success) {
+                messageStore[chatId]?.clear()
+                pinnedStore.remove(chatId)
+            }
+        }
+    }
+
+    override fun canReportSpam(chatId: Long): Boolean = chatId in reportableChats
+
+    override fun reportSpam(chatId: Long, onDone: (String?) -> Unit) {
+        scope.launch {
+            var option = ByteArray(0)
+            var text = ""
+            // Telegram asks for a reason (and sometimes optional details) step by step.
+            repeat(4) {
+                when (val r = client.reportChat(chatId, option, LongArray(0), text)) {
+                    is TdlResult.Failure -> {
+                        onDone(humanize(r.message))
+                        return@launch
+                    }
+                    is TdlResult.Success -> when (val res = r.result) {
+                        is ReportChatResultOk -> {
+                            onDone(null)
+                            return@launch
+                        }
+                        is ReportChatResultOptionRequired -> {
+                            val spam = res.options.firstOrNull { it.text.contains("spam", ignoreCase = true) }
+                            if (spam == null) {
+                                onDone("This chat can't be reported as spam.")
+                                return@launch
+                            }
+                            option = spam.id
+                        }
+                        is ReportChatResultTextRequired -> {
+                            if (!res.isOptional) {
+                                onDone("Telegram needs more details for this report.")
+                                return@launch
+                            }
+                            option = res.optionId
+                            text = ""
+                        }
+                        else -> {
+                            onDone("This chat can't be reported from here.")
+                            return@launch
+                        }
+                    }
+                }
+            }
+            onDone("This chat can't be reported from here.")
+        }
+    }
+
+    override fun editCaption(chatId: Long, messageId: Long, caption: String) {
+        scope.launch {
+            client.editMessageCaption(
+                chatId = chatId,
+                messageId = messageId,
+                replyMarkup = null,
+                caption = caption.takeIf { it.isNotBlank() }?.let { FormattedText(it, emptyArray()) },
+                showCaptionAboveMedia = false,
+            ).also { r -> if (r is TdlResult.Success) addMessage(r.result) }.orReport()
+        }
+    }
+
+    override fun sendTextSilently(chatId: Long, text: String, replyTo: Long?) {
+        scope.launch {
+            client.sendMessage(
+                chatId = chatId,
+                replyTo = replyTo?.let { InputMessageReplyToMessage(it, null, 0, "") },
+                options = MessageSendOptions(
+                    suggestedPostInfo = null,
+                    disableNotification = true,
+                    fromBackground = false,
+                    protectContent = false,
+                    allowPaidBroadcast = false,
+                    paidMessageStarCount = 0L,
+                    updateOrderOfInstalledStickerSets = false,
+                    schedulingState = null,
+                    effectId = 0L,
+                    sendingId = 0,
+                    onlyPreview = false,
+                ),
+                inputMessageContent = InputMessageText(FormattedText(text, emptyArray()), null, true),
+            ).also { r -> if (r is TdlResult.Success) addMessage(r.result) }.orReport()
+        }
+    }
+
+    override fun onlineMemberCount(chatId: Long): Int? = onlineCounts[chatId]?.takeIf { it > 0 }
+    // ---- end Chat features ----
 }
 
 /** Process-wide TDLib instance (TDLib must not be created twice for the same database). */

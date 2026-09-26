@@ -253,6 +253,59 @@ interface TelegramRepository {
     /** Deletes a folder (its chats stay where they are); [onDone] gets an error message or null. */
     fun deleteFolder(folderId: Int, onDone: (String?) -> Unit) = onDone(null)
     // ---- end Polls, contacts, folders ----
+
+    // ---- Chat features (bot keyboards, blocking, clear history, reports, captions, silent send) ----
+
+    /** Loads what the chat screen needs besides messages: bot reply keyboard, block state, delete/report permissions, member counts. */
+    fun loadChatExtras(chatId: Long) {}
+
+    /** Inline keyboard a bot attached under a message, or null. */
+    fun inlineKeyboard(chatId: Long, messageId: Long): InlineKeyboard? = null
+
+    /** Presses a callback button of [messageId]; [onAnswer] gets the bot's answer, or null if it failed / the bot didn't answer. */
+    fun pressCallbackButton(chatId: Long, messageId: Long, data: ByteArray, onAnswer: (BotAnswer?) -> Unit) = onAnswer(null)
+
+    /** Custom reply keyboard a bot currently shows in this chat, or null. */
+    fun replyKeyboard(chatId: Long): ReplyKeyboard? = null
+
+    /** The bot chat's "Start" button: sends /start. */
+    fun startBot(chatId: Long) = sendText(chatId, "/start", null)
+
+    /** Whether the user behind a private / bot chat is blocked. */
+    fun isBlocked(chatId: Long): Boolean = ChatFeatureDemo.blocked[chatId] == true
+
+    /** Blocks or unblocks the user behind a private / bot chat; [onDone] gets an error message or null. */
+    fun setBlocked(chatId: Long, blocked: Boolean, onDone: (String?) -> Unit = {}) {
+        if (blocked) ChatFeatureDemo.blocked[chatId] = true else ChatFeatureDemo.blocked.remove(chatId)
+        onDone(null)
+    }
+
+    /** Which "Clear History" variants the chat allows. */
+    fun clearHistoryOptions(chatId: Long): ClearHistoryOptions = ClearHistoryOptions(forMe = true, forEveryone = false)
+
+    /** Deletes the whole history of a chat (for the other side too when [forEveryone]). */
+    fun clearHistory(chatId: Long, forEveryone: Boolean) = deleteMessages(chatId, messages(chatId).map { it.id }.toSet(), forEveryone)
+
+    /** Whether the chat can be reported to Telegram's moderators. */
+    fun canReportSpam(chatId: Long): Boolean = false
+
+    /** Reports the chat as spam; [onDone] gets an error message or null. */
+    fun reportSpam(chatId: Long, onDone: (String?) -> Unit) = onDone(null)
+
+    /** Changes the caption of a photo / video / file message (empty removes it). */
+    fun editCaption(chatId: Long, messageId: Long, caption: String) = editText(chatId, messageId, caption)
+
+    /** Sends a text message without a notification sound on the recipient's side. */
+    fun sendTextSilently(chatId: Long, text: String, replyTo: Long?) = sendText(chatId, text, replyTo)
+
+    /** Members currently online in a group (null when unknown). */
+    fun onlineMemberCount(chatId: Long): Int? = null
+
+    /** Local state behind the demo defaults above. */
+    object ChatFeatureDemo {
+        val blocked = mutableStateMapOf<Long, Boolean>()
+    }
+    // ---- end Chat features ----
 }
 
 class DemoRepository(private val scope: CoroutineScope) : TelegramRepository {
@@ -472,7 +525,8 @@ class DemoRepository(private val scope: CoroutineScope) : TelegramRepository {
     override fun editText(chatId: Long, messageId: Long, text: String) = updateMessage(chatId, messageId) {
         val c = it.content
         val newContent = when (c) {
-            is MessageContent.Photo -> c.copy(caption = text)
+            is MessageContent.Photo -> c.copy(caption = text.ifBlank { null })
+            is MessageContent.File -> c.copy(caption = text.ifBlank { null })
             else -> MessageContent.Text(text)
         }
         it.copy(content = newContent, edited = true)

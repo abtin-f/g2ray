@@ -74,6 +74,8 @@ sealed interface MessageContent {
         val music: Boolean = false,
         val duration: Int = 0,
         val performer: String? = null,
+        val caption: String? = null,
+        val captionEntities: List<Entity> = emptyList(),
     ) : MessageContent
     data class Location(val title: String, val address: String) : MessageContent
     /** [userId] is the Telegram user behind the contact (0 if not on Telegram / unknown). */
@@ -114,6 +116,7 @@ data class Message(
         get() = when (val c = content) {
             is MessageContent.Text -> c.text
             is MessageContent.Photo -> c.caption
+            is MessageContent.File -> c.caption
             is MessageContent.Link -> c.text
             else -> null
         }

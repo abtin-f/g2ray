@@ -41,6 +41,19 @@ object VoicePlayer {
         private set
     var positionMs by mutableLongStateOf(0L)
         private set
+    /** Playback speed of voice notes (1x / 1.5x / 2x), kept for the next ones like Telegram. */
+    var speed by mutableFloatStateOf(1f)
+        private set
+
+    /** 1x → 1.5x → 2x → 1x. */
+    fun cycleSpeed() {
+        speed = when (speed) {
+            1f -> 1.5f
+            1.5f -> 2f
+            else -> 1f
+        }
+        player?.setPlaybackSpeed(speed)
+    }
 
     private val scope = MainScope()
     private var player: ExoPlayer? = null
@@ -75,6 +88,7 @@ object VoicePlayer {
             player = p
         }
         p.setMediaItem(MediaItem.fromUri(Uri.fromFile(File(path))))
+        p.setPlaybackSpeed(speed)
         p.prepare()
         p.play()
         playing = true
@@ -106,7 +120,7 @@ object VoicePlayer {
             while (isActive) {
                 delay(50)
                 if (simulatedMs > 0) {
-                    if (playing) positionMs += 50
+                    if (playing) positionMs += (50 * speed).toLong()
                     progress = (positionMs.toFloat() / simulatedMs).coerceIn(0f, 1f)
                     if (positionMs >= simulatedMs) { stop(); return@launch }
                 } else {
