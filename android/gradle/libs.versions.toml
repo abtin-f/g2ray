@@ -1,0 +1,24 @@
+[versions]
+# Same toolchain as Kyant0/AndroidLiquidGlass 1.0.6 (known-good combination)
+agp = "9.0.0"
+kotlin = "2.3.10"
+activity = "1.12.4"
+core = "1.17.0"
+compose = "1.10.3"
+composeIcons = "1.7.8"
+backdrop = "1.0.6"
+kyantShapes = "1.2.0"
+
+[libraries]
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "core" }
+androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activity" }
+androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "compose" }
+androidx-compose-ui = { group = "androidx.compose.ui", name = "ui", version.ref = "compose" }
+androidx-compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics", version.ref = "compose" }
+androidx-compose-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended", version.ref = "composeIcons" }
+kyant-backdrop = { group = "io.github.kyant0", name = "backdrop", version.ref = "backdrop" }
+kyant-shapes = { group = "io.github.kyant0", name = "shapes", version.ref = "kyantShapes" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
