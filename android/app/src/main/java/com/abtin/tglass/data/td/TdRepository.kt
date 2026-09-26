@@ -98,6 +98,7 @@ class TdRepository(context: Context) : TelegramRepository {
         var notifications: ChatNotificationSettings,
         var draft: String?,
         var lastReadOutbox: Long,
+        var lastReadInbox: Long = 0,
         var typing: String? = null,
     )
 
@@ -125,6 +126,10 @@ class TdRepository(context: Context) : TelegramRepository {
     private val contactIds = mutableStateListOf<Long>()
     private val chatInfos = mutableStateMapOf<Long, ChatInfo>()
     private val sharedMediaStore = mutableStateMapOf<String, List<UiMessage>>()
+    private val messageCache = mutableStateMapOf<String, UiMessage>()
+    private val requestedMessages = HashSet<String>()
+    private val pinnedStore = mutableStateMapOf<Long, UiMessage>()
+    private val lastTypingSent = HashMap<Long, Long>()
     private val packs = mutableStateListOf<StickerPack>()
     private val recents = mutableStateListOf<StickerItem>()
     private val gifs = mutableStateListOf<GifItem>()
@@ -286,10 +291,59 @@ class TdRepository(context: Context) : TelegramRepository {
         }
     }
 
-    override fun deleteMessages(chatId: Long, ids: Set<Long>) {
+    override fun deleteMessages(chatId: Long, ids: Set<Long>, forEveryone: Boolean) {
+        scope.launch { client.deleteMessages(chatId, ids.toLongArray(), forEveryone).orReport() }
+    }
+
+    override fun findMessage(chatId: Long, messageId: Long): UiMessage? =
+        super.findMessage(chatId, messageId) ?: messageCache["$chatId:$messageId"]
+
+    override fun requestMessage(chatId: Long, messageId: Long) {
+        val key = "$chatId:$messageId"
+        if (messageCache.containsKey(key) || !requestedMessages.add(key)) return
         scope.launch {
-            val revoke = chat(chatId)?.type.let { it == UiChatType.Private || it == UiChatType.Saved || it == UiChatType.Bot }
-            client.deleteMessages(chatId, ids.toLongArray(), revoke).orReport()
+            val r = client.getMessage(chatId, messageId)
+            if (r is TdlResult.Success) messageCache[key] = mapMessage(r.result)
+        }
+    }
+
+    override fun loadAround(chatId: Long, messageId: Long, onLoaded: () -> Unit) {
+        if (messages(chatId).any { it.id == messageId }) return onLoaded()
+        scope.launch {
+            val r = client.getChatHistory(chatId, messageId, -25, 50, false)
+            if (r is TdlResult.Success) {
+                messageStore.getOrPut(chatId) { mutableStateListOf() }
+                r.result.messages.filterNotNull().forEach { addMessage(it) }
+            }
+            onLoaded()
+        }
+    }
+
+    override fun pinnedMessage(chatId: Long): UiMessage? = pinnedStore[chatId]
+
+    private fun loadPinned(chatId: Long) {
+        scope.launch {
+            val r = client.getChatPinnedMessage(chatId)
+            if (r is TdlResult.Success) pinnedStore[chatId] = mapMessage(r.result) else pinnedStore.remove(chatId)
+        }
+    }
+
+    override fun readAnchor(chatId: Long): Long? {
+        val st = chatStates[chatId] ?: return null
+        return st.lastReadInbox.takeIf { st.unread > 0 }
+    }
+
+    override fun sendTyping(chatId: Long) {
+        val now = System.currentTimeMillis()
+        if (now - (lastTypingSent[chatId] ?: 0L) < 5_000) return
+        lastTypingSent[chatId] = now
+        scope.launch { client.sendChatAction(chatId = chatId, businessConnectionId = "", action = ChatActionTyping()) }
+    }
+
+    override fun searchInChat(chatId: Long, query: String, onResult: (List<UiMessage>) -> Unit) {
+        scope.launch {
+            val r = client.searchChatMessages(chatId = chatId, query = query, fromMessageId = 0, offset = 0, limit = 100)
+            onResult(if (r is TdlResult.Success) r.result.messages.map { mapMessage(it) } else emptyList())
         }
     }
 
@@ -317,6 +371,7 @@ class TdRepository(context: Context) : TelegramRepository {
         openChats += chatId
         scope.launch {
             client.openChat(chatId)
+            loadPinned(chatId)
             if (messageStore[chatId] == null) loadHistory(chatId, initial = true)
             markRead(chatId)
         }
@@ -554,7 +609,7 @@ class TdRepository(context: Context) : TelegramRepository {
         downloading.clear(); fileProgressMap.clear(); historyLoading.clear(); historyComplete.clear(); openChats.clear()
         chatMap.clear(); userMap.clear(); lastMessages.clear(); messageStore.clear(); avatars.clear(); filePaths.clear()
         contactIds.clear(); callList.clear(); sessionList.clear(); folderInfos = emptyList()
-        chatInfos.clear(); sharedMediaStore.clear()
+        chatInfos.clear(); sharedMediaStore.clear(); messageCache.clear(); requestedMessages.clear(); pinnedStore.clear()
         packs.clear(); recents.clear(); gifs.clear(); stickersLoaded = false
         myId = 0
     }
@@ -696,6 +751,7 @@ class TdRepository(context: Context) : TelegramRepository {
                     id = c.id, type = c.type, title = c.title, photo = c.photo, lastMessage = c.lastMessage,
                     unread = c.unreadCount, mentions = c.unreadMentionCount, markedUnread = c.isMarkedAsUnread,
                     notifications = c.notificationSettings, draft = draftText(c.draftMessage), lastReadOutbox = c.lastReadOutboxMessageId,
+                    lastReadInbox = c.lastReadInboxMessageId,
                 )
                 c.positions.forEach { st.positions[key(it.list)] = it }
                 chatStates[c.id] = st
@@ -712,7 +768,7 @@ class TdRepository(context: Context) : TelegramRepository {
             }
             is UpdateChatPosition -> chat(u.chatId) { positions[key(u.position.list)] = u.position }
             is UpdateChatReadInbox -> {
-                chat(u.chatId) { unread = u.unreadCount }
+                chat(u.chatId) { unread = u.unreadCount; lastReadInbox = u.lastReadInboxMessageId }
                 if (u.unreadCount == 0) com.abtin.tglass.notify.Notifier.cancel(app, u.chatId)
             }
             is UpdateChatReadOutbox -> chat(u.chatId) {
@@ -760,7 +816,10 @@ class TdRepository(context: Context) : TelegramRepository {
             }
             is UpdateMessageContent -> updateMessage(u.chatId, u.messageId) { it.copy(content = mapContent(u.newContent, u.chatId)) }
             is UpdateMessageEdited -> updateMessage(u.chatId, u.messageId) { it.copy(edited = true) }
-            is UpdateMessageIsPinned -> updateMessage(u.chatId, u.messageId) { it.copy(pinned = u.isPinned) }
+            is UpdateMessageIsPinned -> {
+                updateMessage(u.chatId, u.messageId) { it.copy(pinned = u.isPinned) }
+                if (u.chatId in openChats) loadPinned(u.chatId)
+            }
             is UpdateMessageInteractionInfo -> updateMessage(u.chatId, u.messageId) {
                 it.copy(reactions = mapReactions(u.interactionInfo), views = if (it.views != null) u.interactionInfo?.viewCount else null)
             }

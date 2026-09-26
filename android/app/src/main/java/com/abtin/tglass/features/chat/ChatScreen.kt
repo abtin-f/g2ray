@@ -15,6 +15,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -68,6 +69,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
@@ -196,7 +198,23 @@ fun ChatScreen(chatId: Long) {
     val isChannel = chat.type == ChatType.Channel
     // Telegram-iOS ChatMessageItemCommon: compactInset 36 (+ avatarInset 38 in groups).
     val maxBubble: Dp = (LocalConfiguration.current.screenWidthDp - 36 - (if (isGroup) 38 else 0)).dp
-    val pinned = messages.lastOrNull { it.pinned }
+    val pinned = repo.pinnedMessage(chatId)
+    // "Unread Messages" divider: fixed when the chat opens (before it is marked as read).
+    val readAnchor = remember { repo.readAnchor(chatId) }
+    val firstUnreadId = readAnchor?.let { a -> messages.firstOrNull { !it.outgoing && it.id > a }?.id }
+    var initialScrollDone by remember { mutableStateOf(readAnchor == null) }
+    var pendingJump by remember { mutableStateOf<Long?>(null) }
+    // In-chat search (opened from the profile's Search button).
+    var searchMode by rememberSaveable { mutableStateOf(false) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var results by remember { mutableStateOf<List<Message>>(emptyList()) }
+    var resultIndex by remember { mutableIntStateOf(0) }
+    LaunchedEffect(ChatSearchRequest.chatId) {
+        if (ChatSearchRequest.chatId == chatId) {
+            ChatSearchRequest.chatId = null
+            searchMode = true
+        }
+    }
 
     LaunchedEffect(Unit) { repo.openChat(chatId) }
     DisposableEffect(Unit) {
@@ -209,6 +227,16 @@ fun ChatScreen(chatId: Long) {
     val nearTop by remember { derivedStateOf { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index?.let { it >= listState.layoutInfo.totalItemsCount - 6 } == true } }
     LaunchedEffect(nearTop, messages.size) { if (nearTop && messages.isNotEmpty()) repo.loadOlderMessages(chatId) }
     LaunchedEffect(messages.size) {
+        if (!initialScrollDone && messages.isNotEmpty()) {
+            // Open at the first unread message, with the divider in the upper part of the screen.
+            val idx = firstUnreadId?.let { id -> reversed.indexOfFirst { it.id == id } } ?: -1
+            if (idx > 0) {
+                listState.scrollToItem(idx)
+                listState.scrollBy(-listState.layoutInfo.viewportSize.height * 0.55f)
+            }
+            if (idx >= 0) initialScrollDone = true
+            return@LaunchedEffect
+        }
         val last = messages.lastOrNull()
         if (last != null && last.outgoing && last.date > openedAt) wallpaperPhase++
         if (listState.firstVisibleItemIndex <= 2) listState.animateScrollToItem(0)
@@ -221,6 +249,32 @@ fun ChatScreen(chatId: Long) {
             highlightId = id
             kotlinx.coroutines.delay(1200)
             highlightId = -1
+        }
+    }
+
+    /** Scrolls to a message, loading the history around it first if needed. */
+    fun jumpToAny(id: Long) {
+        if (messages.any { it.id == id }) jumpTo(id) else repo.loadAround(chatId, id) { pendingJump = id }
+    }
+    LaunchedEffect(pendingJump, messages.size) {
+        val id = pendingJump ?: return@LaunchedEffect
+        if (reversed.any { it.id == id }) {
+            pendingJump = null
+            jumpTo(id)
+        }
+    }
+    val currentSearch = androidx.compose.runtime.rememberUpdatedState(searchQuery.trim())
+    LaunchedEffect(searchQuery, searchMode) {
+        results = emptyList()
+        resultIndex = 0
+        val q = searchQuery.trim()
+        if (!searchMode || q.isEmpty()) return@LaunchedEffect
+        kotlinx.coroutines.delay(300)
+        repo.searchInChat(chatId, q) { found ->
+            if (currentSearch.value == q) {
+                results = found
+                found.firstOrNull()?.let { jumpToAny(it.id) }
+            }
         }
     }
 
@@ -284,11 +338,23 @@ fun ChatScreen(chatId: Long) {
     }
 
     fun confirmDelete(ids: List<Long>) {
-        sheet.show(SheetRequest(actions = listOf(SheetAction(if (ids.size == 1) "Delete Message" else "Delete ${ids.size} Messages", destructive = true) {
-            repo.deleteMessages(chatId, ids.toSet())
-            selected.clear()
-            selecting = false
-        })))
+        val chosen = messages.filter { it.id in ids }
+        val done = { selected.clear(); selecting = false }
+        val one = ids.size == 1
+        // Telegram lets you delete for everyone in private chats and for your own messages elsewhere.
+        val canRevoke = repo.isLive && chat.type != ChatType.Saved &&
+            (chat.type == ChatType.Private || chat.type == ChatType.Bot || chosen.all { it.outgoing })
+        val actions = if (canRevoke) listOf(
+            SheetAction(if (chat.type == ChatType.Private) "Delete for Me and ${chat.title.substringBefore(' ')}" else "Delete for Everyone", destructive = true) {
+                repo.deleteMessages(chatId, ids.toSet(), forEveryone = true); done()
+            },
+            SheetAction("Delete for Me", destructive = true) { repo.deleteMessages(chatId, ids.toSet(), forEveryone = false); done() },
+        ) else listOf(
+            SheetAction(if (one) "Delete Message" else "Delete ${ids.size} Messages", destructive = true) {
+                repo.deleteMessages(chatId, ids.toSet(), forEveryone = chat.type == ChatType.Channel); done()
+            },
+        )
+        sheet.show(SheetRequest(title = if (canRevoke) (if (one) "Delete this message?" else "Delete ${ids.size} messages?") else null, actions = actions))
     }
 
     fun openMenu(m: Message, bounds: Rect) {
@@ -348,6 +414,7 @@ fun ChatScreen(chatId: Long) {
                         val group = groupFor(messages, idx, isGroup)
                         Column(Modifier.animateItem()) {
                             if (prev == null || !sameDay(prev.date, m.date)) ServicePill(formatDay(m.date))
+                            if (m.id == firstUnreadId) UnreadDivider()
                             if (m.content is MessageContent.Service) {
                                 ServicePill((m.content as MessageContent.Service).text)
                             } else {
@@ -359,7 +426,11 @@ fun ChatScreen(chatId: Long) {
                                     isGroup = isGroup,
                                     isChannel = isChannel,
                                     maxBubble = maxBubble,
-                                    replyTo = m.replyToId?.let { r -> messages.firstOrNull { it.id == r } },
+                                    replyTo = m.replyToId?.let { r ->
+                                        repo.findMessage(chatId, r).also { found ->
+                                            if (found == null) LaunchedEffect(r) { repo.requestMessage(chatId, r) }
+                                        }
+                                    },
                                     selecting = selecting,
                                     selected = m.id in selected,
                                     highlighted = highlightId == m.id,
@@ -371,7 +442,7 @@ fun ChatScreen(chatId: Long) {
                                     },
                                     onLongPress = { b -> if (!selecting) { Haptics.longPress(view); openMenu(m, b) } },
                                     onSwipeReply = { replyToId = m.id; editingId = null; focusRequester.requestFocus() },
-                                    onReplyClick = { m.replyToId?.let { jumpTo(it) } },
+                                    onReplyClick = { m.replyToId?.let { jumpToAny(it) } },
                                     onReact = { e -> repo.toggleReaction(chatId, m.id, e) },
                                     onVote = { o -> repo.vote(chatId, m.id, o) },
                                     onMedia = { nav.push(Route.Media(chatId, m.id)) },
@@ -392,7 +463,11 @@ fun ChatScreen(chatId: Long) {
                     .padding(horizontal = 10.dp, vertical = 6.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (selecting) {
+                    if (searchMode) {
+                        ChatSearchField(searchQuery, { searchQuery = it }, Modifier.weight(1f))
+                        Spacer(Modifier.width(8.dp))
+                        GlassTextButton("Cancel", { searchMode = false; searchQuery = ""; focus.clearFocus() })
+                    } else if (selecting) {
                         GlassTextButton("Cancel", { selecting = false; selected.clear() })
                         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                             GlassBox(onClick = null, modifier = Modifier.height(44.dp)) {
@@ -420,7 +495,7 @@ fun ChatScreen(chatId: Long) {
                 // Pinned message bar
                 if (pinned != null && !selecting) {
                     Spacer(Modifier.height(6.dp))
-                    GlassBox(onClick = { jumpTo(pinned.id) }, shape = Capsule(), modifier = Modifier.fillMaxWidth().height(44.dp), contentAlignment = Alignment.CenterStart) {
+                    GlassBox(onClick = { jumpToAny(pinned.id) }, shape = Capsule(), modifier = Modifier.fillMaxWidth().height(44.dp), contentAlignment = Alignment.CenterStart) {
                         Row(Modifier.padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                             Box(Modifier.width(2.dp).height(28.dp).clip(Capsule()).background(c.accent))
                             Spacer(Modifier.width(8.dp))
@@ -447,6 +522,13 @@ fun ChatScreen(chatId: Long) {
                     GlassIconButton(IosIcons.ChevronDown, { scope.launch { listState.animateScrollToItem(0) } }, size = 44.dp, iconSize = 24.dp)
                 }
                 when {
+                    searchMode -> SearchResultsBar(
+                        count = results.size,
+                        index = resultIndex,
+                        searching = searchQuery.isNotBlank(),
+                        onOlder = { if (resultIndex < results.lastIndex) { resultIndex++; jumpToAny(results[resultIndex].id) } },
+                        onNewer = { if (resultIndex > 0) { resultIndex--; jumpToAny(results[resultIndex].id) } },
+                    )
                     selecting -> Row(
                         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -473,7 +555,10 @@ fun ChatScreen(chatId: Long) {
                     else -> {
                         Composer(
                             text = text,
-                            onTextChange = { text = it },
+                            onTextChange = {
+                                text = it
+                                if (it.isNotBlank()) repo.sendTyping(chatId)
+                            },
                             replyTo = replyToId?.let { r -> messages.firstOrNull { it.id == r } },
                             replyName = replyToId?.let { r -> messages.firstOrNull { it.id == r }?.let { repo.senderName(it) } },
                             editing = editingId?.let { e -> messages.firstOrNull { it.id == e } },
@@ -747,5 +832,65 @@ fun ChatPeek(chatId: Long, onOpen: () -> Unit) {
                 if (sub != null) T(sub, TgTheme.type.footnote, if (active) c.accent else c.secondaryText, maxLines = 1)
             }
         }
+    }
+}
+
+
+/** Set by the profile's "Search" button; the chat screen picks it up and opens in-chat search. */
+object ChatSearchRequest {
+    var chatId by androidx.compose.runtime.mutableStateOf<Long?>(null)
+}
+
+@Composable
+private fun UnreadDivider() {
+    val c = TgTheme.colors
+    Box(
+        Modifier.fillMaxWidth().padding(vertical = 6.dp).background(c.background.copy(alpha = 0.75f)).padding(vertical = 5.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        T("Unread Messages", TgTheme.type.footnote, c.secondaryText, weight = FontWeight.Medium)
+    }
+}
+
+@Composable
+private fun ChatSearchField(value: String, onValue: (String) -> Unit, modifier: Modifier) {
+    val c = TgTheme.colors
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+    GlassBox(onClick = null, shape = Capsule(), modifier = modifier.height(44.dp), contentAlignment = Alignment.CenterStart) {
+        Box(Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
+            if (value.isEmpty()) T("Search", TgTheme.type.body, c.secondaryText)
+            androidx.compose.foundation.text.BasicTextField(
+                value, onValue,
+                Modifier.fillMaxWidth().focusRequester(focus),
+                singleLine = true,
+                textStyle = TgTheme.type.body.copy(color = c.text),
+                cursorBrush = androidx.compose.ui.graphics.SolidColor(c.accent),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SearchResultsBar(count: Int, index: Int, searching: Boolean, onOlder: () -> Unit, onNewer: () -> Unit) {
+    val c = TgTheme.colors
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        GlassBox(onClick = null, shape = Capsule(), modifier = Modifier.weight(1f).height(46.dp)) {
+            T(
+                when {
+                    !searching -> "Search messages"
+                    count == 0 -> "No results"
+                    else -> "${index + 1} of $count"
+                },
+                TgTheme.type.body, c.text,
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        GlassIconButton(IosIcons.ChevronDown, onOlder, modifier = Modifier.graphicsLayer { rotationZ = 180f }, size = 46.dp, iconSize = 20.dp)
+        Spacer(Modifier.width(8.dp))
+        GlassIconButton(IosIcons.ChevronDown, onNewer, size = 46.dp, iconSize = 20.dp)
     }
 }

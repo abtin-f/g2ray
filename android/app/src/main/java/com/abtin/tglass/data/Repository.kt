@@ -37,7 +37,7 @@ interface TelegramRepository {
     fun sendText(chatId: Long, text: String, replyTo: Long?)
     fun sendContent(chatId: Long, content: MessageContent, replyTo: Long? = null)
     fun editText(chatId: Long, messageId: Long, text: String)
-    fun deleteMessages(chatId: Long, ids: Set<Long>)
+    fun deleteMessages(chatId: Long, ids: Set<Long>, forEveryone: Boolean = false)
     fun toggleReaction(chatId: Long, messageId: Long, emoji: String)
     fun togglePinMessage(chatId: Long, messageId: Long)
     fun vote(chatId: Long, messageId: Long, option: Int)
@@ -128,6 +128,31 @@ interface TelegramRepository {
     fun findMessage(chatId: Long, messageId: Long): Message? =
         messages(chatId).firstOrNull { it.id == messageId }
             ?: MediaKind.entries.firstNotNullOfOrNull { k -> sharedMedia(chatId, k).firstOrNull { it.id == messageId } }
+
+    /** Fetches a single message (e.g. the original of a reply) so [findMessage] can return it. */
+    fun requestMessage(chatId: Long, messageId: Long) {}
+
+    /** Loads the history around [messageId] (search results, old pins); [onLoaded] runs when it is in [messages]. */
+    fun loadAround(chatId: Long, messageId: Long, onLoaded: () -> Unit) = onLoaded()
+
+    /** The chat's pinned message (latest one). */
+    fun pinnedMessage(chatId: Long): Message? = messages(chatId).lastOrNull { it.pinned }
+
+    /** Id of the last message the user has read; newer incoming ones are unread. Null when nothing is unread. */
+    fun readAnchor(chatId: Long): Long? {
+        val chat = chat(chatId) ?: return null
+        if (chat.unread <= 0) return null
+        val incoming = messages(chatId).filter { !it.outgoing }
+        return incoming.dropLast(chat.unread).lastOrNull()?.id ?: 0L
+    }
+
+    /** Tells the other side "typing…" (throttled by the implementation). */
+    fun sendTyping(chatId: Long) {}
+
+    /** Messages of a chat containing [query], newest first. */
+    fun searchInChat(chatId: Long, query: String, onResult: (List<Message>) -> Unit) {
+        onResult(messages(chatId).filter { it.preview.contains(query, ignoreCase = true) }.asReversed())
+    }
 
     /** Finds the chat behind a public @username (null if there is none). */
     fun resolveUsername(username: String, onResult: (Long?) -> Unit) {
@@ -369,7 +394,7 @@ class DemoRepository(private val scope: CoroutineScope) : TelegramRepository {
         it.copy(content = newContent, edited = true)
     }
 
-    override fun deleteMessages(chatId: Long, ids: Set<Long>) {
+    override fun deleteMessages(chatId: Long, ids: Set<Long>, forEveryone: Boolean) {
         messageStore[chatId]?.removeAll { it.id in ids }
     }
 

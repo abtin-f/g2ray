@@ -95,6 +95,12 @@ fun ProfileScreen(chatId: Long) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     val listState = rememberLazyListState()
     val collapse = rememberHeroCollapse(listState)
+    /** Opens the chat with its search bar (back to it when we came from there). */
+    fun searchInChat() {
+        com.abtin.tglass.features.chat.ChatSearchRequest.chatId = chat.id
+        val below = nav.stack.getOrNull(nav.stack.size - 2)?.route
+        if (below == Route.Chat(chat.id)) nav.pop() else nav.replaceTop(Route.Chat(chat.id))
+    }
     val isGroup = chat.type == ChatType.Group
     val tabs = (if (isGroup) listOf("Members") else emptyList()) + listOf("Media", "Files", "Links", "Voice", "GIFs")
     androidx.compose.runtime.LaunchedEffect(chatId) { repo.loadChatInfo(chatId) }
@@ -135,7 +141,7 @@ fun ProfileScreen(chatId: Long) {
                                 HeroAction(TgIcons.PiVideo, "Video") { user?.let { nav.push(Route.ActiveCall(it.id, true)) } }
                             }
                             else -> {
-                                HeroAction(TgIcons.PiSearch, "Search") { toast.show("Search in chat") }
+                                HeroAction(TgIcons.PiSearch, "Search") { searchInChat() }
                                 HeroAction(TgIcons.PiLeave, "Leave") {
                                     sheet.show(SheetRequest(actions = listOf(SheetAction(if (chat.type == ChatType.Channel) "Leave Channel" else "Leave Group", destructive = true) {
                                         repo.deleteChat(chat.id); nav.resetTo(Route.Main)
@@ -145,6 +151,7 @@ fun ProfileScreen(chatId: Long) {
                         }
                         HeroAction(TgIcons.PiMore, "More") {
                             sheet.show(SheetRequest(actions = listOf(
+                                SheetAction("Search Messages") { searchInChat() },
                                 SheetAction("Share Contact") { toast.show("Link copied") },
                                 SheetAction("Clear History", destructive = true) { repo.deleteMessages(chat.id, repo.messages(chat.id).map { it.id }.toSet()) },
                             )))
