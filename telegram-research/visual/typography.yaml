@@ -1,0 +1,23 @@
+# System font (SF Pro on iOS). Sizes at default text size (baseDisplaySize = 17).
+# Source file noted per entry.
+chat_list:                     # ChatListUI/Sources/Node/ChatListItem.swift
+  title:   { size: 16, weight: semibold }
+  message: { size: 15, weight: regular }
+  author:  { size: 15, weight: semibold }
+  date:    { size: 14, weight: regular }
+  badge:   { size: 12, weight: semibold, monospacedDigits: true }
+message:                       # ChatMessageDateAndStatusNode.swift
+  body:    { size: 17, weight: regular }
+  date:    { size: 11, weight: regular }
+  check:   { size: 11 }
+  reactionCount: { size: 12, weight: regular }
+context_menu:                  # ContextControllerActionsStackNode.swift
+  item:     { size: 17, weight: regular }
+  subtitle: { size: 14, weight: regular }
+  small:    { size: 14, weight: regular }
+tab_bar:                       # TabBarComponent.swift
+  title:  { size: 10, weight: semibold }
+  badge:  { size: 13, weight: regular }
+composer:
+  input:       { size: 17, weight: regular }
+  placeholder: { size: 17, weight: regular }

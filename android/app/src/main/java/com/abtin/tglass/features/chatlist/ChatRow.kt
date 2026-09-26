@@ -104,14 +104,14 @@ fun ChatRow(
 ) {
     val c = TgTheme.colors
     val last = repo.lastMessage(chat.id)
-    val bg = if (chat.pinned) (if (c.isDark) Color(0xFF111112) else Color(0xFFF7F7F7)) else c.background
+    val bg = if (chat.pinned) c.pinnedRow else c.background
     Box(modifier.fillMaxWidth().background(bg)) {
         Row(
             Modifier
                 .fillMaxWidth()
                 .iosClickable(onLongClick = onLongClick, onClick = onClick)
-                .height(78.dp)
-                .padding(start = 10.dp, end = 14.dp),
+                .height(72.dp)
+                .padding(start = 16.dp, end = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (editing) {
@@ -124,16 +124,16 @@ fun ChatRow(
                     contentAlignment = Alignment.Center,
                 ) { if (selected) Icon(Icons.Rounded.Check, Color.White, 16.dp) }
             }
-            ChatAvatar(chat, repo, 62.dp)
+            ChatAvatar(chat, repo, 60.dp)
             Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f).fillMaxHeight().padding(top = 9.dp, bottom = 8.dp)) {
+            Column(Modifier.weight(1f).fillMaxHeight().padding(top = 8.dp, bottom = 6.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     val typeIcon = chatIcon(chat)
                     if (typeIcon != null && chat.type != ChatType.Bot) {
                         Icon(typeIcon, c.text, 16.dp)
                         Spacer(Modifier.width(3.dp))
                     }
-                    T(chat.title, TgTheme.type.headline, c.text, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                    T(chat.title, TgTheme.type.headline.copy(fontSize = TgTheme.type.headline.fontSize * (16f / 17f)), c.text, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
                     if (chat.verified) {
                         Spacer(Modifier.width(3.dp))
                         Icon(Icons.Rounded.Verified, c.accent, 16.dp)
@@ -146,8 +146,8 @@ fun ChatRow(
                     if (last != null && last.outgoing && chat.type != ChatType.Saved) {
                         val (icon, tint) = when (last.status) {
                             MessageStatus.Sending -> Icons.Rounded.Schedule to c.secondaryText
-                            MessageStatus.Sent -> Icons.Rounded.Check to c.green
-                            MessageStatus.Read -> Icons.Rounded.DoneAll to c.green
+                            MessageStatus.Sent -> Icons.Rounded.Check to c.listCheckmark
+                            MessageStatus.Read -> Icons.Rounded.DoneAll to c.listCheckmark
                             MessageStatus.Failed -> Icons.Rounded.ErrorOutline to c.destructive
                         }
                         Icon(icon, tint, 17.dp)
@@ -175,7 +175,7 @@ fun ChatRow(
                 }
             }
         }
-        Separator(Modifier.align(Alignment.BottomStart), startPadding = if (editing) 116.dp else 82.dp)
+        Separator(Modifier.align(Alignment.BottomStart), startPadding = if (editing) 120.dp else 86.dp)
     }
 }
 

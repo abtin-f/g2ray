@@ -181,7 +181,8 @@ fun ChatScreen(chatId: Long) {
     val reversed = messages.asReversed()
     val isGroup = chat.type == ChatType.Group
     val isChannel = chat.type == ChatType.Channel
-    val maxBubble: Dp = (LocalConfiguration.current.screenWidthDp * (if (isGroup) 0.74f else 0.8f)).dp
+    // Telegram-iOS ChatMessageItemCommon: compactInset 36 (+ avatarInset 38 in groups).
+    val maxBubble: Dp = (LocalConfiguration.current.screenWidthDp - 36 - (if (isGroup) 38 else 0)).dp
     val pinned = messages.lastOrNull { it.pinned }
 
     LaunchedEffect(Unit) { repo.openChat(chatId) }
@@ -570,7 +571,7 @@ private fun MessageRow(
                 ) { if (selected) Icon(Icons.Rounded.Check, Color.White, 16.dp) }
             }
             if (isGroup && !m.outgoing) {
-                Box(Modifier.width(40.dp)) {
+                Box(Modifier.width(38.dp)) { // Telegram-iOS avatarInset = 34 + 4
                     if (group.showAvatar) {
                         val u = repo.user(m.senderId)
                         com.abtin.tglass.ui.components.Avatar(u?.name ?: "?", m.senderId, 34.dp)

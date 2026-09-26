@@ -22,7 +22,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.util.lerp
 import com.abtin.tglass.core.design.GlassLevel
 import com.abtin.tglass.core.design.LocalAppSettings
 import com.abtin.tglass.core.design.TgTheme
@@ -125,9 +124,10 @@ fun GlassBox(
                 surface = surface,
                 layerBlock = if (interactive) {
                     {
-                        val scale = lerp(1f, 1f + 6.dp.toPx() / size.height.coerceAtLeast(1f), highlight.pressProgress)
-                        scaleX = scale
-                        scaleY = scale
+                        // Telegram-iOS TouchEffect: pressedSizeIncrease = 20pt on each axis.
+                        val grow = 20.dp.toPx() * highlight.pressProgress
+                        scaleX = 1f + grow / size.width.coerceAtLeast(1f)
+                        scaleY = 1f + grow / size.height.coerceAtLeast(1f)
                     }
                 } else null,
             )

@@ -1,0 +1,18 @@
+component: ChatListItem
+source: submodules/ChatListUI/Sources/Node/ChatListItem.swift
+layout:
+  avatar: { diameter: 60, leftEdgeInset: 16 }            # min(60, base*60/17); avatarLeftEdgeInset = 16
+  textLeftInset: 84                                        # 24 + avatarDiameter; content x += 2
+  height: { derived: "17 - 21 + titleLine + 3*titleLine - 1 - 3 ≈ 72 at default size" }
+  badge: { diameter: 20 }                                  # base*20/17
+  separatorInsetFrom: text start
+states: [normal, unread, muted, pinned, draft, typing, sending, failed, selected, archived, mention, reactions]
+swipe:
+  leading:   # swipe right
+    - { key: toggleMarkedUnread, title: "Read/Unread", color: "inactive (Read) / accent (Unread)" }
+    - { key: pin, title: "Pin/Unpin", color: constructive }
+  trailing:  # swipe left
+    - { key: mute, title: "Mute/Unmute", color: neutral2 }
+    - { key: delete, title: Delete, color: destructive }
+    - { key: archive, title: "Archive/Unarchive", color: inactive }
+long_press: { action: context_menu, preview: chat_peek }

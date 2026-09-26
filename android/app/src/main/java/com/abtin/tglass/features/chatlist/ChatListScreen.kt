@@ -123,6 +123,13 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
     LaunchedEffect(searching, editing) { tabBar.hidden = searching || editing }
     DisposableEffect(Unit) { onDispose { tabBar.hidden = false } }
     LaunchedEffect(searching) { if (searching) searchFocus.requestFocus() }
+    var handledSearch by rememberSaveable { mutableIntStateOf(tabBar.searchRequests) }
+    LaunchedEffect(tabBar.searchRequests) {
+        if (tabBar.searchRequests > handledSearch) {
+            handledSearch = tabBar.searchRequests
+            searching = true
+        }
+    }
 
     val all = repo.chats.filter { !it.archived }
     val chats = when (repo.folders.getOrNull(folder)) {
@@ -325,11 +332,11 @@ private fun ArchiveRow(archived: List<Chat>, repo: TelegramRepository, onClick: 
             Modifier
                 .fillMaxWidth()
                 .iosClickable(onClick = onClick)
-                .height(78.dp)
-                .padding(start = 10.dp, end = 14.dp),
+                .height(72.dp)
+                .padding(start = 16.dp, end = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Avatar("Archive", 0, 62.dp, icon = Icons.Rounded.Archive, iconColors = Color(0xFFB8C2CC) to Color(0xFF9EAAB5))
+            Avatar("Archive", 0, 60.dp, icon = Icons.Rounded.Archive, iconColors = Color(0xFFDEDEE5) to Color(0xFFC5C6CC))
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -339,7 +346,7 @@ private fun ArchiveRow(archived: List<Chat>, repo: TelegramRepository, onClick: 
                 T(archived.joinToString(", ") { it.title }, TgTheme.type.subheadline, c.secondaryText, maxLines = 2)
             }
         }
-        Separator(Modifier.align(Alignment.BottomStart), startPadding = 82.dp)
+        Separator(Modifier.align(Alignment.BottomStart), startPadding = 86.dp)
     }
 }
 

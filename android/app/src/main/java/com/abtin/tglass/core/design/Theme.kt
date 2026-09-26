@@ -43,6 +43,8 @@ data class TgColors(
     val searchField: Color,
     val bubbleIn: Color,
     val bubbleOut: Color,
+    /** Night theme paints outgoing bubbles with a gradient (#61BCF9 → #0088FF). */
+    val bubbleOutGradient: List<Color>? = null,
     val bubbleInText: Color,
     val bubbleOutText: Color,
     val bubbleInMeta: Color,
@@ -55,6 +57,9 @@ data class TgColors(
     val wallpaper: List<Color>,
     val wallpaperPattern: Color,
     val serviceBubble: Color,
+    val onlineDot: Color = Color(0xFF4CC91F),
+    val listCheckmark: Color = Color(0xFF0088FF),
+    val pinnedRow: Color = Color(0xFFF7F7F7),
 )
 
 val LightColors = TgColors(
@@ -66,7 +71,7 @@ val LightColors = TgColors(
     text = Color(0xFF000000),
     secondaryText = Color(0xFF8E8E93),
     tertiaryText = Color(0xFFC7C7CC),
-    separator = Color(0x4D3C3C43),
+    separator = Color(0xFFC8C7CC),
     accent = Color(0xFF0088FF),
     destructive = Color(0xFFFF3B30),
     green = Color(0xFF34C759),
@@ -77,48 +82,51 @@ val LightColors = TgColors(
     bubbleOut = Color(0xFFE1FFC7),
     bubbleInText = Color(0xFF000000),
     bubbleOutText = Color(0xFF000000),
-    bubbleInMeta = Color(0xFF8E8E93),
-    bubbleOutMeta = Color(0xFF3FA33F),
-    bubbleOutAccent = Color(0xFF3FA33F),
+    bubbleInMeta = Color(0xFF525252).copy(alpha = 0.6f),
+    bubbleOutMeta = Color(0xFF008C09).copy(alpha = 0.8f),
+    bubbleOutAccent = Color(0xFF00A700),
     glassSurface = Color(0xFFFAFAFA).copy(alpha = 0.45f),
-    glassOpaque = Color(0xFFF7F7F7),
+    glassOpaque = Color(0xFFFFFFFF).copy(alpha = 0.92f),
     menuSurface = Color(0xFFF7F7F7).copy(alpha = 0.72f),
     scrim = Color(0xFF000000).copy(alpha = 0.18f),
     wallpaper = listOf(Color(0xFFDBDDBB), Color(0xFF6BA587), Color(0xFFD5D88D), Color(0xFF88B884)),
     wallpaperPattern = Color(0xFF000000).copy(alpha = 0.09f),
-    serviceBubble = Color(0xFF000000).copy(alpha = 0.22f),
+    serviceBubble = Color(0xFF000000).copy(alpha = 0.2f),
 )
 
 val DarkColors = TgColors(
     isDark = true,
     groupedBackground = Color(0xFF000000),
     background = Color(0xFF000000),
-    cell = Color(0xFF1C1C1E),
+    cell = Color(0xFF1C1C1D),
     cellPressed = Color(0xFF2C2C2E),
     text = Color(0xFFFFFFFF),
-    secondaryText = Color(0xFF8D8E93),
+    secondaryText = Color(0xFF98989E),
     tertiaryText = Color(0xFF48484A),
-    separator = Color(0x99545458),
+    separator = Color(0xFF545458).copy(alpha = 0.55f),
     accent = Color(0xFF3E88F7),
     destructive = Color(0xFFFF453A),
     green = Color(0xFF30D158),
     orange = Color(0xFFFF9F0A),
     mutedBadge = Color(0xFF666666),
     searchField = Color(0x3D767680),
-    bubbleIn = Color(0xFF262628),
-    bubbleOut = Color(0xFF313131),
+    bubbleIn = Color(0xFF1D1D1D),
+    bubbleOut = Color(0xFF0088FF),
+    bubbleOutGradient = listOf(Color(0xFF61BCF9), Color(0xFF0088FF)),
     bubbleInText = Color(0xFFFFFFFF),
     bubbleOutText = Color(0xFFFFFFFF),
-    bubbleInMeta = Color(0xFF8D8E93),
-    bubbleOutMeta = Color(0xFF8D8E93),
-    bubbleOutAccent = Color(0xFF3E88F7),
+    bubbleInMeta = Color(0xFFFFFFFF).copy(alpha = 0.5f),
+    bubbleOutMeta = Color(0xFFFFFFFF).copy(alpha = 0.5f),
+    bubbleOutAccent = Color(0xFFFFFFFF),
     glassSurface = Color(0xFF121212).copy(alpha = 0.45f),
-    glassOpaque = Color(0xFF1C1C1E),
+    glassOpaque = Color(0xFF1C1C1C).copy(alpha = 0.85f),
     menuSurface = Color(0xFF252525).copy(alpha = 0.78f),
     scrim = Color(0xFF000000).copy(alpha = 0.35f),
     wallpaper = listOf(Color(0xFF0B1A2B), Color(0xFF1C2B3E), Color(0xFF0F2031), Color(0xFF223246)),
     wallpaperPattern = Color(0xFFFFFFFF).copy(alpha = 0.06f),
     serviceBubble = Color(0xFFFFFFFF).copy(alpha = 0.12f),
+    listCheckmark = Color(0xFF3E88F7),
+    pinnedRow = Color(0xFF1C1C1D),
 )
 
 /** iOS text styles. Letter spacing mimics SF Pro tracking. */
@@ -182,7 +190,7 @@ class AppSettings(context: Context) {
         private set
     var textScale by mutableFloatStateOf(prefs.getFloat("textScale", 1f))
         private set
-    var bubbleRadius by mutableFloatStateOf(prefs.getFloat("bubbleRadius", 17f))
+    var bubbleRadius by mutableFloatStateOf(prefs.getFloat("bubbleRadius", 16f))
         private set
     var wallpaperIndex by mutableIntStateOf(prefs.getInt("wallpaper", 0))
         private set

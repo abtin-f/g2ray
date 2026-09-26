@@ -136,7 +136,7 @@ fun Avatar(
                     .background(TgTheme.colors.background)
                     .padding(dot * 0.18f)
                     .clip(CircleShape)
-                    .background(TgTheme.colors.green)
+                    .background(TgTheme.colors.onlineDot)
             )
         }
     }
@@ -159,9 +159,9 @@ fun Badge(count: Int, muted: Boolean = false, modifier: Modifier = Modifier, men
     ) {
         T(
             if (mention) "@" else formatCount(count),
-            TgTheme.type.footnote.copy(fontSize = 14.sp, lineHeight = 16.sp),
+            TgTheme.type.footnote.copy(fontSize = 13.sp, lineHeight = 16.sp),
             Color.White,
-            weight = FontWeight.Medium,
+            weight = FontWeight.SemiBold,
         )
     }
 }

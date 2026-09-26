@@ -264,12 +264,14 @@ private fun MenuList(actions: List<MenuAction>, onClick: (MenuAction) -> Unit) {
                     .fillMaxWidth()
                     .iosClickable(highlight = if (c.isDark) Color.White.copy(0.1f) else Color.Black.copy(0.08f)) { onClick(a) }
                     .height(44.dp)
-                    .padding(horizontal = 16.dp),
+                    .padding(start = 20.dp, end = 18.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                // Telegram-iOS ContextControllerActionsStackNode: icon slot 32pt at x=20, title at x=60.
                 val color = if (a.destructive) c.destructive else c.text
+                Box(Modifier.width(32.dp), contentAlignment = Alignment.Center) { Icon(a.icon, color, 24.dp) }
+                Spacer(Modifier.width(8.dp))
                 T(a.title, TgTheme.type.body, color, modifier = Modifier.weight(1f), maxLines = 1)
-                Icon(a.icon, color, 22.dp)
             }
         }
     }

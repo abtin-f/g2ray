@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -142,13 +143,21 @@ data class BubbleGroup(val groupedTop: Boolean, val groupedBottom: Boolean, val 
 
 /** Palette for one bubble side. */
 @Immutable
-data class BubbleColors(val fill: Color, val text: Color, val meta: Color, val accent: Color, val link: Color)
+data class BubbleColors(val fill: Color, val text: Color, val meta: Color, val accent: Color, val link: Color, val gradient: List<Color>? = null) {
+    /** Content drawn on top of an [accent]-filled control (play button, file icon, chosen reaction). */
+    val onAccent: Color
+        get() = when {
+            accent == Color.White -> Color(0xFF0088FF)   // night outgoing: white controls, blue glyph
+            fill == Color(0xFFE1FFC7) -> fill            // day outgoing: glyph uses the bubble green
+            else -> Color.White
+        }
+}
 
 @Composable
 fun bubbleColors(outgoing: Boolean): BubbleColors {
     val c = TgTheme.colors
-    return if (outgoing) BubbleColors(c.bubbleOut, c.bubbleOutText, c.bubbleOutMeta, c.bubbleOutAccent, c.bubbleOutAccent)
-    else BubbleColors(c.bubbleIn, c.bubbleInText, c.bubbleInMeta, c.accent, c.accent)
+    return if (outgoing) BubbleColors(c.bubbleOut, c.bubbleOutText, c.bubbleOutMeta, c.bubbleOutAccent, if (c.isDark) Color.White else Color(0xFF004BAD), c.bubbleOutGradient)
+    else BubbleColors(c.bubbleIn, c.bubbleInText, c.bubbleInMeta, c.accent, if (c.isDark) c.accent else Color(0xFF004BAD))
 }
 
 /**
@@ -179,7 +188,7 @@ fun MessageBubble(
     }
     val radius = LocalAppSettings.current.bubbleRadius.dp
     val shape = remember(m.outgoing, group, radius) {
-        BubbleShape(m.outgoing, !group.groupedBottom, radius, (radius.value * 0.35f).coerceAtLeast(4f).dp, group.groupedTop, group.groupedBottom)
+        BubbleShape(m.outgoing, !group.groupedBottom, radius, (radius.value / 2f).coerceAtLeast(4f).dp, group.groupedTop, group.groupedBottom)
     }
     val colors = bubbleColors(m.outgoing)
     val tailPad = TailWidth
@@ -188,12 +197,13 @@ fun MessageBubble(
         modifier
             .widthIn(max = maxWidth)
             .width(IntrinsicSize.Max)
+            .defaultMinSize(minWidth = 40.dp + TailWidth, minHeight = 35.dp)
             .clip(shape)
-            .background(colors.fill)
+            .then(if (colors.gradient != null) Modifier.background(Brush.verticalGradient(colors.gradient)) else Modifier.background(colors.fill))
             .padding(start = if (m.outgoing) 0.dp else tailPad, end = if (m.outgoing) tailPad else 0.dp)
             .padding(if (isMediaOnly) 2.dp else 0.dp)
     ) {
-        val inner = Modifier.padding(horizontal = 10.dp)
+        val inner = Modifier.padding(horizontal = 11.dp)
         if (senderName != null) {
             T(
                 senderName, TgTheme.type.subheadline.copy(fontSize = 14.sp), if (isChannel) c.accent else avatarColors(senderSeed).second,
@@ -258,9 +268,9 @@ fun MetaRow(m: Message, color: Color, overlay: Boolean = false) {
                 Spacer(Modifier.width(5.dp))
             }
             if (m.edited) {
-                T("edited ", TgTheme.type.caption1, color, maxLines = 1)
+                T("edited ", TgTheme.type.caption2, color, maxLines = 1)
             }
-            T(formatTime(m.date), TgTheme.type.caption1, color, maxLines = 1)
+            T(formatTime(m.date), TgTheme.type.caption2, color, maxLines = 1)
             if (m.outgoing) {
                 Spacer(Modifier.width(2.dp))
                 when (m.status) {
@@ -368,7 +378,7 @@ private fun StickerMessage(m: Message, s: MessageContent.Sticker, modifier: Modi
 private fun VoiceBody(m: Message, v: MessageContent.Voice, colors: BubbleColors) {
     Row(Modifier.padding(start = 8.dp, end = 10.dp, top = 8.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(44.dp).clip(CircleShape).background(colors.accent).bounceClickable { }, contentAlignment = Alignment.Center) {
-            Icon(Icons.Rounded.PlayArrow, if (m.outgoing && !TgTheme.colors.isDark) colors.fill else Color.White, 30.dp)
+            Icon(Icons.Rounded.PlayArrow, colors.onAccent, 30.dp)
         }
         Spacer(Modifier.width(10.dp))
         Column {
@@ -401,7 +411,7 @@ private fun VoiceBody(m: Message, v: MessageContent.Voice, colors: BubbleColors)
 private fun FileBody(m: Message, f: MessageContent.File, colors: BubbleColors) {
     Row(Modifier.padding(start = 8.dp, end = 10.dp, top = 8.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(48.dp).clip(RoundedRectangle(10.dp)).background(colors.accent), contentAlignment = Alignment.Center) {
-            Icon(Icons.AutoMirrored.Rounded.InsertDriveFile, if (m.outgoing && !TgTheme.colors.isDark) colors.fill else Color.White, 26.dp)
+            Icon(Icons.AutoMirrored.Rounded.InsertDriveFile, colors.onAccent, 26.dp)
         }
         Spacer(Modifier.width(10.dp))
         Column(Modifier.widthIn(max = 190.dp)) {
@@ -543,7 +553,7 @@ private fun ReactionsRow(reactions: List<Reaction>, colors: BubbleColors, modifi
             ) {
                 BasicText(r.emoji, style = TextStyle(fontSize = 16.sp))
                 Spacer(Modifier.width(4.dp))
-                T(formatCount(r.count), TgTheme.type.footnote, if (r.chosen) Color.White else colors.accent, weight = FontWeight.SemiBold)
+                T(formatCount(r.count), TgTheme.type.footnote, if (r.chosen) colors.onAccent else colors.accent, weight = FontWeight.SemiBold)
             }
         }
     }
