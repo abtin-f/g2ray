@@ -52,6 +52,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Constraints
@@ -241,7 +242,7 @@ fun MessageBubble(
             ReplyHeader(replyName ?: "", replyTo.preview, colors, Modifier.padding(start = 6.dp, end = 6.dp, top = 6.dp).fadeClickable(onClick = onReplyClick))
         }
         when (content) {
-            is MessageContent.Text -> TextBody(content.text, m, colors, inner.padding(top = if (senderName != null || replyTo != null) 2.dp else 6.dp, bottom = 6.dp))
+            is MessageContent.Text -> TextBody(content, m, colors, inner.padding(top = if (senderName != null || replyTo != null) 2.dp else 6.dp, bottom = 6.dp))
             is MessageContent.Photo -> PhotoBody(m, content, colors, isMediaOnly, onMediaClick)
             is MessageContent.Voice -> VoiceBody(m, content, colors)
             is MessageContent.File -> FileBody(m, content, colors)
@@ -315,7 +316,11 @@ fun MetaRow(m: Message, color: Color, overlay: Boolean = false) {
  * exactly how Telegram lays out timestamps.
  */
 @Composable
-fun TextWithMeta(text: String, style: TextStyle, meta: @Composable () -> Unit, modifier: Modifier = Modifier) {
+fun TextWithMeta(text: String, style: TextStyle, meta: @Composable () -> Unit, modifier: Modifier = Modifier) =
+    TextWithMeta(AnnotatedString(text), style, meta, modifier)
+
+@Composable
+fun TextWithMeta(text: AnnotatedString, style: TextStyle, meta: @Composable () -> Unit, modifier: Modifier = Modifier) {
     val holder = remember { arrayOfNulls<TextLayoutResult>(1) }
     Layout(
         modifier = modifier,
@@ -355,11 +360,25 @@ fun TextWithMeta(text: String, style: TextStyle, meta: @Composable () -> Unit, m
 }
 
 @Composable
-private fun TextBody(text: String, m: Message, colors: BubbleColors, modifier: Modifier) {
+private fun richFor(m: Message, text: String, entities: List<com.abtin.tglass.data.Entity>, colors: BubbleColors): AnnotatedString {
+    var revealed by remember(m.id) { androidx.compose.runtime.mutableStateOf(false) }
+    return rememberRichText(
+        text, entities,
+        link = colors.link,
+        codeBackground = colors.accent.copy(alpha = 0.13f),
+        spoilerColor = colors.text.copy(alpha = 0.22f),
+        spoilersRevealed = revealed,
+        onRevealSpoiler = { revealed = true },
+    )
+}
+
+@Composable
+private fun TextBody(content: MessageContent.Text, m: Message, colors: BubbleColors, modifier: Modifier) {
+    val text = content.text
     val emojiOnly = text.length <= 8 && text.none { it.isLetterOrDigit() } && text.isNotBlank()
     val style = if (emojiOnly) TgTheme.type.body.copy(fontSize = 34.sp, lineHeight = 40.sp) else TgTheme.type.body
     TextWithMeta(
-        text,
+        richFor(m, text, content.entities, colors),
         style.copy(color = colors.text),
         meta = { MetaRow(m, colors.meta) },
         modifier = modifier,
@@ -396,15 +415,23 @@ private fun PhotoBody(m: Message, p: MessageContent.Photo, colors: BubbleColors,
         }
     }
     if (p.caption != null) {
-        TextWithMeta(p.caption, TgTheme.type.body.copy(color = colors.text), { MetaRow(m, colors.meta) }, Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
+        TextWithMeta(richFor(m, p.caption, p.captionEntities, colors), TgTheme.type.body.copy(color = colors.text), { MetaRow(m, colors.meta) }, Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
     }
 }
 
 @Composable
 private fun StickerMessage(m: Message, s: MessageContent.Sticker, modifier: Modifier) {
+    val repo = com.abtin.tglass.features.main.LocalRepository.current
+    val anim = s.animation
+    val animPath = anim?.let { repo.filePath(it) }
+    androidx.compose.runtime.LaunchedEffect(anim, animPath) { if (anim != null && animPath == null) repo.requestImage(anim) }
     Column(modifier.padding(horizontal = 4.dp), horizontalAlignment = if (m.outgoing) Alignment.End else Alignment.Start) {
-        if (s.image != null) TgImage(s.image, Modifier.size(160.dp), maxPx = 512, contentScale = ContentScale.Fit)
-        else BasicText(s.emoji, style = TextStyle(fontSize = 110.sp, lineHeight = 124.sp))
+        val still: @Composable () -> Unit = {
+            if (s.image != null) TgImage(s.image, Modifier.size(160.dp), maxPx = 512, contentScale = ContentScale.Fit)
+            else BasicText(s.emoji, style = TextStyle(fontSize = 110.sp, lineHeight = 124.sp))
+        }
+        if (anim != null) com.abtin.tglass.ui.components.TgsSticker(animPath, Modifier.size(160.dp), still)
+        else still()
         MetaRow(m, Color.White, overlay = true)
     }
 }
@@ -593,7 +620,7 @@ private fun Modifier.coerceMinWidth(): Modifier = this.then(Modifier.widthIn(min
 @Composable
 private fun LinkBody(m: Message, l: MessageContent.Link, colors: BubbleColors) {
     Column(Modifier.padding(horizontal = 10.dp, vertical = 6.dp).widthIn(max = 280.dp)) {
-        T(l.text, TgTheme.type.body, colors.link)
+        BasicText(richFor(m, l.text, l.entities, colors), style = TgTheme.type.body.copy(color = colors.text))
         Spacer(Modifier.height(6.dp))
         Row(
             Modifier

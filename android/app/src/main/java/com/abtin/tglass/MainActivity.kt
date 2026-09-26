@@ -12,7 +12,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
@@ -81,10 +83,34 @@ object DebugLaunch {
 class MainActivity : ComponentActivity() {
     private val demo by lazy { DemoRepository(lifecycleScope) }
 
+    /** Chat to open, requested by tapping a notification. */
+    private var openChatRequest by androidx.compose.runtime.mutableStateOf<Long?>(null)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        readChatRequest(intent)
+    }
+
+    private fun readChatRequest(intent: Intent?) {
+        val id = intent?.getLongExtra(com.abtin.tglass.notify.Notifier.EXTRA_CHAT_ID, 0L) ?: 0L
+        if (id != 0L) openChatRequest = id
+    }
+
+    override fun onStart() {
+        super.onStart()
+        com.abtin.tglass.notify.AppVisibility.foreground = true
+    }
+
+    override fun onStop() {
+        com.abtin.tglass.notify.AppVisibility.foreground = false
+        super.onStop()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         DebugLaunch.parse(intent)
+        readChatRequest(intent)
         val settings = AppSettings(this)
         DebugLaunch.theme?.let { settings.updateTheme(if (it == "dark") ThemeMode.Dark else ThemeMode.Light) }
         if (DebugLaunch.screen != null && DebugLaunch.screen != "welcome") settings.updateLoggedIn(true)
@@ -139,6 +165,24 @@ class MainActivity : ComponentActivity() {
                 }
             }
             LaunchedEffect(live) { live.errors.collect { toast.show(it, androidx.compose.material.icons.Icons.Rounded.ErrorOutline) } }
+
+            // Notifications: ask once after signing in, and keep the background connection in sync.
+            val notifPermission = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) {}
+            LaunchedEffect(auth) {
+                if (auth == AuthStep.Ready && android.os.Build.VERSION.SDK_INT >= 33 && !com.abtin.tglass.notify.Notifier.canPost(this@MainActivity)) {
+                    notifPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                }
+            }
+            val request = openChatRequest
+            LaunchedEffect(request, auth) {
+                if (request != null && auth == AuthStep.Ready && settings.loggedIn) {
+                    openChatRequest = null
+                    if ((nav.top as? Route.Chat)?.chatId != request) nav.push(Route.Chat(request))
+                }
+            }
+        }
+        LaunchedEffect(settings.loggedIn, settings.demoMode, settings.backgroundConnection) {
+            com.abtin.tglass.notify.ConnectionService.sync(this@MainActivity)
         }
 
         CompositionLocalProvider(LocalAppSettings provides settings) {
@@ -165,6 +209,9 @@ class MainActivity : ComponentActivity() {
                         }
                         ActionSheetHost(sheet)
                         ToastHost(toast)
+                        com.abtin.tglass.notify.InAppBannerHost { chatId ->
+                            if ((nav.top as? Route.Chat)?.chatId != chatId) nav.push(Route.Chat(chatId))
+                        }
                     }
                 }
             }

@@ -35,17 +35,24 @@ class ImageRef(val fileId: Int, val path: String? = null, val mini: ByteArray? =
     override fun hashCode() = fileId * 31 + (path?.hashCode() ?: 0)
 }
 
+/** Formatting / link span inside a message text, in UTF-16 offsets (same as TDLib and Kotlin strings). */
+@Immutable
+data class Entity(val start: Int, val end: Int, val type: EntityType, val url: String? = null, val userId: Long = 0)
+
+enum class EntityType { Bold, Italic, Underline, Strike, Code, Pre, Spoiler, Quote, Url, TextUrl, Mention, MentionName, Hashtag, Cashtag, BotCommand, Email, Phone }
+
 @Immutable
 data class Reaction(val emoji: String, val count: Int, val chosen: Boolean)
 
 @Immutable
 sealed interface MessageContent {
-    data class Text(val text: String) : MessageContent
+    data class Text(val text: String, val entities: List<Entity> = emptyList()) : MessageContent
     data class Photo(
         val seed: Int,
         val aspect: Float,
         val caption: String? = null,
         val emoji: String = "🏞",
+        val captionEntities: List<Entity> = emptyList(),
         /** Picture to show (the photo itself, or a video's thumbnail). */
         val image: ImageRef? = null,
         val video: Boolean = false,
@@ -56,12 +63,13 @@ sealed interface MessageContent {
         val loop: Boolean = false,
     ) : MessageContent
     data class Voice(val seconds: Int, val waveform: List<Float>, val media: ImageRef? = null) : MessageContent
-    data class Sticker(val emoji: String, val image: ImageRef? = null) : MessageContent
+    /** [animation] is a Telegram animated sticker (gzipped Lottie, .tgs). */
+    data class Sticker(val emoji: String, val image: ImageRef? = null, val animation: ImageRef? = null) : MessageContent
     data class File(val name: String, val size: String) : MessageContent
     data class Location(val title: String, val address: String) : MessageContent
     data class Contact(val name: String, val phone: String) : MessageContent
     data class Poll(val question: String, val options: List<String>, val votes: List<Int>, val voted: Int? = null, val quiz: Boolean = false) : MessageContent
-    data class Link(val text: String, val site: String, val title: String, val description: String) : MessageContent
+    data class Link(val text: String, val site: String, val title: String, val description: String, val entities: List<Entity> = emptyList()) : MessageContent
     data class Service(val text: String) : MessageContent
 }
 

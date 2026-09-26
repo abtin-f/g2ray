@@ -359,6 +359,27 @@ private fun ToggleCell(title: String, initial: Boolean, divider: Boolean = true,
 }
 
 private fun LazyListScope.notifications() {
+    item {
+        val s = LocalAppSettings.current
+        val context = androidx.compose.ui.platform.LocalContext.current
+        Section(
+            header = "Background",
+            footer = "Keeps TGlass connected while it is closed so new messages arrive as notifications. " +
+                "If they stop after a while, allow TGlass to ignore battery optimization.",
+        ) {
+            Cell("Keep Connected in Background", chevron = false, trailing = { IOSSwitch(s.backgroundConnection, { s.updateBackgroundConnection(it) }) })
+            Cell("Battery Optimization", divider = false, onClick = {
+                val pm = context.getSystemService(android.os.PowerManager::class.java)
+                val intent = if (pm?.isIgnoringBatteryOptimizations(context.packageName) == true) {
+                    android.content.Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                } else {
+                    android.content.Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, android.net.Uri.parse("package:${context.packageName}"))
+                }
+                runCatching { context.startActivity(intent) }
+            })
+        }
+        Spacer(Modifier.height(24.dp))
+    }
     listOf("Private Chats", "Group Chats", "Channels").forEachIndexed { i, header ->
         item {
             Section(header = "Message Notifications".takeIf { i == 0 }) {
@@ -372,7 +393,8 @@ private fun LazyListScope.notifications() {
         Section(header = "In-App Notifications") {
             ToggleCell("In-App Sounds", true)
             ToggleCell("In-App Vibrate", true)
-            ToggleCell("In-App Preview", true, divider = false)
+            val s = LocalAppSettings.current
+            Cell("In-App Preview", chevron = false, divider = false, trailing = { IOSSwitch(s.inAppPreview, { s.updateInAppPreview(it) }) })
         }
     }
 }

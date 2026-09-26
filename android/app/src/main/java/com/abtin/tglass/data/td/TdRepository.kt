@@ -11,6 +11,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import com.abtin.tglass.BuildConfig
 import com.abtin.tglass.data.CallRecord
+import com.abtin.tglass.data.Entity
+import com.abtin.tglass.data.EntityType
 import com.abtin.tglass.data.ImageRef
 import com.abtin.tglass.data.MessageStatus
 import com.abtin.tglass.data.TelegramRepository
@@ -514,6 +516,7 @@ class TdRepository(context: Context) : TelegramRepository {
     }
 
     private fun reset() {
+        com.abtin.tglass.notify.Notifier.cancelAll(app)
         chatStates.clear(); rawUsers.clear(); basicGroups.clear(); supergroups.clear()
         typingJobs.values.forEach { it.cancel() }; typingJobs.clear()
         downloading.clear(); fileProgressMap.clear(); historyLoading.clear(); historyComplete.clear(); openChats.clear()
@@ -674,7 +677,10 @@ class TdRepository(context: Context) : TelegramRepository {
                 publishLast(this)
             }
             is UpdateChatPosition -> chat(u.chatId) { positions[key(u.position.list)] = u.position }
-            is UpdateChatReadInbox -> chat(u.chatId) { unread = u.unreadCount }
+            is UpdateChatReadInbox -> {
+                chat(u.chatId) { unread = u.unreadCount }
+                if (u.unreadCount == 0) com.abtin.tglass.notify.Notifier.cancel(app, u.chatId)
+            }
             is UpdateChatReadOutbox -> chat(u.chatId) {
                 lastReadOutbox = u.lastReadOutboxMessageId
                 messageStore[u.chatId]?.let { list ->
@@ -711,6 +717,7 @@ class TdRepository(context: Context) : TelegramRepository {
                 if (u.message.chatId in openChats && !u.message.isOutgoing) {
                     scope.launch { client.viewMessages(u.message.chatId, longArrayOf(u.message.id), null, true) }
                 }
+                maybeNotify(u.message)
             }
             is UpdateMessageSendSucceeded -> replaceMessage(u.message, u.oldMessageId)
             is UpdateMessageSendFailed -> {
@@ -730,6 +737,57 @@ class TdRepository(context: Context) : TelegramRepository {
             is UpdateFile -> onFile(u.file)
             else -> Unit
         }
+    }
+
+    /** Marks everything in a chat as read (used by the notification action). */
+    fun markChatRead(chatId: Long) {
+        val st = chatStates[chatId] ?: return
+        scope.launch {
+            st.lastMessage?.let { client.viewMessages(chatId, longArrayOf(it.id), null, true) }
+            if (st.mentions > 0) client.readAllChatMentions(chatId)
+            if (st.markedUnread) client.toggleChatIsMarkedAsUnread(chatId, false)
+        }
+    }
+
+    /** New incoming message → system notification (app closed) or in-app banner (app open, other chat). */
+    private fun maybeNotify(m: Message) {
+        if (m.isOutgoing || auth != AuthStep.Ready) return
+        val st = chatStates[m.chatId] ?: return
+        if (isMuted(st)) return
+        if (System.currentTimeMillis() / 1000 - m.date > 30 * 60) return
+        val foreground = com.abtin.tglass.notify.AppVisibility.foreground
+        if (foreground && m.chatId in openChats) return
+        val chat = chatMap[m.chatId] ?: return
+        val senderId = when (val s = m.senderId) {
+            is MessageSenderUser -> s.userId
+            is MessageSenderChat -> s.chatId
+            else -> m.chatId
+        }
+        val senderName = userMap[senderId]?.name ?: chatMap[senderId]?.title ?: chat.title
+        val text = mapMessage(m).preview
+        if (foreground) {
+            val prefs = app.getSharedPreferences("tglass", Context.MODE_PRIVATE)
+            if (!prefs.getBoolean("inAppPreview", true)) return
+            val title = if (chat.type == UiChatType.Group) "$senderName @ ${chat.title}" else chat.title
+            com.abtin.tglass.notify.InAppBanners.post(com.abtin.tglass.notify.Banner(m.chatId, m.chatId, title, text))
+            return
+        }
+        fun path(peer: Long) = avatars[peer]?.let { filePath(it) }
+        com.abtin.tglass.notify.Notifier.show(
+            app,
+            com.abtin.tglass.notify.NotifyMessage(
+                chatId = m.chatId,
+                messageId = m.id,
+                chatTitle = chat.title,
+                group = chat.type == UiChatType.Group,
+                senderId = senderId,
+                senderName = senderName,
+                text = text,
+                date = m.date * 1000L,
+                senderAvatarPath = path(senderId),
+                chatAvatarPath = path(m.chatId),
+            ),
+        )
     }
 
     private inline fun chat(id: Long, f: ChatState.() -> Unit) {
@@ -970,8 +1028,8 @@ class TdRepository(context: Context) : TelegramRepository {
         is MessageText -> {
             val lp = c.linkPreview
             if (lp != null && (lp.title.isNotBlank() || lp.description.text.isNotBlank()))
-                UiContent.Link(c.text.text, lp.siteName.ifBlank { lp.displayUrl }, lp.title, lp.description.text)
-            else UiContent.Text(c.text.text)
+                UiContent.Link(c.text.text, lp.siteName.ifBlank { lp.displayUrl }, lp.title, lp.description.text, entities(c.text))
+            else UiContent.Text(c.text.text, entities(c.text))
         }
         is MessagePhoto -> {
             val sizes = c.photo.sizes
@@ -980,6 +1038,7 @@ class TdRepository(context: Context) : TelegramRepository {
                 seed = best?.photo?.id ?: 0,
                 aspect = if (best != null && best.height > 0) best.width.toFloat() / best.height else 1f,
                 caption = c.caption.text.ifBlank { null },
+                captionEntities = entities(c.caption),
                 image = best?.let { imageOf(it.photo, c.photo.minithumbnail, it.width, it.height) },
             )
         }
@@ -989,6 +1048,7 @@ class TdRepository(context: Context) : TelegramRepository {
                 seed = v.video.id,
                 aspect = if (v.height > 0) v.width.toFloat() / v.height else 1.6f,
                 caption = c.caption.text.ifBlank { null },
+                captionEntities = entities(c.caption),
                 emoji = "🎬",
                 image = v.thumbnail?.let { imageOf(it.file, v.minithumbnail, it.width, it.height) } ?: v.minithumbnail?.let { ImageRef(-v.video.id, null, it.data) },
                 video = true,
@@ -1002,6 +1062,7 @@ class TdRepository(context: Context) : TelegramRepository {
                 seed = a.animation.id,
                 aspect = if (a.height > 0) a.width.toFloat() / a.height else 1.4f,
                 caption = c.caption.text.ifBlank { null },
+                captionEntities = entities(c.caption),
                 emoji = "🎞",
                 image = a.thumbnail?.let { imageOf(it.file, a.minithumbnail, it.width, it.height) } ?: a.minithumbnail?.let { ImageRef(-a.animation.id, null, it.data) },
                 video = true,
@@ -1028,9 +1089,12 @@ class TdRepository(context: Context) : TelegramRepository {
                 s.thumbnail?.format.let { it is ThumbnailFormatWebp || it is ThumbnailFormatJpeg } -> imageOf(s.thumbnail!!.file, null)
                 else -> null
             }
-            UiContent.Sticker(s.emoji.ifBlank { "🙂" }, image)
+            UiContent.Sticker(s.emoji.ifBlank { "🙂" }, image, s.sticker.takeIf { s.format is StickerFormatTgs }?.let { imageOf(it, null) })
         }
-        is MessageAnimatedEmoji -> UiContent.Sticker(c.emoji)
+        is MessageAnimatedEmoji -> {
+            val s = c.animatedEmoji.sticker
+            UiContent.Sticker(c.emoji, null, s?.takeIf { it.format is StickerFormatTgs }?.let { imageOf(it.sticker, null) })
+        }
         is MessageDice -> UiContent.Sticker(c.emoji)
         is MessageLocation -> UiContent.Location("Location", "%.5f, %.5f".format(Locale.US, c.location.latitude, c.location.longitude))
         is MessageVenue -> UiContent.Location(c.venue.title, c.venue.address)
@@ -1066,6 +1130,37 @@ class TdRepository(context: Context) : TelegramRepository {
         is MessageExpiredPhoto -> UiContent.Service("Photo has expired")
         is MessageExpiredVideo -> UiContent.Service("Video has expired")
         else -> UiContent.Service("This message is not supported yet")
+    }
+
+    private fun entities(t: FormattedText): List<Entity> = t.entities.mapNotNull { e ->
+        val end = e.offset + e.length
+        when (val type = e.type) {
+            is TextEntityTypeBold -> Entity(e.offset, end, EntityType.Bold)
+            is TextEntityTypeItalic -> Entity(e.offset, end, EntityType.Italic)
+            is TextEntityTypeUnderline -> Entity(e.offset, end, EntityType.Underline)
+            is TextEntityTypeStrikethrough -> Entity(e.offset, end, EntityType.Strike)
+            is TextEntityTypeCode -> Entity(e.offset, end, EntityType.Code)
+            is TextEntityTypePre, is TextEntityTypePreCode -> Entity(e.offset, end, EntityType.Pre)
+            is TextEntityTypeSpoiler -> Entity(e.offset, end, EntityType.Spoiler)
+            is TextEntityTypeBlockQuote, is TextEntityTypeExpandableBlockQuote -> Entity(e.offset, end, EntityType.Quote)
+            is TextEntityTypeUrl -> Entity(e.offset, end, EntityType.Url)
+            is TextEntityTypeTextUrl -> Entity(e.offset, end, EntityType.TextUrl, url = type.url)
+            is TextEntityTypeMention -> Entity(e.offset, end, EntityType.Mention)
+            is TextEntityTypeMentionName -> Entity(e.offset, end, EntityType.MentionName, userId = type.userId)
+            is TextEntityTypeHashtag -> Entity(e.offset, end, EntityType.Hashtag)
+            is TextEntityTypeCashtag -> Entity(e.offset, end, EntityType.Cashtag)
+            is TextEntityTypeBotCommand -> Entity(e.offset, end, EntityType.BotCommand)
+            is TextEntityTypeEmailAddress -> Entity(e.offset, end, EntityType.Email)
+            is TextEntityTypePhoneNumber -> Entity(e.offset, end, EntityType.Phone)
+            else -> null
+        }
+    }
+
+    override fun resolveUsername(username: String, onResult: (Long?) -> Unit) {
+        scope.launch {
+            val r = client.searchPublicChat(username.removePrefix("@"))
+            onResult(if (r is TdlResult.Success) r.result.id else null)
+        }
     }
 
     /** TDLib voice waveforms are packed 5-bit samples. */

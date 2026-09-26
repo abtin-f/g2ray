@@ -88,6 +88,14 @@ interface TelegramRepository {
 
     fun closeChat(chatId: Long) {}
 
+    /** Finds the chat behind a public @username (null if there is none). */
+    fun resolveUsername(username: String, onResult: (Long?) -> Unit) {
+        val name = username.removePrefix("@")
+        val id = chats.firstOrNull { it.username.equals(name, true) }?.id
+            ?: users.values.firstOrNull { it.username.equals(name, true) }?.let { privateChatWith(it.id) }
+        onResult(id)
+    }
+
     fun forward(fromChatId: Long, messageIds: List<Long>, toChatId: Long) {
         messageIds.mapNotNull { id -> messages(fromChatId).firstOrNull { it.id == id } }.forEach { sendContent(toChatId, it.content) }
     }

@@ -237,6 +237,36 @@ fun ChatScreen(chatId: Long) {
         text = ""
     }
 
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+    fun openUsername(name: String) = repo.resolveUsername(name) { id ->
+        if (id != null) nav.push(Route.Chat(id)) else toast.show("No one uses @${name.removePrefix("@")}")
+    }
+    fun openUrl(raw: String) {
+        val url = if (raw.startsWith("http", ignoreCase = true)) raw else "https://$raw"
+        // t.me/username links open inside the app, like Telegram.
+        Regex("""(?i)^https?://(?:www\.)?(?:t|telegram)\.me/([A-Za-z][A-Za-z0-9_]{3,31})/?$""").find(url)?.let {
+            openUsername(it.groupValues[1])
+            return
+        }
+        runCatching { uriHandler.openUri(url) }.onFailure { toast.show("Can't open this link") }
+    }
+    val linkHandler: (com.abtin.tglass.data.Entity, String) -> Unit = { e, value ->
+        when (e.type) {
+            com.abtin.tglass.data.EntityType.Url -> openUrl(value)
+            com.abtin.tglass.data.EntityType.TextUrl -> openUrl(e.url ?: value)
+            com.abtin.tglass.data.EntityType.Email -> runCatching { uriHandler.openUri("mailto:$value") }
+            com.abtin.tglass.data.EntityType.Phone -> runCatching { uriHandler.openUri("tel:$value") }
+            com.abtin.tglass.data.EntityType.Mention -> openUsername(value)
+            com.abtin.tglass.data.EntityType.MentionName -> nav.push(Route.Chat(repo.privateChatWith(e.userId)))
+            com.abtin.tglass.data.EntityType.BotCommand -> repo.sendText(chatId, value, null)
+            else -> {
+                val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                cm.setPrimaryClip(ClipData.newPlainText("text", value))
+                toast.show("$value copied")
+            }
+        }
+    }
+
     fun copy(m: Message) {
         val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         cm.setPrimaryClip(ClipData.newPlainText("message", m.text ?: m.preview))
@@ -298,7 +328,7 @@ fun ChatScreen(chatId: Long) {
         )
     }
 
-    androidx.compose.runtime.CompositionLocalProvider(LocalBackdrop provides backdrop) {
+    androidx.compose.runtime.CompositionLocalProvider(LocalBackdrop provides backdrop, LocalLinkHandler provides linkHandler) {
         Box(Modifier.fillMaxSize()) {
             // Z0: wallpaper + messages (the glass source)
             Box(Modifier.fillMaxSize().layerBackdrop(backdrop)) {

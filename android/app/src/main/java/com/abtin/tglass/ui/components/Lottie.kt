@@ -94,3 +94,34 @@ fun LottieLoop(@RawRes res: Int, size: Dp, modifier: Modifier = Modifier, iterat
     val progress by animateLottieCompositionAsState(composition, iterations = iterations, isPlaying = animations)
     LottieAnimation(composition = composition, progress = { progress }, modifier = modifier.size(size))
 }
+
+/** Decompressed Telegram animated stickers (.tgs = gzipped Lottie JSON), keyed by file path. */
+private val tgsCache = android.util.LruCache<String, String>(48)
+
+/**
+ * A Telegram animated sticker / animated emoji from a local .tgs file, looping.
+ * Shows [placeholder] until the animation is parsed (and when it can't be).
+ */
+@Composable
+fun TgsSticker(path: String?, modifier: Modifier, placeholder: @Composable () -> Unit) {
+    val json = androidx.compose.runtime.produceState(path?.let { tgsCache.get(it) }, path) {
+        if (path == null || value != null) return@produceState
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching {
+                java.util.zip.GZIPInputStream(java.io.File(path).inputStream()).bufferedReader().use { it.readText() }
+            }.getOrNull()
+        }?.also { tgsCache.put(path, it) }
+    }.value
+    if (json == null) {
+        androidx.compose.foundation.layout.Box(modifier, contentAlignment = androidx.compose.ui.Alignment.Center) { placeholder() }
+        return
+    }
+    val composition by rememberLottieComposition(LottieCompositionSpec.JsonString(json), cacheKey = "tgs:$path")
+    val animate = LocalAppSettings.current.animations
+    if (composition == null) {
+        androidx.compose.foundation.layout.Box(modifier, contentAlignment = androidx.compose.ui.Alignment.Center) { placeholder() }
+        return
+    }
+    val progress by animateLottieCompositionAsState(composition, iterations = if (animate) LottieConstants.IterateForever else 1, isPlaying = true)
+    LottieAnimation(composition, { progress }, modifier)
+}
