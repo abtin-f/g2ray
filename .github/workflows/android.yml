@@ -33,7 +33,21 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Show SDK
         run: echo "ANDROID_HOME=$ANDROID_HOME" && ls "$ANDROID_HOME/platforms" "$ANDROID_HOME/build-tools" || true
+      - name: Release signing key (repository secret, optional)
+        env:
+          KEYSTORE_B64: ${{ secrets.TGLASS_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/tglass.jks"
+            echo "TGLASS_KEYSTORE=$RUNNER_TEMP/tglass.jks" >> "$GITHUB_ENV"
+          else
+            echo "No TGLASS_KEYSTORE_B64 secret: release APK is signed with the runner's debug key."
+          fi
       - name: Build APKs
+        env:
+          TGLASS_KEYSTORE_PASSWORD: ${{ secrets.TGLASS_KEYSTORE_PASSWORD }}
+          TGLASS_KEY_ALIAS: ${{ secrets.TGLASS_KEY_ALIAS }}
+          TGLASS_KEY_PASSWORD: ${{ secrets.TGLASS_KEY_PASSWORD }}
         run: ./gradlew --no-configuration-cache assembleDebug assembleRelease --stacktrace
       - name: Publish APK (release + builds branch)
         if: github.event_name == 'push'

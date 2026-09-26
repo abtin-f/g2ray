@@ -28,13 +28,27 @@ android {
         }
     }
 
+    signingConfigs {
+        // A fixed key makes every new APK install as an update of the previous one. It comes from
+        // the TGLASS_KEYSTORE* environment (CI decodes it from a repository secret); never committed.
+        val keystore = System.getenv("TGLASS_KEYSTORE")?.takeIf { it.isNotBlank() }?.let { file(it) }?.takeIf { it.exists() }
+        if (keystore != null) {
+            create("release") {
+                storeFile = keystore
+                storePassword = System.getenv("TGLASS_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("TGLASS_KEY_ALIAS")
+                keyPassword = System.getenv("TGLASS_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Signed with the debug key so the release APK is installable for personal use.
-            signingConfig = signingConfigs.getByName("debug")
+            // Without the release key (local builds) fall back to the debug key so the APK still installs.
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
     buildFeatures {
