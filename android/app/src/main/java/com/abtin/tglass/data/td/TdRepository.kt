@@ -1328,7 +1328,7 @@ class TdRepository(context: Context) : TelegramRepository {
         scope.launch {
             val publicChats = if (query.length >= 4) {
                 val r = client.searchPublicChats(query)
-                if (r is TdlResult.Success) r.result.chatIds.mapNotNull { chatMap[it] } else emptyList()
+                if (r is TdlResult.Success) r.result.chatIds.toList().mapNotNull { chatMap[it] } else emptyList()
             } else emptyList()
             val found = client.searchMessages(query = query, offset = "", limit = 40, minDate = 0, maxDate = 0)
             val messages = if (found is TdlResult.Success) found.result.messages.map { mapMessage(it) } else emptyList()
