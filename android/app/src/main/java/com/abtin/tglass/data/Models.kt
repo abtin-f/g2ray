@@ -254,6 +254,57 @@ enum class PrivacyKey(val title: String) {
 
 enum class PrivacyValue(val title: String) { Everybody("Everybody"), Contacts("My Contacts"), Nobody("Nobody") }
 
+enum class ProxyKind(val title: String) { Socks5("SOCKS5"), MTProto("MTProto"), Http("HTTP") }
+
+/** A saved proxy server; [ping] is the last measured round trip in ms (null = unknown, -1 = unavailable). */
+@Immutable
+data class ProxyItem(
+    val id: Int,
+    val server: String,
+    val port: Int,
+    val kind: ProxyKind,
+    val secret: String = "",
+    val username: String = "",
+    val password: String = "",
+    val enabled: Boolean = false,
+    val ping: Int? = null,
+) {
+    /** Shareable t.me link, like Telegram's "Share" action. */
+    val link: String
+        get() = when (kind) {
+            ProxyKind.MTProto -> "https://t.me/proxy?server=$server&port=$port&secret=$secret"
+            else -> "https://t.me/socks?server=$server&port=$port" +
+                (if (username.isNotEmpty()) "&user=${android.net.Uri.encode(username)}&pass=${android.net.Uri.encode(password)}" else "")
+        }
+
+    companion object {
+        /** Parses tg://proxy, tg://socks, t.me/proxy and t.me/socks links (null if it isn't one). */
+        fun fromLink(link: String): ProxyItem? {
+            val uri = runCatching { android.net.Uri.parse(link.trim()) }.getOrNull() ?: return null
+            val scheme = uri.scheme?.lowercase() ?: return null
+            val kind = when {
+                scheme == "tg" && uri.host == "proxy" -> ProxyKind.MTProto
+                scheme == "tg" && uri.host == "socks" -> ProxyKind.Socks5
+                scheme.startsWith("http") && uri.host?.lowercase()?.removePrefix("www.") in setOf("t.me", "telegram.me") ->
+                    when (uri.pathSegments.firstOrNull()?.lowercase()) {
+                        "proxy" -> ProxyKind.MTProto
+                        "socks" -> ProxyKind.Socks5
+                        else -> return null
+                    }
+                else -> return null
+            }
+            val server = uri.getQueryParameter("server")?.takeIf { it.isNotBlank() } ?: return null
+            val port = uri.getQueryParameter("port")?.toIntOrNull() ?: return null
+            return ProxyItem(
+                id = 0, server = server, port = port, kind = kind,
+                secret = uri.getQueryParameter("secret").orEmpty(),
+                username = uri.getQueryParameter("user").orEmpty(),
+                password = uri.getQueryParameter("pass").orEmpty(),
+            )
+        }
+    }
+}
+
 /** Shared media tabs of a profile. */
 enum class MediaKind { Media, Files, Links, Voice, Gifs }
 

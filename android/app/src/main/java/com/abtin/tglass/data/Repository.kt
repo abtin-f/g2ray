@@ -182,6 +182,20 @@ interface TelegramRepository {
 
     fun logOut() {}
 
+    // ---- Proxy ----
+
+    /** Saved proxies (live: TDLib's list). */
+    val proxies: List<ProxyItem> get() = emptyList()
+    fun loadProxies() {}
+    /** Adds ([id] null) or edits a proxy; [onDone] gets an error message or null. */
+    fun saveProxy(id: Int?, proxy: ProxyItem, enable: Boolean, onDone: (String?) -> Unit) = onDone("Proxies need a real account")
+    fun enableProxy(id: Int) {}
+    fun disableProxy() {}
+    fun removeProxy(id: Int) {}
+    /** Measures the round trip of every saved proxy (results arrive in [proxies]). */
+    fun pingProxies() {}
+    // ---- end Proxy ----
+
     // ---- Stories ----
 
     /** People shown in the stories strip, in Telegram's order (unseen first). The current user is not included. */

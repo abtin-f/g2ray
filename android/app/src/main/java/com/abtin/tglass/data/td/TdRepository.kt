@@ -19,6 +19,8 @@ import com.abtin.tglass.data.StickerItem
 import com.abtin.tglass.data.StickerPack
 import com.abtin.tglass.data.MediaKind
 import com.abtin.tglass.data.PrivacyKey
+import com.abtin.tglass.data.ProxyItem
+import com.abtin.tglass.data.ProxyKind
 import com.abtin.tglass.data.PrivacyValue
 import com.abtin.tglass.data.Member
 import com.abtin.tglass.data.Entity
@@ -1976,6 +1978,78 @@ class TdRepository(context: Context) : TelegramRepository {
         else -> humanize(error)
     }
     // ---- end Polls, contacts, folders ----
+
+    // =====================================================================================
+    // ---- Proxy ----
+    // =====================================================================================
+
+    private val proxyList = mutableStateListOf<ProxyItem>()
+    private val proxyPings = mutableStateMapOf<Int, Int>()
+
+    override val proxies: List<ProxyItem> get() = proxyList.map { it.copy(ping = proxyPings[it.id]) }
+
+    private fun toItem(p: AddedProxy): ProxyItem {
+        val base = ProxyItem(p.id, p.proxy.server, p.proxy.port, ProxyKind.Socks5, enabled = p.isEnabled)
+        return when (val t = p.proxy.type) {
+            is ProxyTypeMtproto -> base.copy(kind = ProxyKind.MTProto, secret = t.secret)
+            is ProxyTypeHttp -> base.copy(kind = ProxyKind.Http, username = t.username, password = t.password)
+            is ProxyTypeSocks5 -> base.copy(username = t.username, password = t.password)
+            else -> base
+        }
+    }
+
+    private fun toProxy(p: ProxyItem): Proxy = Proxy(
+        p.server.trim(), p.port,
+        when (p.kind) {
+            ProxyKind.MTProto -> ProxyTypeMtproto(p.secret.trim())
+            ProxyKind.Http -> ProxyTypeHttp(p.username, p.password, false)
+            ProxyKind.Socks5 -> ProxyTypeSocks5(p.username, p.password)
+        },
+    )
+
+    override fun loadProxies() {
+        scope.launch {
+            val r = client.getProxies()
+            if (r is TdlResult.Success) {
+                proxyList.clear()
+                proxyList.addAll(r.result.proxies.map { toItem(it) })
+            }
+        }
+    }
+
+    override fun saveProxy(id: Int?, proxy: ProxyItem, enable: Boolean, onDone: (String?) -> Unit) {
+        scope.launch {
+            val r = if (id == null) client.addProxy(toProxy(proxy), enable, "") else client.editProxy(id, toProxy(proxy), enable, "")
+            if (r is TdlResult.Success) {
+                loadProxies()
+                onDone(null)
+            } else if (r is TdlResult.Failure) {
+                onDone(if ("PROXY" in r.message.uppercase() || "SECRET" in r.message.uppercase()) "Invalid proxy details: ${r.message}" else humanize(r.message))
+            }
+        }
+    }
+
+    override fun enableProxy(id: Int) {
+        scope.launch { client.enableProxy(id).orReport(); loadProxies() }
+    }
+
+    override fun disableProxy() {
+        scope.launch { client.disableProxy().orReport(); loadProxies() }
+    }
+
+    override fun removeProxy(id: Int) {
+        scope.launch { client.removeProxy(id).orReport(); loadProxies() }
+    }
+
+    override fun pingProxies() {
+        proxyList.toList().forEach { p ->
+            scope.launch {
+                val r = client.pingProxy(toProxy(p))
+                proxyPings[p.id] = if (r is TdlResult.Success) (r.result.seconds * 1000).toInt() else -1
+            }
+        }
+    }
+
 }
 
 /** Process-wide TDLib instance (TDLib must not be created twice for the same database). */

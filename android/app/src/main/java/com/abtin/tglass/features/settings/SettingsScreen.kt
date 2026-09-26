@@ -160,7 +160,7 @@ fun SettingsScreen(backdrop: LayerBackdrop) {
             }
             item {
                 Section {
-                    Cell("Saved Messages", icon = TgIcons.SetSaved, iconColor = Blue, onClick = { nav.push(Route.Chat(100)) })
+                    Cell("Saved Messages", icon = TgIcons.SetSaved, iconColor = Blue, onClick = { nav.push(Route.Chat(repo.savedChatId)) })
                     Cell("Recent Calls", icon = TgIcons.SetCalls, iconColor = Green, onClick = { nav.push(Route.Calls) })
                     Cell("Devices", icon = TgIcons.SetDevices, iconColor = Orange, value = "${repo.sessions.size}", onClick = { open(Page.Devices) })
                     Cell("Chat Folders", icon = TgIcons.SetFolders, iconColor = Teal, divider = false, onClick = { open(Page.Folders) })
@@ -172,6 +172,7 @@ fun SettingsScreen(backdrop: LayerBackdrop) {
                     Cell("Notifications and Sounds", icon = TgIcons.SetNotifications, iconColor = Red, onClick = { open(Page.Notifications) })
                     Cell("Privacy and Security", icon = TgIcons.SetPrivacy, iconColor = Gray, onClick = { open(Page.Privacy) })
                     Cell("Data and Storage", icon = TgIcons.SetData, iconColor = Green, onClick = { open(Page.Data) })
+                    if (repo.isLive) Cell("Proxy", icon = TgIcons.SetData, iconColor = Blue, value = proxySummary(), onClick = { nav.push(Route.Proxy) })
                     Cell("Appearance", icon = TgIcons.SetAppearance, iconColor = Teal, onClick = { open(Page.Appearance) })
                     Cell("Power Saving", icon = TgIcons.SetPower, iconColor = Orange, value = settings.glassLevel.title, onClick = { open(Page.PowerSaving) })
                     Cell("Language", icon = TgIcons.SetLanguage, iconColor = Purple, value = "English", divider = false, onClick = { open(Page.Language) })

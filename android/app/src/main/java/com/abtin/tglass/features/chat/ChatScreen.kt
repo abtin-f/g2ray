@@ -296,7 +296,11 @@ fun ChatScreen(chatId: Long) {
         if (id != null) nav.push(Route.Chat(id)) else toast.show("No one uses @${name.removePrefix("@")}")
     }
     fun openUrl(raw: String) {
-        val url = if (raw.startsWith("http", ignoreCase = true)) raw else "https://$raw"
+        val url = if (raw.startsWith("http", ignoreCase = true) || raw.startsWith("tg:", ignoreCase = true)) raw else "https://$raw"
+        if (com.abtin.tglass.data.ProxyItem.fromLink(url) != null) {
+            nav.push(Route.ProxyLink(url))
+            return
+        }
         // t.me/username links open inside the app, like Telegram.
         Regex("""(?i)^https?://(?:www\.)?(?:t|telegram)\.me/([A-Za-z][A-Za-z0-9_]{3,31})/?$""").find(url)?.let {
             openUsername(it.groupValues[1])

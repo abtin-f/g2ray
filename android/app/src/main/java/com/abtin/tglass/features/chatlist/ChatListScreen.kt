@@ -298,6 +298,7 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
                         ChatsTitle(
                             storyUsers.take(3).map { it.id to it.name },
                             status = repo.connectionStatus,
+                            onStatus = { nav.push(Route.Proxy) },
                             collapsed = 1f - storiesFraction,
                             modifier = Modifier.align(Alignment.Center),
                             onStories = {
@@ -361,7 +362,7 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
 
 /** "Chats" title with the stacked story avatars that Telegram shows when stories are collapsed. */
 @Composable
-private fun ChatsTitle(stories: List<Pair<Long, String>>, status: String?, collapsed: Float, modifier: Modifier, onStories: () -> Unit) {
+private fun ChatsTitle(stories: List<Pair<Long, String>>, status: String?, collapsed: Float, modifier: Modifier, onStories: () -> Unit, onStatus: () -> Unit = {}) {
     val c = TgTheme.colors
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         if (stories.isNotEmpty() && collapsed > 0.01f) {
@@ -390,7 +391,7 @@ private fun ChatsTitle(stories: List<Pair<Long, String>>, status: String?, colla
         // Telegram shows the connection state in place of the title until it is online.
         androidx.compose.animation.AnimatedContent(status, label = "chatsTitle") { st ->
             if (st == null) T("Chats", TgTheme.type.headline, c.text)
-            else Row(verticalAlignment = Alignment.CenterVertically) {
+            else Row(Modifier.fadeClickable(onClick = onStatus), verticalAlignment = Alignment.CenterVertically) {
                 com.abtin.tglass.ui.components.ActivityIndicator(16.dp)
                 Spacer(Modifier.width(6.dp))
                 T(st, TgTheme.type.headline, c.text)

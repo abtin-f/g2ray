@@ -35,6 +35,23 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Proxy links: tg://proxy, tg://socks, t.me/proxy, t.me/socks -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="tg" android:host="proxy" />
+                <data android:scheme="tg" android:host="socks" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:host="t.me" />
+                <data android:pathPrefix="/proxy" />
+                <data android:pathPrefix="/socks" />
+            </intent-filter>
         </activity>
 
         <!-- Background connection for notifications (see notify/). -->

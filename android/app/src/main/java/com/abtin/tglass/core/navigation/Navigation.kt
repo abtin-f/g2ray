@@ -38,6 +38,11 @@ sealed interface Route {
     data object Phone : Route
     data class Code(val phone: String) : Route
     data object ApiSetup : Route
+    /** Settings → Proxy. */
+    data object Proxy : Route
+    data class ProxyEdit(val id: Int?) : Route
+    /** Confirmation for an opened proxy link. */
+    data class ProxyLink(val link: String) : Route
     data object Password : Route
     data object Register : Route
     data object Main : Route

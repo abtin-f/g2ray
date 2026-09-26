@@ -91,7 +91,11 @@ class MainActivity : ComponentActivity() {
         readChatRequest(intent)
     }
 
+    /** Proxy link (tg://proxy, t.me/socks…) the app was opened with. */
+    private var proxyLinkRequest by androidx.compose.runtime.mutableStateOf<String?>(null)
+
     private fun readChatRequest(intent: Intent?) {
+        intent?.dataString?.takeIf { com.abtin.tglass.data.ProxyItem.fromLink(it) != null }?.let { proxyLinkRequest = it }
         val id = intent?.getLongExtra(com.abtin.tglass.notify.Notifier.EXTRA_CHAT_ID, 0L) ?: 0L
         if (id != 0L) openChatRequest = id
     }
@@ -183,6 +187,14 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        val proxyLink = proxyLinkRequest
+        LaunchedEffect(proxyLink) {
+            if (proxyLink != null) {
+                proxyLinkRequest = null
+                if (settings.demoMode) settings.updateDemoMode(false)
+                nav.push(Route.ProxyLink(proxyLink))
+            }
+        }
         LaunchedEffect(settings.loggedIn, settings.demoMode, settings.backgroundConnection) {
             com.abtin.tglass.notify.ConnectionService.sync(this@MainActivity)
         }
@@ -230,6 +242,9 @@ private fun Screen(route: Route) {
         Route.Phone -> PhoneScreen()
         is Route.Code -> CodeScreen(route.phone)
         Route.ApiSetup -> ApiSetupScreen()
+        Route.Proxy -> com.abtin.tglass.features.settings.ProxyListScreen()
+        is Route.ProxyEdit -> com.abtin.tglass.features.settings.ProxyEditScreen(route.id)
+        is Route.ProxyLink -> com.abtin.tglass.features.settings.ProxyLinkScreen(route.link)
         Route.Password -> PasswordScreen()
         Route.Register -> RegisterScreen()
         Route.Main -> MainScreen()

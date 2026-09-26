@@ -111,7 +111,14 @@ private fun AuthPage(
             }
             if (button != null) Box(Modifier.padding(horizontal = 24.dp, vertical = 16.dp).navigationBarsPadding()) { button() }
         }
-        GlassTopBar(title = null, fade = Color.Transparent)
+        val live = liveRepo()
+        val nav = LocalNavigator.current
+        GlassTopBar(
+            title = null,
+            fade = Color.Transparent,
+            // Telegram iOS shows proxy settings on the login screens: often the only way to connect.
+            right = if (live != null) ({ com.abtin.tglass.ui.components.GlassTextButton("Proxy", { nav.push(Route.Proxy) }) }) else null,
+        )
     }
 }
 
