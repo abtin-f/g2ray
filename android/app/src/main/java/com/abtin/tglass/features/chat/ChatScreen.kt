@@ -305,7 +305,7 @@ fun ChatScreen(chatId: Long) {
     /** Scrolls to a message, loading the history around it first if needed. */
     fun jumpToAny(id: Long) {
         if (messages.any { it.id == id }) jumpTo(id)
-        else repo.loadAroundMessage(chatId, id) { found -> if (found) pendingJump = id else toast.show("Message not found") }
+        else repo.loadAroundMessage(chatId, id) { found -> if (found) pendingJump = id else toast.error("Message not found") }
     }
     LaunchedEffect(pendingJump, messages.size) {
         val id = pendingJump ?: return@LaunchedEffect
@@ -571,7 +571,7 @@ fun ChatScreen(chatId: Long) {
                                 message = "If you stop this ${if (quiz) "quiz" else "poll"} now, nobody will be able to ${if (quiz) "answer" else "vote in"} it anymore. This action cannot be undone.",
                                 actions = listOf(
                                     SheetAction(if (quiz) "Stop Quiz" else "Stop Poll", destructive = true) {
-                                        repo.stopPoll(chatId, m.id) { err -> if (err != null) toast.show(err) }
+                                        repo.stopPoll(chatId, m.id) { err -> if (err != null) toast.error(err) }
                                     },
                                 ),
                                 alert = true,
