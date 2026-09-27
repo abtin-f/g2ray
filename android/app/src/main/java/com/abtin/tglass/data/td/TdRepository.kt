@@ -2831,6 +2831,87 @@ class TdRepository(context: Context) : TelegramRepository {
         }
     }
     // ---- end Settings (real) ----
+
+    // ---- Edit Profile & Appearance ----
+    private var profileBirthdate by mutableStateOf<com.abtin.tglass.data.ProfileBirthdate?>(null)
+    private var profileChannel by mutableStateOf<com.abtin.tglass.data.PersonalChannel?>(null)
+    private var profileNameColor by mutableStateOf(-1)
+
+    override val myBirthdate: com.abtin.tglass.data.ProfileBirthdate? get() = profileBirthdate
+    override val myPersonalChannel: com.abtin.tglass.data.PersonalChannel? get() = profileChannel
+    override val myNameColorId: Int get() = if (profileNameColor >= 0) profileNameColor else (rawUsers[myId]?.accentColorId ?: 5)
+
+    private suspend fun channelTitle(chatId: Long): com.abtin.tglass.data.PersonalChannel? {
+        val r = client.getChat(chatId)
+        if (r !is TdlResult.Success) return null
+        return com.abtin.tglass.data.PersonalChannel(chatId, r.result.title)
+    }
+
+    override fun loadProfileExtras() {
+        scope.launch {
+            client.getMe().let { if (it is TdlResult.Success) { onUser(it.result); profileNameColor = it.result.accentColorId } }
+            val full = client.getUserFullInfo(myId)
+            if (full is TdlResult.Success) {
+                profileBirthdate = full.result.birthdate?.let { com.abtin.tglass.data.ProfileBirthdate(it.day, it.month, it.year) }
+                val pc = full.result.personalChatId
+                profileChannel = if (pc != 0L) channelTitle(pc) else null
+            }
+        }
+    }
+
+    override fun setBirthdate(value: com.abtin.tglass.data.ProfileBirthdate?, onDone: (String?) -> Unit) {
+        scope.launch {
+            val r = client.setBirthdate(value?.let { Birthdate(it.day, it.month, it.year) })
+            if (r is TdlResult.Success) profileBirthdate = value
+            onDone(if (r is TdlResult.Failure) humanize(r.message) else null)
+        }
+    }
+
+    override fun loadPersonalChannelCandidates(onResult: (List<com.abtin.tglass.data.PersonalChannel>) -> Unit) {
+        scope.launch {
+            val r = client.getSuitablePersonalChats()
+            if (r !is TdlResult.Success) { r.orReport(); onResult(emptyList()); return@launch }
+            onResult(r.result.chatIds.toList().mapNotNull { channelTitle(it) })
+        }
+    }
+
+    override fun setPersonalChannel(chatId: Long?, onDone: (String?) -> Unit) {
+        scope.launch {
+            val r = client.setPersonalChat(chatId ?: 0L)
+            if (r is TdlResult.Success) profileChannel = chatId?.let { channelTitle(it) }
+            onDone(if (r is TdlResult.Failure) humanize(r.message) else null)
+        }
+    }
+
+    override fun setNameColor(colorId: Int, onDone: (String?) -> Unit) {
+        scope.launch {
+            // Keep a Premium user's background emoji.
+            val emoji = rawUsers[myId]?.backgroundCustomEmojiId ?: 0L
+            val r = client.setAccentColor(colorId, emoji)
+            if (r is TdlResult.Success) { profileNameColor = colorId; refreshMe() }
+            onDone(if (r is TdlResult.Failure) humanize(r.message) else null)
+        }
+    }
+
+    override fun checkUsername(username: String, onResult: (com.abtin.tglass.data.UsernameCheck) -> Unit) {
+        com.abtin.tglass.data.localUsernameCheck(username)?.let { onResult(it); return }
+        if (username.equals(me.username, true)) { onResult(com.abtin.tglass.data.UsernameCheck.Available); return }
+        scope.launch {
+            val r = client.checkChatUsername(myId, username)
+            onResult(
+                if (r !is TdlResult.Success) com.abtin.tglass.data.UsernameCheck.Error
+                else when (r.result) {
+                    is CheckChatUsernameResultOk -> com.abtin.tglass.data.UsernameCheck.Available
+                    is CheckChatUsernameResultUsernameOccupied -> com.abtin.tglass.data.UsernameCheck.Taken
+                    is CheckChatUsernameResultUsernamePurchasable -> com.abtin.tglass.data.UsernameCheck.Purchasable
+                    is CheckChatUsernameResultUsernameInvalid -> com.abtin.tglass.data.UsernameCheck.Invalid
+                    is CheckChatUsernameResultPublicChatsTooMany -> com.abtin.tglass.data.UsernameCheck.TooMany
+                    else -> com.abtin.tglass.data.UsernameCheck.Error
+                }
+            )
+        }
+    }
+    // ---- end Edit Profile & Appearance ----
 }
 
 /** Process-wide TDLib instance (TDLib must not be created twice for the same database). */

@@ -438,6 +438,34 @@ interface TelegramRepository {
     /** The user's public t.me link (username, or a temporary link when there is none). */
     fun loadMyLink(onResult: (String?) -> Unit) = onResult(me.username?.let { "https://t.me/$it" })
     // ---- end Settings (real) ----
+
+    // ---- Edit Profile & Appearance ----
+    /** Own birthday; null when not set (or not loaded yet, see [loadProfileExtras]). */
+    val myBirthdate: ProfileBirthdate? get() = DemoProfile.birthdate
+    /** Channel shown on the own profile; null when none. */
+    val myPersonalChannel: PersonalChannel? get() = DemoProfile.personalChannel
+    /** Own name color (accent color id 0–6). */
+    val myNameColorId: Int get() = DemoProfile.nameColor
+    /** Loads birthday, personal channel and name color of the own account. */
+    fun loadProfileExtras() {}
+    fun setBirthdate(value: ProfileBirthdate?, onDone: (String?) -> Unit) { DemoProfile.birthdate = value; onDone(null) }
+    /** Channels the user owns that can be shown on the profile. */
+    fun loadPersonalChannelCandidates(onResult: (List<PersonalChannel>) -> Unit) =
+        onResult(chats.filter { it.type == ChatType.Channel }.map { PersonalChannel(it.id, it.title) })
+    /** [chatId] null removes the personal channel. */
+    fun setPersonalChannel(chatId: Long?, onDone: (String?) -> Unit) {
+        DemoProfile.personalChannel = chatId?.let { id -> chat(id)?.let { PersonalChannel(id, it.title) } }
+        onDone(null)
+    }
+    fun setNameColor(colorId: Int, onDone: (String?) -> Unit) { DemoProfile.nameColor = colorId; onDone(null) }
+    /** Checks whether [username] can be taken by the own account. */
+    fun checkUsername(username: String, onResult: (UsernameCheck) -> Unit) {
+        localUsernameCheck(username)?.let { onResult(it); return }
+        val taken = username.equals(me.username, true).not() &&
+            (users.values.any { it.username.equals(username, true) } || chats.any { it.username.equals(username, true) })
+        onResult(if (taken) UsernameCheck.Taken else UsernameCheck.Available)
+    }
+    // ---- end Edit Profile & Appearance ----
 }
 
 class DemoRepository(private val scope: CoroutineScope) : TelegramRepository {

@@ -381,7 +381,7 @@ private fun richFor(m: Message, text: String, entities: List<com.abtin.tglass.da
 @Composable
 private fun TextBody(content: MessageContent.Text, m: Message, colors: BubbleColors, modifier: Modifier) {
     val text = content.text
-    val emojiOnly = text.length <= 8 && text.none { it.isLetterOrDigit() } && text.isNotBlank()
+    val emojiOnly = LocalAppSettings.current.largeEmoji && text.length <= 8 && text.none { it.isLetterOrDigit() } && text.isNotBlank()
     val style = if (emojiOnly) TgTheme.type.body.copy(fontSize = 34.sp, lineHeight = 40.sp) else TgTheme.type.body
     TextWithMeta(
         richFor(m, text, content.entities, colors),

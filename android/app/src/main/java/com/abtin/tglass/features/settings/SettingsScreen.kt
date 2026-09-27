@@ -66,7 +66,6 @@ import com.abtin.tglass.core.design.LocalAppSettings
 import com.abtin.tglass.core.design.ProvideTextScale
 import com.abtin.tglass.core.design.ThemeMode
 import com.abtin.tglass.core.design.TgTheme
-import com.abtin.tglass.core.design.WallpaperPresets
 import com.abtin.tglass.core.glass.GlassIconButton
 import com.abtin.tglass.core.glass.LocalBackdrop
 import com.abtin.tglass.core.navigation.LocalNavigator
@@ -124,6 +123,13 @@ enum class Page(val title: String) {
     AutoDownloadWifi("Using Wi-Fi"),
     AutoDownloadRoaming("Roaming"),
     QrCode("QR Code"),
+    TextSize("Text Size"),
+    MessageCorners("Message Corners"),
+    Wallpaper("Chat Wallpaper"),
+    AutoNight("Auto-Night Mode"),
+    NameColor("Your Color"),
+    Username("Username"),
+    PersonalChannel("Personal Channel"),
 }
 
 private val Red = Color(0xFFFF3B30)
@@ -172,10 +178,27 @@ fun SettingsScreen(backdrop: LayerBackdrop) {
                 )
             }
             item {
+                // Telegram-iOS "edit" section: accent-colored actions.
                 Section {
                     // Emoji statuses need a status picker (and Premium); the live app does not offer one yet.
-                    if (!live) Cell("Set Emoji Status", icon = TgIcons.SetStatus, iconColor = Purple, onClick = { toast.show("Emoji status set ✨") })
-                    Cell("My Profile", icon = TgIcons.SetProfile, iconColor = Red, divider = false, onClick = { open(Page.EditProfile) })
+                    if (!live) Cell("Set Emoji Status", icon = TgIcons.SetStatus, iconColor = Purple, titleColor = c.accent, chevron = false, onClick = { toast.show("Emoji status set ✨") })
+                    val hasPhoto = repo.avatar(me.id) != null
+                    Cell(
+                        if (hasPhoto) "Change Profile Photo" else "Set Profile Photo",
+                        icon = IosIcons.Camera, iconColor = Blue, titleColor = c.accent, chevron = false,
+                        divider = me.username.isNullOrBlank(),
+                        onClick = { open(Page.EditProfile) },
+                    )
+                    if (me.username.isNullOrBlank()) {
+                        Cell("Set Username", icon = SettingsGlyphs.At, iconColor = Teal, titleColor = c.accent, chevron = false, divider = false, onClick = { open(Page.Username) })
+                    }
+                }
+                Spacer(Modifier.height(24.dp))
+            }
+            item {
+                Section {
+                    Cell("My Profile", icon = TgIcons.SetProfile, iconColor = Red, divider = live, onClick = { open(Page.EditProfile) })
+                    if (live) Cell("Proxy", icon = SettingsGlyphs.Shield, iconColor = Blue, value = proxySummary(), divider = false, onClick = { nav.push(Route.Proxy) })
                 }
                 Spacer(Modifier.height(24.dp))
             }
@@ -183,7 +206,7 @@ fun SettingsScreen(backdrop: LayerBackdrop) {
                 Section {
                     Cell("Saved Messages", icon = TgIcons.SetSaved, iconColor = Blue, onClick = { nav.push(Route.Chat(repo.savedChatId)) })
                     Cell("Recent Calls", icon = TgIcons.SetCalls, iconColor = Green, onClick = { nav.push(Route.Calls) })
-                    Cell("Devices", icon = TgIcons.SetDevices, iconColor = Orange, value = "${repo.sessions.size}", onClick = { open(Page.Devices) })
+                    Cell("Devices", icon = TgIcons.SetDevices, iconColor = Orange, value = repo.sessions.size.takeIf { it > 0 }?.toString(), onClick = { open(Page.Devices) })
                     Cell("Chat Folders", icon = TgIcons.SetFolders, iconColor = Teal, divider = false, onClick = { open(Page.Folders) })
                 }
                 Spacer(Modifier.height(24.dp))
@@ -193,9 +216,8 @@ fun SettingsScreen(backdrop: LayerBackdrop) {
                     Cell("Notifications and Sounds", icon = TgIcons.SetNotifications, iconColor = Red, onClick = { open(Page.Notifications) })
                     Cell("Privacy and Security", icon = TgIcons.SetPrivacy, iconColor = Gray, onClick = { open(Page.Privacy) })
                     Cell("Data and Storage", icon = TgIcons.SetData, iconColor = Green, onClick = { open(Page.Data) })
-                    if (repo.isLive) Cell("Proxy", icon = TgIcons.SetData, iconColor = Blue, value = proxySummary(), onClick = { nav.push(Route.Proxy) })
                     Cell("Appearance", icon = TgIcons.SetAppearance, iconColor = Teal, onClick = { open(Page.Appearance) })
-                    Cell("Power Saving", icon = TgIcons.SetPower, iconColor = Orange, value = settings.glassLevel.title, onClick = { open(Page.PowerSaving) })
+                    Cell("Power Saving", icon = TgIcons.SetPower, iconColor = Orange, value = if (settings.glassLevel == GlassLevel.Full && settings.animations) "Off" else "On", onClick = { open(Page.PowerSaving) })
                     Cell("Language", icon = TgIcons.SetLanguage, iconColor = Purple, value = "English", divider = false, onClick = { open(Page.Language) })
                 }
                 Spacer(Modifier.height(24.dp))
@@ -239,21 +261,7 @@ fun SettingsScreen(backdrop: LayerBackdrop) {
                         }
                     })
                 }
-                Spacer(Modifier.height(24.dp))
-            }
-            item {
-                Section {
-                    Cell("Log Out", titleColor = c.destructive, chevron = false, divider = false, onClick = {
-                        sheet.show(SheetRequest(title = "Log out?", message = "You will return to the welcome screen.", alert = true, actions = listOf(SheetAction("Log Out", destructive = true) {
-                            repo.logOut()
-                            PasscodeLock.disable()
-                            settings.updateLoggedIn(false)
-                            settings.updateDemoMode(false)
-                            nav.resetTo(Route.Welcome)
-                        })))
-                    })
-                }
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(16.dp))
                 T("TGlass for Android v${com.abtin.tglass.BuildConfig.VERSION_NAME}", TgTheme.type.footnote, c.secondaryText, align = TextAlign.Center, modifier = Modifier.fillMaxWidth())
             }
         }
@@ -274,9 +282,16 @@ fun SettingsPageScreen(page: Page) {
         Page.Passcode -> PasscodeSettingsScreen()
         Page.PasscodeSetup -> PasscodeSetupScreen()
         Page.EditProfile -> EditProfileScreen()
+        Page.Username -> UsernameScreen()
         else -> SettingsScaffold(page.title) {
             when (page) {
-                Page.Appearance -> appearance()
+                Page.Appearance -> appearancePage()
+                Page.TextSize -> textSizePage()
+                Page.MessageCorners -> messageCornersPage()
+                Page.Wallpaper -> wallpaperPage()
+                Page.AutoNight -> autoNightPage()
+                Page.NameColor -> nameColorPage()
+                Page.PersonalChannel -> personalChannelPage()
                 Page.PowerSaving -> powerSaving()
                 Page.Notifications -> notifications()
                 Page.Privacy -> privacy()
@@ -291,7 +306,7 @@ fun SettingsPageScreen(page: Page) {
                 Page.NetworkUsage -> networkUsage()
                 Page.AutoDownloadCellular, Page.AutoDownloadWifi, Page.AutoDownloadRoaming -> page.downloadNetwork()?.let { autoDownload(it) }
                 Page.QrCode -> myQrCode()
-                Page.Passcode, Page.PasscodeSetup, Page.EditProfile -> {}
+                Page.Passcode, Page.PasscodeSetup, Page.EditProfile, Page.Username -> {}
             }
         }
     }
@@ -317,107 +332,6 @@ internal fun SettingsScaffold(title: String, content: LazyListScope.() -> Unit) 
 }
 
 private fun LazyListScope.gap() = item { Spacer(Modifier.height(24.dp)) }
-
-private fun LazyListScope.appearance() {
-    item {
-        val s = LocalAppSettings.current
-        Section(header = "Chat List", footer = "Compact matches Telegram for iPhone. Larger sizes show bigger photos and text.") {
-            Box(Modifier.padding(12.dp)) {
-                SegmentedControl(
-                    com.abtin.tglass.core.design.ChatListSize.entries.map { it.title },
-                    s.chatListSize.ordinal,
-                    { s.updateChatListSize(com.abtin.tglass.core.design.ChatListSize.entries[it]) },
-                    Modifier.fillMaxWidth(),
-                )
-            }
-        }
-        Spacer(Modifier.height(24.dp))
-    }
-    item {
-        val s = LocalAppSettings.current
-        val c = TgTheme.colors
-        Section(header = "Color Theme") {
-            Row(Modifier.fillMaxWidth().padding(14.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                ThemeMode.entries.forEach { mode ->
-                    val sel = s.themeMode == mode
-                    Column(Modifier.weight(1f).fadeClickable { s.updateTheme(mode) }, horizontalAlignment = Alignment.CenterHorizontally) {
-                        val dark = mode == ThemeMode.Dark
-                        Box(
-                            Modifier
-                                .fillMaxWidth()
-                                .height(96.dp)
-                                .clip(RoundedRectangle(14.dp))
-                                .border(if (sel) 2.5.dp else 1.dp, if (sel) c.accent else c.separator, RoundedRectangle(14.dp))
-                                .background(
-                                    if (mode == ThemeMode.System) Brush.linearGradient(listOf(Color(0xFFDBDDBB), Color(0xFF1C2B3E)))
-                                    else Brush.linearGradient(if (dark) listOf(Color(0xFF0B1A2B), Color(0xFF223246)) else listOf(Color(0xFFDBDDBB), Color(0xFF88B884)))
-                                )
-                                .padding(10.dp),
-                        ) {
-                            Box(Modifier.align(Alignment.TopStart).size(46.dp, 16.dp).clip(RoundedRectangle(8.dp)).background(if (dark) Color(0xFF262628) else Color.White))
-                            Box(Modifier.align(Alignment.BottomEnd).size(52.dp, 16.dp).clip(RoundedRectangle(8.dp)).background(if (dark) Color(0xFF313131) else Color(0xFFE1FFC7)))
-                        }
-                        Spacer(Modifier.height(6.dp))
-                        T(when (mode) { ThemeMode.System -> "System"; ThemeMode.Light -> "Day"; ThemeMode.Dark -> "Night" }, TgTheme.type.footnote, if (sel) c.accent else c.text, weight = if (sel) FontWeight.SemiBold else null)
-                    }
-                }
-            }
-        }
-    }
-    gap()
-    item {
-        val s = LocalAppSettings.current
-        val c = TgTheme.colors
-        // The slider only changes a local value while dragging: the preview follows it live and the whole app is
-        // re-laid out once, when the finger lifts (otherwise every step re-measures every screen and the slider).
-        var scale by remember { mutableFloatStateOf(s.textScale) }
-        var corners by remember { mutableFloatStateOf(s.bubbleRadius) }
-        Section(header = "Preview") {
-            Box(Modifier.fillMaxWidth().heightIn(min = 170.dp).clip(RoundedRectangle(26.dp))) {
-                Box(Modifier.matchParentSize()) { ChatWallpaper() }
-                ProvideTextScale(scale) {
-                    Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        MessageBubble(BubbleDemo.incoming, BubbleGroup(false, false, false, false), null, 1, null, null, false, 260.dp, radiusOverride = corners)
-                        Row { Spacer(Modifier.weight(1f)); MessageBubble(BubbleDemo.outgoing, BubbleGroup(false, false, false, false), null, 0, BubbleDemo.incoming, "Sara", false, 260.dp, radiusOverride = corners) }
-                    }
-                }
-            }
-        }
-        Spacer(Modifier.height(24.dp))
-        Section(header = "Text Size", footer = "Adjusts text size across the whole app.") {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                // Fixed sizes: labels that grew with the setting would resize the slider under the finger.
-                T("A", TextStyle(fontSize = 13.sp), c.text)
-                IOSSlider(scale, { scale = it }, 0.85f..1.3f, Modifier.weight(1f).padding(horizontal = 12.dp), steps = 8, onValueChangeFinished = { if (scale != s.textScale) s.updateTextScale(scale) })
-                T("A", TextStyle(fontSize = 20.sp), c.text)
-            }
-        }
-        Spacer(Modifier.height(24.dp))
-        Section(header = "Message Corners") {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                IOSSlider(corners, { corners = it }, 6f..22f, Modifier.weight(1f), steps = 7, onValueChangeFinished = { if (corners != s.bubbleRadius) s.updateBubbleRadius(corners) })
-            }
-        }
-        Spacer(Modifier.height(24.dp))
-        Section(header = "Chat Wallpaper") {
-            Row(Modifier.fillMaxWidth().padding(14.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-                WallpaperPresets.forEachIndexed { i, preset ->
-                    val colors = preset ?: listOf(Color(0xFFDBDDBB), Color(0xFF6BA587), Color(0xFFD5D88D), Color(0xFF88B884))
-                    Box(
-                        Modifier
-                            .size(46.dp)
-                            .clip(CircleShape)
-                            .border(if (s.wallpaperIndex == i) 3.dp else 0.dp, c.accent, CircleShape)
-                            .padding(if (s.wallpaperIndex == i) 4.dp else 0.dp)
-                            .clip(CircleShape)
-                            .background(Brush.linearGradient(colors))
-                            .fadeClickable { s.updateWallpaper(i) }
-                    )
-                }
-            }
-        }
-    }
-}
 
 private fun LazyListScope.powerSaving() {
     item {

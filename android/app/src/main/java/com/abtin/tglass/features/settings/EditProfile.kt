@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
@@ -114,12 +115,15 @@ fun EditProfileScreen() {
     val scope = rememberCoroutineScope()
     val c = TgTheme.colors
     val me = repo.me
-    LaunchedEffect(me.id) { repo.loadChatInfo(me.id) }
+    val settings = com.abtin.tglass.core.design.LocalAppSettings.current
+    LaunchedEffect(me.id) {
+        repo.loadChatInfo(me.id)
+        repo.loadProfileExtras()
+    }
     val serverBio = repo.chatInfo(me.id)?.about ?: me.bio ?: ""
 
     var first by rememberSaveable(me.id) { mutableStateOf(me.firstName) }
     var last by rememberSaveable(me.id) { mutableStateOf(me.lastName) }
-    var username by rememberSaveable(me.id) { mutableStateOf(me.username ?: "") }
     // The bio arrives with the full user info; fill it in once unless the user already typed.
     var bio by rememberSaveable(me.id) { mutableStateOf(serverBio) }
     var bioTouched by rememberSaveable(me.id) { mutableStateOf(false) }
@@ -131,7 +135,14 @@ fun EditProfileScreen() {
     var photoRemoved by rememberSaveable { mutableStateOf(false) }
     var cropSource by remember { mutableStateOf<Uri?>(null) }
 
-    val changed = first.trim() != me.firstName || last.trim() != me.lastName || bio.trim() != serverBio.trim() || username != (me.username ?: "")
+    // Birthday: edited inline and saved with Done, like on iOS.
+    var birthday by remember { mutableStateOf(repo.myBirthdate) }
+    var birthdayTouched by rememberSaveable { mutableStateOf(false) }
+    var birthdayEditing by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(repo.myBirthdate) { if (!birthdayTouched) birthday = repo.myBirthdate }
+    val birthdayChanged = birthdayTouched && birthday != repo.myBirthdate
+
+    val changed = first.trim() != me.firstName || last.trim() != me.lastName || bio.trim() != serverBio.trim() || birthdayChanged
     val hasPhoto = !photoRemoved && (localPhoto != null || repo.avatar(me.id) != null)
 
     fun close() = nav.pop()
@@ -148,12 +159,11 @@ fun EditProfileScreen() {
         if (first.isBlank()) { toast.show("Please enter your first name"); return }
         saving = true
         val profileChanged = first.trim() != me.firstName || last.trim() != me.lastName || bio.trim() != serverBio.trim()
-        val usernameChanged = username != (me.username ?: "")
-        fun saveUsername() {
-            if (!usernameChanged) { saving = false; close(); return }
-            repo.updateUsername(username) { err ->
+        fun saveBirthday() {
+            if (!birthdayChanged) { saving = false; close(); return }
+            repo.setBirthdate(birthday) { err ->
                 saving = false
-                if (err != null) sheet.show(SheetRequest(title = "Username", message = err, alert = true, actions = emptyList(), cancel = "OK"))
+                if (err != null) sheet.show(SheetRequest(title = "Birthday", message = err, alert = true, actions = emptyList(), cancel = "OK"))
                 else close()
             }
         }
@@ -162,9 +172,9 @@ fun EditProfileScreen() {
                 if (err != null) {
                     saving = false
                     sheet.show(SheetRequest(title = "Couldn't save", message = err, alert = true, actions = emptyList(), cancel = "OK"))
-                } else saveUsername()
+                } else saveBirthday()
             }
-        } else saveUsername()
+        } else saveBirthday()
     }
     BackHandler(enabled = changed || cropSource != null) { if (cropSource != null) cropSource = null else cancel() }
 
@@ -246,12 +256,59 @@ fun EditProfileScreen() {
                         ProfileField(bio, { bio = it.take(70); bioTouched = true }, "Bio", divider = false, trailingHint = "${70 - bio.length}")
                     }
                     Spacer(Modifier.height(24.dp))
-                    Section(header = "Username", footer = "You can use a–z, 0–9 and underscores. Minimum length is 5 characters.") {
-                        ProfileField(username, { username = it.filter { ch -> ch.isLetterOrDigit() || ch == '_' }.take(32) }, "Username", divider = false, prefix = "@")
+                    Section(footer = "Choose who can see your birthday in Settings → Privacy and Security.") {
+                        Cell(
+                            "Birthday", icon = SettingsGlyphs.Gift, iconColor = Color(0xFFFF2D55),
+                            value = birthday?.label() ?: "Add", chevron = false,
+                            divider = birthdayEditing,
+                            onClick = {
+                                if (birthday == null) { birthday = com.abtin.tglass.data.ProfileBirthdate(1, 1, 2000); birthdayTouched = true }
+                                birthdayEditing = !birthdayEditing
+                            },
+                        )
+                        val b = birthday
+                        if (birthdayEditing && b != null) {
+                            BirthdayPicker(b) { birthday = it; birthdayTouched = true }
+                            Separator(startPadding = 16.dp)
+                            Cell("Remove Birthday", titleColor = c.destructive, chevron = false, divider = false, onClick = {
+                                birthday = null; birthdayTouched = true; birthdayEditing = false
+                            })
+                        }
                     }
                     Spacer(Modifier.height(24.dp))
                     Section {
-                        Cell("Phone Number", value = me.phone, chevron = false, divider = false)
+                        Cell("Phone Number", icon = SettingsGlyphs.Phone, iconColor = Color(0xFF34C759), value = me.phone, onClick = {
+                            sheet.show(SheetRequest(
+                                title = "Change Number",
+                                message = "Your number is ${me.phone}. Changing it moves your account, chats and media to the new number; TGlass can't do this yet, so use the official Telegram app (Settings → Edit → Phone Number).",
+                                alert = true, actions = emptyList(), cancel = "OK",
+                            ))
+                        })
+                        Cell("Username", icon = SettingsGlyphs.At, iconColor = Color(0xFF32ADE6), value = me.username?.let { "@$it" } ?: "", onClick = {
+                            nav.push(com.abtin.tglass.core.navigation.Route.SettingsPage(Page.Username))
+                        })
+                        Cell("Your Color", icon = SettingsGlyphs.Palette, iconColor = Color(0xFFFF9500), trailing = {
+                            Box(Modifier.size(22.dp).clip(CircleShape).background(com.abtin.tglass.data.NameColors.color(repo.myNameColorId, c.isDark)))
+                            Spacer(Modifier.width(8.dp))
+                            com.abtin.tglass.ui.components.Icon(com.abtin.tglass.ui.components.IosIcons.ChevronRight, c.tertiaryText, 14.dp)
+                        }, onClick = { nav.push(com.abtin.tglass.core.navigation.Route.SettingsPage(Page.NameColor)) })
+                        Cell("Personal Channel", icon = SettingsGlyphs.Channel, iconColor = Color(0xFF007AFF), value = repo.myPersonalChannel?.title ?: "Add", divider = false, onClick = {
+                            nav.push(com.abtin.tglass.core.navigation.Route.SettingsPage(Page.PersonalChannel))
+                        })
+                    }
+                    Spacer(Modifier.height(24.dp))
+                    Section {
+                        Box(Modifier.fillMaxWidth().height(50.dp).fadeClickable {
+                            sheet.show(SheetRequest(title = "Log out?", message = "You will return to the welcome screen.", alert = true, actions = listOf(SheetAction("Log Out", destructive = true) {
+                                repo.logOut()
+                                PasscodeLock.disable()
+                                settings.updateLoggedIn(false)
+                                settings.updateDemoMode(false)
+                                nav.resetTo(com.abtin.tglass.core.navigation.Route.Welcome)
+                            })))
+                        }, contentAlignment = Alignment.Center) {
+                            T("Log Out", TgTheme.type.body, c.destructive)
+                        }
                     }
                 }
             }
@@ -445,4 +502,64 @@ private fun writeCrop(context: Context, bmp: Bitmap, left: Float, top: Float, si
     val file = File(dir, "avatar_${System.nanoTime()}.jpg")
     FileOutputStream(file).use { out.compress(Bitmap.CompressFormat.JPEG, 92, it) }
     return file.absolutePath
+}
+
+/** Inline iOS-style date wheels (day · month · year, year optional) under the Birthday row. */
+@Composable
+private fun BirthdayPicker(value: com.abtin.tglass.data.ProfileBirthdate, onChange: (com.abtin.tglass.data.ProfileBirthdate) -> Unit) {
+    val thisYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+    // Year list: "—" (no year) then this year back to 1900.
+    val years = remember(thisYear) { listOf("—") + (thisYear downTo 1900).map { it.toString() } }
+    val yearIndex = if (value.year <= 0) 0 else (thisYear - value.year + 1).coerceIn(1, years.lastIndex)
+    val days = com.abtin.tglass.data.ProfileBirthdate.daysIn(value.month, value.year)
+    fun emit(day: Int, month: Int, year: Int) {
+        val d = day.coerceIn(1, com.abtin.tglass.data.ProfileBirthdate.daysIn(month, year))
+        onChange(com.abtin.tglass.data.ProfileBirthdate(d, month, year))
+    }
+    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
+        WheelPicker((1..days).map { it.toString() }, (value.day - 1).coerceIn(0, days - 1), { emit(it + 1, value.month, value.year) }, Modifier.weight(0.8f))
+        WheelPicker(com.abtin.tglass.data.ProfileBirthdate.Months, value.month - 1, { emit(value.day, it + 1, value.year) }, Modifier.weight(1.6f))
+        WheelPicker(years, yearIndex, { emit(value.day, value.month, if (it == 0) 0 else thisYear - it + 1) }, Modifier.weight(1f))
+    }
+}
+
+/** A single UIPickerView-like wheel: snaps to the middle row and reports it when scrolling stops. */
+@Composable
+private fun WheelPicker(labels: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
+    val c = TgTheme.colors
+    val rowHeight = 34.dp
+    val last = (labels.size - 1).coerceAtLeast(0)
+    val state = androidx.compose.foundation.lazy.rememberLazyListState(initialFirstVisibleItemIndex = selected.coerceIn(0, last))
+    val fling = androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior(lazyListState = state)
+    fun centerIndex(): Int {
+        val info = state.layoutInfo
+        val mid = (info.viewportStartOffset + info.viewportEndOffset) / 2
+        return info.visibleItemsInfo.minByOrNull { kotlin.math.abs(it.offset + it.size / 2 - mid) }?.index ?: selected
+    }
+    LaunchedEffect(state.isScrollInProgress) {
+        if (!state.isScrollInProgress) {
+            val i = centerIndex().coerceIn(0, last)
+            if (i != selected) onSelect(i)
+        }
+    }
+    // Follow outside changes (e.g. the day list got shorter).
+    LaunchedEffect(selected, labels.size) {
+        if (!state.isScrollInProgress && centerIndex() != selected && selected in labels.indices) state.scrollToItem(selected)
+    }
+    Box(modifier.height(rowHeight * 5), contentAlignment = Alignment.Center) {
+        Box(Modifier.fillMaxWidth().height(rowHeight).clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)).background(c.searchField))
+        LazyColumn(
+            state = state,
+            flingBehavior = fling,
+            contentPadding = PaddingValues(vertical = rowHeight * 2),
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            items(labels.size) { i ->
+                Box(Modifier.fillMaxWidth().height(rowHeight), contentAlignment = Alignment.Center) {
+                    T(labels[i], TgTheme.type.body, if (i == selected) c.text else c.secondaryText, maxLines = 1)
+                }
+            }
+        }
+    }
 }
