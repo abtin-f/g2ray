@@ -350,6 +350,90 @@ interface TelegramRepository {
         val blocked = mutableStateMapOf<Long, Boolean>()
     }
     // ---- end Chat features ----
+
+    // ---- Settings (real) ----
+    // Demo defaults keep their state in [DemoSettings]; the live repository talks to TDLib.
+
+    /** Blocked users and chats; null until [loadBlocked] delivered them. */
+    val blockedPeers: List<BlockedPeer>? get() = DemoSettings.blocked
+    /** Total number of blocked senders (may exceed [blockedPeers] while not all are loaded). */
+    val blockedCount: Int? get() = blockedPeers?.size
+    fun loadBlocked() {}
+    /** Removes [peer] from the block list; [onDone] gets an error message or null. */
+    fun unblock(peer: BlockedPeer, onDone: (String?) -> Unit) {
+        DemoSettings.blocked.remove(peer)
+        onDone(null)
+    }
+
+    /** 2-step verification state; null until [loadPasswordInfo] delivered it. */
+    val passwordInfo: PasswordInfo? get() = DemoSettings.password
+    fun loadPasswordInfo() {}
+    /**
+     * Sets, changes ([oldPassword] = current one) or removes ([newPassword] empty) the 2-step verification password.
+     * A non-null [recoveryEmail] also changes the recovery email (it then needs [confirmRecoveryEmail]).
+     */
+    fun setPassword(oldPassword: String, newPassword: String, hint: String, recoveryEmail: String?, onDone: (String?) -> Unit) {
+        if (DemoSettings.password.hasPassword && oldPassword != DemoSettings.passwordValue) {
+            onDone("Invalid password. Please try again.")
+            return
+        }
+        DemoSettings.passwordValue = newPassword
+        DemoSettings.password = if (newPassword.isEmpty()) PasswordInfo(false)
+        else PasswordInfo(true, hint, hasRecoveryEmail = !recoveryEmail.isNullOrBlank() || DemoSettings.password.hasRecoveryEmail)
+        onDone(null)
+    }
+    /** Changes the recovery email of an existing password (it then needs [confirmRecoveryEmail]). */
+    fun setRecoveryEmail(password: String, email: String, onDone: (String?) -> Unit) {
+        if (password != DemoSettings.passwordValue) {
+            onDone("Invalid password. Please try again.")
+            return
+        }
+        DemoSettings.password = DemoSettings.password.copy(hasRecoveryEmail = true)
+        onDone(null)
+    }
+    /** Confirms a new recovery email with the code sent to it. */
+    fun confirmRecoveryEmail(code: String, onDone: (String?) -> Unit) = onDone(null)
+    fun resendRecoveryEmailCode(onDone: (String?) -> Unit) = onDone(null)
+
+    /** Days of inactivity after which the account is deleted; null until [loadAccountTtl]. */
+    val accountTtlDays: Int? get() = DemoSettings.accountTtlDays
+    fun loadAccountTtl() {}
+    fun setAccountTtl(days: Int) { DemoSettings.accountTtlDays = days }
+
+    /** Storage used on this device; null until [loadStorage]. */
+    val storageInfo: StorageInfo? get() = DemoSettings.storage
+    fun loadStorage() {}
+    /** Deletes cached media; [onDone] gets the freed bytes (or null) and an error message (or null). */
+    fun clearCache(onDone: (freed: Long?, error: String?) -> Unit) {
+        val s = DemoSettings.storage
+        DemoSettings.storage = s.copy(filesSize = 0, fileCount = 0)
+        onDone(s.filesSize, null)
+    }
+
+    /** Network usage statistics; null until [loadDataUsage]. */
+    val dataUsage: DataUsage? get() = DemoSettings.dataUsage
+    fun loadDataUsage() {}
+    fun resetDataUsage() {
+        DemoSettings.dataUsage = DataUsage(System.currentTimeMillis(), emptyList(), emptyList(), emptyList())
+    }
+
+    /** Sends the automatic download settings of one network to Telegram (they are also kept locally by the UI). */
+    fun applyAutoDownload(network: DownloadNetwork, value: AutoDownload) {}
+
+    /** Default notification settings of a chat type; null until [loadScopeNotifications]. */
+    fun scopeNotifications(kind: NotifyScope): ScopeNotifications? = DemoSettings.scopes[kind]
+    fun loadScopeNotifications() {}
+    fun setScopeNotifications(kind: NotifyScope, value: ScopeNotifications) { DemoSettings.scopes[kind] = value }
+
+    /** Opens (creating if needed) the chat with Telegram support; [onResult] gets its chat id or null. */
+    fun openSupportChat(onResult: (Long?) -> Unit) {
+        val support = users.values.firstOrNull { it.username == "telegram" }
+        onResult(support?.let { privateChatWith(it.id) })
+    }
+
+    /** The user's public t.me link (username, or a temporary link when there is none). */
+    fun loadMyLink(onResult: (String?) -> Unit) = onResult(me.username?.let { "https://t.me/$it" })
+    // ---- end Settings (real) ----
 }
 
 class DemoRepository(private val scope: CoroutineScope) : TelegramRepository {

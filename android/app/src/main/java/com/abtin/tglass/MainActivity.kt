@@ -226,6 +226,8 @@ class MainActivity : ComponentActivity() {
                         com.abtin.tglass.notify.InAppBannerHost { chatId ->
                             if ((nav.top as? Route.Chat)?.chatId != chatId) nav.push(Route.Chat(chatId))
                         }
+                        // Settings → Passcode Lock: covers everything while the app is locked.
+                        if (DebugLaunch.screen == null) com.abtin.tglass.features.settings.PasscodeLockHost()
                     }
                 }
             }
