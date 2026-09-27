@@ -2833,6 +2833,290 @@ class TdRepository(context: Context) : TelegramRepository {
     }
     // ---- end Settings (real) ----
 
+    // =====================================================================================
+    // ---- Profile ----
+    // Profile page: full user info (birthday, profile music, personal channel, business, emoji status,
+    // profile color), profile photos, received gifts, shared-media counts, music, groups in common,
+    // adding / renaming contacts.
+    // State holders are lazy because this class body runs start() from init before later properties exist.
+    // =====================================================================================
+
+    private val profileDetailsStore by lazy { mutableStateMapOf<Long, com.abtin.tglass.data.ProfileDetails>() }
+    private val profilePhotoStore by lazy { mutableStateMapOf<Long, List<com.abtin.tglass.data.ProfilePhotoItem>>() }
+    private val profileGiftStore by lazy { mutableStateMapOf<Long, List<com.abtin.tglass.data.ProfileGift>>() }
+    private val sharedCountStore by lazy { mutableStateMapOf<String, Int>() }
+    private val sharedMusicStore by lazy { mutableStateMapOf<Long, List<UiMessage>>() }
+    private val commonGroupStore by lazy { mutableStateMapOf<Long, List<Long>>() }
+
+    override fun profileDetails(chatId: Long): com.abtin.tglass.data.ProfileDetails? = profileDetailsStore[chatId]
+
+    /** The sticker of a custom-emoji (or collectible gift) emoji status. */
+    private suspend fun emojiStatusSticker(status: EmojiStatus?): StickerItem? {
+        val id = when (val t = status?.type) {
+            is EmojiStatusTypeCustomEmoji -> t.customEmojiId
+            is EmojiStatusTypeUpgradedGift -> t.modelCustomEmojiId
+            else -> 0L
+        }
+        if (id == 0L) return null
+        val r = client.getCustomEmojiStickers(longArrayOf(id))
+        return if (r is TdlResult.Success) r.result.stickers.firstOrNull()?.let { stickerItem(it) } else null
+    }
+
+    private fun profileBirthdayText(b: Birthdate): String {
+        val month = java.time.Month.of(b.month.coerceIn(1, 12)).getDisplayName(java.time.format.TextStyle.SHORT, Locale.US)
+        return if (b.year > 0) "${b.day} $month ${b.year}" else "${b.day} $month"
+    }
+
+    private fun profileBirthdayAge(b: Birthdate): Int? {
+        if (b.year <= 0) return null
+        return runCatching {
+            java.time.Period.between(java.time.LocalDate.of(b.year, b.month, b.day), java.time.LocalDate.now()).years
+        }.getOrNull()
+    }
+
+    private fun profileInHours(seconds: Int): String = when {
+        seconds < 3600 -> "${(seconds / 60).coerceAtLeast(1)} min"
+        seconds < 86_400 -> "${seconds / 3600} h"
+        else -> "${seconds / 86_400} d"
+    }
+
+    override fun loadProfileDetails(chatId: Long) {
+        val st = chatStates[chatId] ?: return
+        scope.launch {
+            val t = st.type
+            if (t is ChatTypePrivate) {
+                val full = client.getUserFullInfo(t.userId)
+                if (full !is TdlResult.Success) return@launch
+                val f = full.result
+                val raw = rawUsers[t.userId]
+                if (f.personalChatId != 0L) ensureChat(f.personalChatId)
+                val business = f.businessInfo
+                val hours = if (business == null || business.openingHours == null) null else when {
+                    business.nextCloseIn > 0 -> "Open now · closes in ${profileInHours(business.nextCloseIn)}"
+                    business.nextOpenIn > 0 -> "Closed · opens in ${profileInHours(business.nextOpenIn)}"
+                    else -> null
+                }
+                profileDetailsStore[chatId] = com.abtin.tglass.data.ProfileDetails(
+                    birthday = f.birthdate?.let { profileBirthdayText(it) },
+                    age = f.birthdate?.let { profileBirthdayAge(it) },
+                    music = f.firstProfileAudio?.let { a ->
+                        com.abtin.tglass.data.ProfileMusic(
+                            title = a.title.ifBlank { a.fileName.ifBlank { "Audio" } },
+                            performer = a.performer,
+                            duration = a.duration,
+                            file = imageOf(a.audio, null),
+                            cover = a.albumCoverThumbnail?.let { imageOf(it.file, a.albumCoverMinithumbnail) },
+                        )
+                    },
+                    personalChatId = f.personalChatId,
+                    businessAddress = business?.location?.address?.ifBlank { null },
+                    businessHours = hours,
+                    giftCount = f.giftCount,
+                    commonGroupCount = f.groupInCommonCount,
+                    canCall = f.canBeCalled,
+                    videoCalls = f.supportsVideoCalls,
+                    emojiStatus = emojiStatusSticker(raw?.emojiStatus),
+                    profileColorId = raw?.profileAccentColorId ?: -1,
+                    botDescription = f.botInfo?.shortDescription?.ifBlank { null },
+                )
+            } else {
+                val r = client.getChat(chatId)
+                if (r !is TdlResult.Success) return@launch
+                profileDetailsStore[chatId] = com.abtin.tglass.data.ProfileDetails(
+                    emojiStatus = emojiStatusSticker(r.result.emojiStatus),
+                    profileColorId = r.result.profileAccentColorId,
+                )
+            }
+        }
+    }
+
+    private fun profilePhotoItem(p: ChatPhoto): com.abtin.tglass.data.ProfilePhotoItem {
+        val big = p.sizes.maxByOrNull { it.width }
+        val small = p.sizes.minByOrNull { it.width }
+        return com.abtin.tglass.data.ProfilePhotoItem(
+            id = p.id,
+            image = big?.let { imageOf(it.photo, p.minithumbnail, it.width, it.height) },
+            thumb = small?.let { imageOf(it.photo, p.minithumbnail, it.width, it.height) },
+            date = p.addedDate.toLong(),
+        )
+    }
+
+    /** Earlier photos of a group / channel, from its "changed the photo" service messages. */
+    private suspend fun chatPhotoHistory(chatId: Long): List<ChatPhoto> {
+        val r = client.searchChatMessages(chatId = chatId, query = "", fromMessageId = 0, offset = 0, limit = 50, filter = SearchMessagesFilterChatPhoto())
+        return if (r is TdlResult.Success) r.result.messages.mapNotNull { (it.content as? MessageChatChangePhoto)?.photo } else emptyList()
+    }
+
+    override fun profilePhotos(chatId: Long): List<com.abtin.tglass.data.ProfilePhotoItem> =
+        profilePhotoStore[chatId] ?: super.profilePhotos(chatId)
+
+    override fun loadProfilePhotos(chatId: Long) {
+        val st = chatStates[chatId] ?: return
+        scope.launch {
+            val photos: List<ChatPhoto> = when (val t = st.type) {
+                is ChatTypePrivate -> {
+                    val r = client.getUserProfilePhotos(t.userId, 0, 100)
+                    if (r is TdlResult.Success) r.result.photos.toList() else return@launch
+                }
+                is ChatTypeBasicGroup -> {
+                    val r = client.getBasicGroupFullInfo(t.basicGroupId)
+                    listOfNotNull(if (r is TdlResult.Success) r.result.photo else null) + chatPhotoHistory(chatId)
+                }
+                is ChatTypeSupergroup -> {
+                    val r = client.getSupergroupFullInfo(t.supergroupId)
+                    listOfNotNull(if (r is TdlResult.Success) r.result.photo else null) + chatPhotoHistory(chatId)
+                }
+                else -> return@launch
+            }
+            profilePhotoStore[chatId] = photos.distinctBy { it.id }.map { profilePhotoItem(it) }
+        }
+    }
+
+    private fun profileShortCount(n: Int): String = when {
+        n >= 1_000_000 -> String.format(Locale.US, "%.1fM", n / 1_000_000.0).replace(".0M", "M")
+        n >= 1_000 -> String.format(Locale.US, "%.1fK", n / 1_000.0).replace(".0K", "K")
+        else -> n.toString()
+    }
+
+    private fun profileGift(g: ReceivedGift): com.abtin.tglass.data.ProfileGift? {
+        val sender = when (val s = g.senderId) {
+            is MessageSenderUser -> userMap[s.userId]?.name
+            is MessageSenderChat -> chatMap[s.chatId]?.title
+            else -> null
+        }
+        return when (val sent = g.gift) {
+            is SentGiftRegular -> {
+                val gift = sent.gift
+                com.abtin.tglass.data.ProfileGift(
+                    id = g.receivedGiftId.ifBlank { "g${gift.id}:${g.date}" },
+                    sticker = stickerItem(gift.sticker),
+                    emoji = gift.sticker.emoji.ifBlank { "🎁" },
+                    stars = gift.starCount,
+                    senderName = sender,
+                    message = g.text.text.ifBlank { null },
+                    date = g.date.toLong(),
+                    centerColor = gift.background.centerColor,
+                    edgeColor = gift.background.edgeColor,
+                    pinned = g.isPinned,
+                    ribbon = gift.overallLimits?.let { "1 of ${profileShortCount(it.totalCount)}" },
+                )
+            }
+            is SentGiftUpgraded -> {
+                val u = sent.gift
+                com.abtin.tglass.data.ProfileGift(
+                    id = g.receivedGiftId.ifBlank { "u${u.id}" },
+                    sticker = stickerItem(u.model.sticker),
+                    emoji = u.model.sticker.emoji.ifBlank { "🎁" },
+                    title = "${u.title} #${u.number}",
+                    senderName = sender,
+                    message = g.text.text.ifBlank { null },
+                    date = g.date.toLong(),
+                    centerColor = u.backdrop.colors.centerColor,
+                    edgeColor = u.backdrop.colors.edgeColor,
+                    pinned = g.isPinned,
+                    ribbon = "1 of ${profileShortCount(maxOf(u.maxUpgradedCount, u.totalUpgradedCount))}",
+                )
+            }
+            else -> null
+        }
+    }
+
+    override fun profileGifts(chatId: Long): List<com.abtin.tglass.data.ProfileGift> = profileGiftStore[chatId] ?: emptyList()
+
+    override fun loadProfileGifts(chatId: Long) {
+        val st = chatStates[chatId] ?: return
+        val owner: MessageSender = when (val t = st.type) {
+            is ChatTypePrivate -> MessageSenderUser(t.userId)
+            is ChatTypeSupergroup -> if (t.isChannel) MessageSenderChat(chatId) else return
+            else -> return
+        }
+        scope.launch {
+            val r = client.getReceivedGifts(
+                businessConnectionId = "",
+                ownerId = owner,
+                collectionId = 0,
+                excludeUnsaved = false,
+                excludeSaved = false,
+                excludeUnlimited = false,
+                excludeUpgradable = false,
+                excludeNonUpgradable = false,
+                excludeUpgraded = false,
+                excludeWithoutColors = false,
+                excludeHosted = false,
+                sortByPrice = false,
+                offset = "",
+                limit = 60,
+            )
+            if (r is TdlResult.Success) {
+                val list = r.result.gifts.mapNotNull { profileGift(it) }
+                // Pinned gifts first, like Telegram.
+                profileGiftStore[chatId] = list.filter { it.pinned } + list.filter { !it.pinned }
+            }
+        }
+    }
+
+    private fun profileSharedFilter(kind: com.abtin.tglass.data.SharedKind): SearchMessagesFilter = when (kind) {
+        com.abtin.tglass.data.SharedKind.Media -> SearchMessagesFilterPhotoAndVideo()
+        com.abtin.tglass.data.SharedKind.Files -> SearchMessagesFilterDocument()
+        com.abtin.tglass.data.SharedKind.Links -> SearchMessagesFilterUrl()
+        com.abtin.tglass.data.SharedKind.Music -> SearchMessagesFilterAudio()
+        com.abtin.tglass.data.SharedKind.Voice -> SearchMessagesFilterVoiceAndVideoNote()
+        com.abtin.tglass.data.SharedKind.Gifs -> SearchMessagesFilterAnimation()
+    }
+
+    override fun sharedCount(chatId: Long, kind: com.abtin.tglass.data.SharedKind): Int? = sharedCountStore["$chatId:$kind"]
+
+    override fun loadSharedCounts(chatId: Long) {
+        scope.launch {
+            for (kind in com.abtin.tglass.data.SharedKind.entries) {
+                val r = client.getChatMessageCount(chatId = chatId, filter = profileSharedFilter(kind), returnLocal = false)
+                if (r is TdlResult.Success) sharedCountStore["$chatId:$kind"] = r.result.count
+            }
+        }
+    }
+
+    override fun sharedMusic(chatId: Long): List<UiMessage> = sharedMusicStore[chatId] ?: emptyList()
+
+    override fun loadSharedMusic(chatId: Long) {
+        scope.launch {
+            val r = client.searchChatMessages(chatId = chatId, query = "", fromMessageId = 0, offset = 0, limit = 90, filter = SearchMessagesFilterAudio())
+            if (r is TdlResult.Success) sharedMusicStore[chatId] = r.result.messages.map { mapMessage(it) }
+        }
+    }
+
+    override fun commonGroups(userId: Long): List<Long> = commonGroupStore[userId] ?: emptyList()
+
+    override fun loadCommonGroups(userId: Long) {
+        scope.launch {
+            val r = client.getGroupsInCommon(userId, 0, 100)
+            if (r is TdlResult.Success) {
+                r.result.chatIds.forEach { ensureChat(it) }
+                commonGroupStore[userId] = r.result.chatIds.toList()
+            }
+        }
+    }
+
+    override fun isContact(userId: Long): Boolean {
+        // Reading userMap subscribes the caller to user updates (isContact changes arrive with updateUser).
+        userMap[userId]
+        return userId in contactIds || rawUsers[userId]?.isContact == true
+    }
+
+    override fun saveContact(userId: Long, firstName: String, lastName: String, sharePhone: Boolean, onDone: (String?) -> Unit) {
+        scope.launch {
+            // The phone number may stay empty: TDLib keeps the known one (or adds the user by id).
+            val r = client.addContact(userId, ImportedContact("", firstName.trim(), lastName.trim(), null), sharePhone)
+            if (r is TdlResult.Failure) {
+                onDone(humanize(r.message))
+                return@launch
+            }
+            if (userId !in contactIds) contactIds.add(userId)
+            client.getUser(userId).let { u -> if (u is TdlResult.Success) onUser(u.result) }
+            onDone(null)
+        }
+    }
+    // ---- end Profile ----
+
     // ---- Composer ----
     /** User id of the @gif inline bot, resolved once. */
     private var gifBotId = 0L

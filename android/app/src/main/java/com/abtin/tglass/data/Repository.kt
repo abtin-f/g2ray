@@ -467,6 +467,83 @@ interface TelegramRepository {
     }
     // ---- end Edit Profile & Appearance ----
 
+    // ---- Profile ----
+
+    /** Extra details of a profile page (birthday, profile music, personal channel, business, emoji status); null until loaded. */
+    fun profileDetails(chatId: Long): ProfileDetails? {
+        val chat = chat(chatId) ?: return null
+        val userId = chat.peerUserId
+        if (chat.type != ChatType.Private || userId == null) return ProfileDetails()
+        return ProfileDetails(
+            birthday = if (userId % 2L == 1L) "March 14" else null,
+            music = ProfileMusic("Dance of the Knights", "Symphony Orchestra", 263),
+            giftCount = ProfileDemo.gifts.size,
+            commonGroupCount = commonGroups(userId).size,
+            emojiStatusEmoji = if (user(userId)?.premium == true || userId % 3L == 1L) "🐶" else null,
+            // Some demo people have a profile color, like premium users on Telegram.
+            profileColorId = if (userId % 3L == 1L) (userId % 16L).toInt() else -1,
+        )
+    }
+
+    fun loadProfileDetails(chatId: Long) {}
+
+    /** Profile photos, newest first. The demo only has the current avatar (if any); the viewer then shows the initials. */
+    fun profilePhotos(chatId: Long): List<ProfilePhotoItem> =
+        avatar(chat(chatId)?.peerUserId ?: chatId)?.let { listOf(ProfilePhotoItem(0, it, it)) } ?: emptyList()
+
+    fun loadProfilePhotos(chatId: Long) {}
+
+    /** Gifts displayed on the profile of a user or channel. */
+    fun profileGifts(chatId: Long): List<ProfileGift> = when (chat(chatId)?.type) {
+        ChatType.Private, ChatType.Channel -> ProfileDemo.gifts
+        else -> emptyList()
+    }
+
+    fun loadProfileGifts(chatId: Long) {}
+
+    /** How many messages of [kind] the chat has; null while unknown. */
+    fun sharedCount(chatId: Long, kind: SharedKind): Int? = when (kind) {
+        SharedKind.Media -> sharedMedia(chatId, MediaKind.Media).size
+        SharedKind.Files -> sharedMedia(chatId, MediaKind.Files).count { (it.content as? MessageContent.File)?.music != true }
+        SharedKind.Links -> sharedMedia(chatId, MediaKind.Links).size
+        SharedKind.Music -> sharedMusic(chatId).size
+        SharedKind.Voice -> sharedMedia(chatId, MediaKind.Voice).size
+        SharedKind.Gifs -> sharedMedia(chatId, MediaKind.Gifs).size
+    }
+
+    fun loadSharedCounts(chatId: Long) {}
+
+    /** Music files (audio messages) of a chat, newest first. */
+    fun sharedMusic(chatId: Long): List<Message> =
+        messages(chatId).asReversed().filter { (it.content as? MessageContent.File)?.music == true }
+
+    fun loadSharedMusic(chatId: Long) {}
+
+    /** Chat ids of the groups the user shares with [userId]. */
+    fun commonGroups(userId: Long): List<Long> = chats.filter { it.type == ChatType.Group }.take(2).map { it.id }
+
+    fun loadCommonGroups(userId: Long) {}
+
+    fun isContact(userId: Long): Boolean = contacts.any { it.id == userId }
+
+    /** Adds [userId] to the contacts, or renames an existing contact. [onDone] gets an error message or null. */
+    fun saveContact(userId: Long, firstName: String, lastName: String, sharePhone: Boolean, onDone: (String?) -> Unit) {
+        val u = user(userId)
+        if (u == null) {
+            onDone("User not found")
+            return
+        }
+        val rename = {
+            @Suppress("UNCHECKED_CAST")
+            (users as? MutableMap<Long, User>)?.put(userId, u.copy(firstName = firstName.trim(), lastName = lastName.trim()))
+            onDone(null)
+        }
+        if (!isContact(userId) && u.phone.isNotBlank()) {
+            addContact(firstName, lastName, u.phone) { _, error -> if (error != null) onDone(error) else rename() }
+        } else rename()
+    }
+    // ---- end Profile ----
+
     // ---- Chat bubbles & links ----
     /** Resolves a Telegram link (t.me/…, telegram.me/…, tg://…) to what the app should open. */
     fun resolveLink(url: String, onResult: (ResolvedLink) -> Unit) {
