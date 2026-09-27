@@ -178,14 +178,8 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
     val storiesMax = with(density) { 104.dp.toPx() }
     var storiesPx by rememberSaveable { mutableFloatStateOf(0f) }
     val storiesFraction = (storiesPx / storiesMax).coerceIn(0f, 1f)
-    // Like Telegram iOS 26, the stories row starts expanded at the top of the list; scrolling collapses it.
-    var storiesShownOnce by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(storyUsers.isNotEmpty()) {
-        if (storyUsers.isNotEmpty() && !storiesShownOnce) {
-            storiesShownOnce = true
-            animate(storiesPx, storiesMax, animationSpec = spring(dampingRatio = 0.85f, stiffness = 380f)) { v, _ -> storiesPx = v }
-        }
-    }
+    // As in the owner's Telegram iOS 26 reference, the list opens with the stories collapsed into the stacked
+    // avatars next to the title; pulling the list down (or tapping the avatars) expands them.
     // Hidden archive (Telegram-iOS): the "Archived Chats" row sits hidden above the chats; pulling the list down
     // at the top (after the stories are fully expanded) reveals it. Released past half its height it stays
     // revealed until the list is scrolled up again.
