@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.view.TextureView
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -29,11 +30,44 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 /**
- * App-wide voice note player (one voice plays at a time, like Telegram).
+ * What the global player is playing: shown by the chat's now-playing bar ("Emma" / "Song – Performer").
+ * [chatId]/[messageId] point at the message (0 for items that are not messages, e.g. a recording preview).
+ */
+@Immutable
+data class VoiceTrack(
+    val key: String,
+    val chatId: Long = 0,
+    val messageId: Long = 0,
+    val title: String = "",
+    val subtitle: String? = null,
+    val music: Boolean = false,
+    val seconds: Int = 0,
+)
+
+/**
+ * Where the player gets the next item when one ends (Telegram auto-plays the next voice message of the chat).
+ * [path] is null while the file is not downloaded ([download] starts it); items with [hasFile] false (demo data)
+ * are "played" by a timer.
+ */
+interface VoiceQueue {
+    fun next(after: VoiceTrack): VoiceTrack?
+    fun hasFile(track: VoiceTrack): Boolean
+    fun path(track: VoiceTrack): String?
+    fun download(track: VoiceTrack)
+    /** Called when an item starts playing (marks a voice message as listened). */
+    fun onStarted(track: VoiceTrack) {}
+}
+
+/**
+ * App-wide voice note / music player (one item plays at a time, like Telegram). It keeps playing while the user
+ * switches chats; [track] describes the current item for the now-playing bar.
  * [key] identifies the message; items without a file (demo data) are "played" by a timer so the UI still animates.
  */
 object VoicePlayer {
     var currentKey by mutableStateOf<String?>(null)
+        private set
+    /** The current item (null when nothing is loaded). */
+    var track by mutableStateOf<VoiceTrack?>(null)
         private set
     var playing by mutableStateOf(false)
         private set
@@ -41,6 +75,9 @@ object VoicePlayer {
     var progress by mutableFloatStateOf(0f)
         private set
     var positionMs by mutableLongStateOf(0L)
+        private set
+    /** Length of the current item (0 until known). */
+    var durationMs by mutableLongStateOf(0L)
         private set
     /** Playback speed of voice notes (1x / 1.5x / 2x), kept for the next ones like Telegram. */
     var speed by mutableFloatStateOf(1f)
@@ -59,17 +96,33 @@ object VoicePlayer {
     private val scope = MainScope()
     private var player: ExoPlayer? = null
     private var ticker: Job? = null
+    private var advance: Job? = null
     private var simulatedMs = 0L
+    private var queue: VoiceQueue? = null
+    private var appContext: Context? = null
 
-    fun toggle(context: Context, key: String, path: String?, seconds: Int) {
+    /**
+     * Plays [key] (or pauses/resumes it when it is already the current item). [track] and [queue] are optional:
+     * with them the now-playing bar can show a title and the player moves on to the next item when this one ends.
+     */
+    fun toggle(context: Context, key: String, path: String?, seconds: Int, track: VoiceTrack? = null, queue: VoiceQueue? = null) {
         if (key == currentKey) {
             if (playing) pause() else resume()
             return
         }
+        start(context, track ?: VoiceTrack(key, seconds = seconds), path, queue)
+    }
+
+    private fun start(context: Context, t: VoiceTrack, path: String?, q: VoiceQueue?) {
         stop()
-        currentKey = key
+        appContext = context.applicationContext
+        currentKey = t.key
+        track = t
+        queue = q
+        durationMs = t.seconds * 1000L
+        q?.onStarted(t)
         if (path == null) {
-            simulatedMs = seconds * 1000L
+            simulatedMs = (t.seconds.coerceAtLeast(1)) * 1000L
             playing = true
             startTicker()
             return
@@ -79,11 +132,11 @@ object VoicePlayer {
             p.setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_SPEECH).build(), true)
             p.addListener(object : Player.Listener {
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
-                    if (currentKey != null && simulatedMs == 0L) playing = isPlaying
+                    if (currentKey != null && simulatedMs == 0L) playing = isPlaying || (p.playWhenReady && p.playbackState == Player.STATE_BUFFERING)
                 }
 
                 override fun onPlaybackStateChanged(state: Int) {
-                    if (state == Player.STATE_ENDED) stop()
+                    if (state == Player.STATE_ENDED) finished()
                 }
             })
             player = p
@@ -101,18 +154,83 @@ object VoicePlayer {
         playing = false
     }
 
-    private fun resume() {
+    /** Resumes the current item (after [pause]). */
+    fun resume() {
+        // Still waiting for the next item's file: it starts by itself when the download is done.
+        if (currentKey == null || advance?.isActive == true) return
         if (simulatedMs == 0L) player?.play()
         playing = true
     }
 
+    /** Play/pause of the current item (the now-playing bar's button). */
+    fun playPause() {
+        if (playing) pause() else resume()
+    }
+
+    /** Jumps to [fraction] (0..1) of the current item (dragging the waveform / progress line). */
+    fun seekTo(fraction: Float) {
+        if (currentKey == null) return
+        val f = fraction.coerceIn(0f, 1f)
+        if (simulatedMs > 0) {
+            positionMs = (simulatedMs * f).toLong()
+            progress = f
+        } else {
+            val p = player ?: return
+            val d = p.duration.takeIf { it > 0 } ?: return
+            p.seekTo((d * f).toLong())
+            positionMs = p.currentPosition
+            progress = f
+        }
+    }
+
     fun stop() {
         ticker?.cancel()
+        advance?.cancel()
         player?.stop()
         currentKey = null
+        track = null
+        queue = null
         playing = false
         progress = 0f
         positionMs = 0
+        durationMs = 0
+    }
+
+    /** The item ended: move on to the next one of the queue (downloading it first if needed), like Telegram. */
+    private fun finished() {
+        val t = track
+        val q = queue
+        val ctx = appContext
+        stop()
+        if (t == null || q == null || ctx == null) return
+        val next = runCatching { q.next(t) }.getOrNull() ?: return
+        if (!q.hasFile(next)) {
+            start(ctx, next, null, q)
+            return
+        }
+        val ready = q.path(next)
+        if (ready != null) {
+            start(ctx, next, ready, q)
+            return
+        }
+        q.download(next)
+        // Show the next item right away (paused) while its file arrives.
+        currentKey = next.key
+        track = next
+        queue = q
+        durationMs = next.seconds * 1000L
+        advance = scope.launch {
+            repeat(600) { // up to a minute
+                delay(100)
+                if (currentKey != next.key) return@launch
+                val path = q.path(next)
+                if (path != null) {
+                    start(ctx, next, path, q)
+                    return@launch
+                }
+            }
+            if (currentKey == next.key) stop()
+        }
     }
 
     private fun startTicker() {
@@ -123,10 +241,11 @@ object VoicePlayer {
                 if (simulatedMs > 0) {
                     if (playing) positionMs += (50 * speed).toLong()
                     progress = (positionMs.toFloat() / simulatedMs).coerceIn(0f, 1f)
-                    if (positionMs >= simulatedMs) { stop(); return@launch }
+                    if (positionMs >= simulatedMs) { finished(); return@launch }
                 } else {
                     val p = player ?: continue
                     val d = p.duration.takeIf { it > 0 } ?: continue
+                    durationMs = d
                     positionMs = p.currentPosition
                     progress = (positionMs.toFloat() / d).coerceIn(0f, 1f)
                 }

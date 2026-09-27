@@ -359,6 +359,8 @@ fun MessageBubble(
     album: List<Message> = emptyList(),
     onAlbumItemClick: (Long) -> Unit = {},
     onSenderClick: (() -> Unit)? = null,
+    /** Poll voting / results (multiple answers, View Results); null = single votes through [onVote]. */
+    pollActions: PollActions? = null,
 ) {
     val content = m.content
     val colors = bubbleColors(m.outgoing)
@@ -481,11 +483,15 @@ fun MessageBubble(
                 maxTextWidth = textMax,
             )
             content is MessageContent.Photo -> PhotoBody(m, content, colors, mediaMax, radius, small, hasHeader, showMeta, onMediaClick)
-            content is MessageContent.Voice -> VoiceBody(m, content, colors, showMeta)
+            content is MessageContent.Voice -> VoiceMessageBody(m, content, colors, showMeta)
             content is MessageContent.File -> FileBody(m, content, colors, showMeta)
             content is MessageContent.Location -> LocationBody(m, content, colors, mediaMax, radius, hasHeader, showMeta)
             content is MessageContent.Contact -> ContactBody(m, content, colors, showMeta)
-            content is MessageContent.Poll -> PollBody(m, content, colors, onVote, minOf(contentMax, 300.dp), showMeta)
+            content is MessageContent.Poll -> PollMessageBody(
+                m, content, colors,
+                pollActions ?: PollActions(vote = { ids -> ids.firstOrNull()?.let(onVote) }, viewResults = {}),
+                minOf(contentMax, 300.dp), showMeta,
+            )
             content is MessageContent.Link -> LinkBody(m, content, colors, textMax, textTop, showMeta)
             content is MessageContent.Service -> T(content.text, bodyStyle(colors), colors.text, modifier = inner.padding(vertical = 6.dp))
             else -> {}
@@ -905,107 +911,6 @@ private fun FreeformFooter(m: Message, onReact: (String) -> Unit) {
 }
 
 @Composable
-private fun VoiceBody(m: Message, v: MessageContent.Voice, colors: BubbleColors, showMeta: Boolean) {
-    val repo = LocalRepository.current
-    val context = LocalContext.current
-    val player = com.abtin.tglass.core.media.VoicePlayer
-    val key = "${m.chatId}:${m.id}"
-    val current = player.currentKey == key
-    val playing = current && player.playing
-    val progress = if (current) player.progress else 0f
-    val media = v.media
-    val path = media?.let { repo.filePath(it) }
-    // Tapped before the file was downloaded: start playing as soon as it arrives.
-    var pending by remember(key) { mutableStateOf(false) }
-    LaunchedEffect(pending, path) {
-        if (pending && path != null) {
-            pending = false
-            player.toggle(context, key, path, v.seconds)
-        }
-    }
-    val loading = pending && path == null
-    val waveWidth = (100 + v.seconds * 4).coerceIn(120, 190).dp
-    Row(Modifier.padding(start = 7.dp, end = 10.dp, top = 7.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            Modifier.size(44.dp).clip(CircleShape).background(colors.control).bounceClickable {
-                when {
-                    media == null -> player.toggle(context, key, null, v.seconds)
-                    path != null -> player.toggle(context, key, path, v.seconds)
-                    else -> { pending = !pending; if (pending) repo.requestImage(media) }
-                }
-            },
-            contentAlignment = Alignment.Center,
-        ) {
-            when {
-                loading -> {
-                    val p = media?.let { repo.fileProgress(it) } ?: 0f
-                    Canvas(Modifier.size(36.dp)) {
-                        drawArc(colors.controlGlyph, -90f, 360f * p.coerceAtLeast(0.05f), false, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round))
-                    }
-                    Icon(IosIcons.Close, colors.controlGlyph, 14.dp)
-                }
-                playing -> Icon(IosIcons.Pause, colors.controlGlyph, 20.dp)
-                else -> Icon(IosIcons.Play, colors.controlGlyph, 22.dp, Modifier.offset(x = 1.5.dp))
-            }
-        }
-        Spacer(Modifier.width(9.dp))
-        Column(Modifier.width(IntrinsicSize.Max)) {
-            Canvas(Modifier.width(waveWidth).height(20.dp)) {
-                val barW = 2.dp.toPx()
-                val step = 3.dp.toPx()
-                val bars = (size.width / step).toInt().coerceAtLeast(1)
-                val wave = v.waveform
-                val played = progress * bars
-                for (i in 0 until bars) {
-                    val amp = if (wave.isEmpty()) 0.3f else wave[(i * wave.size / bars).coerceIn(0, wave.lastIndex)]
-                    val bh = (amp.coerceIn(0f, 1f) * size.height).coerceAtLeast(2.dp.toPx())
-                    val f = (played - i).coerceIn(0f, 1f)
-                    val color = if (f >= 1f) colors.control else if (f <= 0f) colors.inactive else androidx.compose.ui.graphics.lerp(colors.inactive, colors.control, f)
-                    drawRoundRect(
-                        color,
-                        topLeft = Offset(i * step, size.height - bh),
-                        size = Size(barW, bh),
-                        cornerRadius = CornerRadius(barW / 2f),
-                    )
-                }
-            }
-            Spacer(Modifier.height(3.dp))
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                val secs = if (current) (player.positionMs / 1000).toInt() else v.seconds
-                T(formatDuration(secs), TgTheme.type.caption1.copy(fontSize = 12.sp), colors.meta, maxLines = 1)
-                if (current) {
-                    Spacer(Modifier.width(6.dp))
-                    VoiceSpeedButton(player.speed, colors) { player.cycleSpeed() }
-                } else if (!m.outgoing && m.content is MessageContent.Voice && media != null && path == null) {
-                    // Not listened yet: Telegram's small dot next to the duration.
-                    Spacer(Modifier.width(4.dp))
-                    Box(Modifier.size(5.dp).clip(CircleShape).background(colors.control))
-                }
-                Spacer(Modifier.weight(1f).widthIn(min = 10.dp))
-                if (showMeta) MetaRow(m, colors.meta)
-            }
-        }
-    }
-}
-
-/** iOS 1x / 1.5x / 2x speed pill, shown while a voice note is the current one. */
-@Composable
-private fun VoiceSpeedButton(speed: Float, colors: BubbleColors, onClick: () -> Unit) {
-    val label = if (speed == 1.5f) "1.5x" else "${speed.roundToInt()}x"
-    Box(
-        Modifier
-            .height(16.dp)
-            .clip(RoundedRectangle(5.dp))
-            .border(1.2.dp, colors.control, RoundedRectangle(5.dp))
-            .fadeClickable(onClick = onClick)
-            .padding(horizontal = 4.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        T(label, TgTheme.type.caption2.copy(fontSize = 10.sp, lineHeight = 12.sp), colors.control, weight = FontWeight.Bold, maxLines = 1)
-    }
-}
-
-@Composable
 private fun FileBody(m: Message, f: MessageContent.File, colors: BubbleColors, showMeta: Boolean = true) {
     val repo = LocalRepository.current
     val context = LocalContext.current
@@ -1017,7 +922,7 @@ private fun FileBody(m: Message, f: MessageContent.File, colors: BubbleColors, s
     // Tapped while not downloaded yet: act (open / play) as soon as the file arrives.
     var pending by remember(key) { mutableStateOf(false) }
     fun act(p: String) {
-        if (f.music) player.toggle(context, key, p, f.duration)
+        if (f.music) playAudioMessage(context, repo, m, p, f.duration)
         else if (!com.abtin.tglass.core.media.Files.open(context, p, f.mime)) toast.show("No app can open this file")
     }
     LaunchedEffect(pending, path) {
@@ -1052,7 +957,10 @@ private fun FileBody(m: Message, f: MessageContent.File, colors: BubbleColors, s
                         }
                         Icon(IosIcons.Close, colors.controlGlyph, 14.dp)
                     }
-                    f.music -> Icon(if (playing) IosIcons.Pause else IosIcons.Play, colors.controlGlyph, 22.dp)
+                    f.music -> {
+                        val t by androidx.compose.animation.core.animateFloatAsState(if (playing) 1f else 0f, label = "musicPlay")
+                        Canvas(Modifier.size(46.dp)) { drawPlayPause(t, colors.controlGlyph, scale = 46f / 44f) }
+                    }
                     ref != null && path == null -> Icon(IosIcons.ArrowDown, colors.controlGlyph, 22.dp)
                     else -> Icon(TgIcons.AttFile, colors.controlGlyph, 24.dp)
                 }
@@ -1145,74 +1053,6 @@ private fun ContactBody(m: Message, ct: MessageContent.Contact, colors: BubbleCo
             }
         }
         if (showMeta) Box(Modifier.align(Alignment.End).padding(end = 10.dp, bottom = 6.dp)) { MetaRow(m, colors.meta) }
-    }
-}
-
-@Composable
-private fun PollBody(m: Message, p: MessageContent.Poll, colors: BubbleColors, onVote: (Int) -> Unit, width: Dp, showMeta: Boolean) {
-    val total = p.votes.sum()
-    val voted = p.voted != null
-    val maxVotes = p.votes.maxOrNull()?.coerceAtLeast(1) ?: 1
-    val textStyle = TgTheme.type.body.copy(fontSize = 16.sp, lineHeight = 21.sp, textDirection = TextDirection.Content)
-    Column(Modifier.width(width).padding(start = 11.dp, end = 11.dp, top = 7.dp, bottom = 6.dp)) {
-        T(p.question, textStyle, colors.text, weight = FontWeight.SemiBold)
-        Spacer(Modifier.height(2.dp))
-        T(
-            when {
-                p.quiz -> if (p.anonymous) "Anonymous Quiz" else "Quiz"
-                else -> if (p.anonymous) "Anonymous Poll" else "Public Poll"
-            },
-            TgTheme.type.footnote, colors.meta,
-        )
-        Spacer(Modifier.height(6.dp))
-        p.options.forEachIndexed { i, opt ->
-            val count = p.votes.getOrElse(i) { 0 }
-            val pct = if (total > 0) (count * 100f / total).roundToInt() else 0
-            Row(
-                Modifier.fillMaxWidth().height(IntrinsicSize.Min).then(if (!voted) Modifier.fadeClickable { onVote(i) } else Modifier),
-                verticalAlignment = Alignment.Top,
-            ) {
-                Box(Modifier.width(34.dp).fillMaxHeight().padding(top = 9.dp, bottom = 2.dp)) {
-                    if (!voted) Box(Modifier.size(21.dp).border(1.2.dp, colors.radio, CircleShape))
-                    else {
-                        T("$pct%", TgTheme.type.footnote.copy(fontSize = 13.sp), colors.text, weight = FontWeight.Bold, maxLines = 1, modifier = Modifier.fillMaxWidth(), align = TextAlign.End)
-                        if (p.voted == i) {
-                            Box(
-                                Modifier.align(Alignment.BottomEnd).size(15.dp).clip(CircleShape).background(colors.pollBar),
-                                contentAlignment = Alignment.Center,
-                            ) { Icon(IosIcons.Checkmark, colors.fill, 10.dp) }
-                        }
-                    }
-                }
-                Spacer(Modifier.width(if (voted) 8.dp else 4.dp))
-                Column(Modifier.weight(1f)) {
-                    Spacer(Modifier.height(9.dp))
-                    T(opt, textStyle, colors.text)
-                    Spacer(Modifier.height(7.dp))
-                    if (voted) {
-                        val frac = (count.toFloat() / maxVotes).coerceIn(0f, 1f)
-                        Box(
-                            Modifier
-                                .fillMaxWidth(frac.coerceAtLeast(0.03f))
-                                .height(4.dp)
-                                .clip(Capsule())
-                                .background(if (p.voted == i) colors.pollBar else colors.pollBar.copy(alpha = 0.6f))
-                        )
-                        Spacer(Modifier.height(2.dp))
-                    } else {
-                        Box(Modifier.fillMaxWidth().height(0.6.dp).background(colors.separator))
-                    }
-                }
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-        Box(Modifier.fillMaxWidth()) {
-            T(
-                if (total == 0) "No votes" else "${formatCount(total)} ${if (total == 1) "vote" else "votes"}",
-                TgTheme.type.footnote, colors.meta, modifier = Modifier.align(Alignment.Center),
-            )
-            if (showMeta) Box(Modifier.align(Alignment.CenterEnd)) { MetaRow(m, colors.meta) }
-        }
     }
 }
 

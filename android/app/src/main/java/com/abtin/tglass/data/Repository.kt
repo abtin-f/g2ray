@@ -600,6 +600,55 @@ interface TelegramRepository {
         ) else onResult(ReportStep.Done)
     }
     // ---- end Message menu ----
+
+    // ---- Chat polls, audio & search ----
+
+    /** Votes in a poll; several [optionIds] for multiple-answer polls (the demo votes for the first one). */
+    fun votePoll(chatId: Long, messageId: Long, optionIds: List<Int>) {
+        optionIds.firstOrNull()?.let { vote(chatId, messageId, it) }
+    }
+
+    /** Takes the user's vote back (Retract Vote). */
+    fun retractPollVote(chatId: Long, messageId: Long) {}
+
+    /** Closes a poll the user created (Stop Poll); [onDone] gets an error message or null. */
+    fun stopPoll(chatId: Long, messageId: Long, onDone: (String?) -> Unit) = onDone(null)
+
+    /** Voters of one option of a public poll, [offset] for paging; [onResult] gets null when they could not be loaded. */
+    fun pollVoters(chatId: Long, messageId: Long, option: Int, offset: Int, onResult: (PollVotersPage?) -> Unit) {
+        val p = findMessage(chatId, messageId)?.content as? MessageContent.Poll
+        val count = p?.votes?.getOrNull(option) ?: 0
+        val people = users.keys.filter { it != me.id && it != 10L }
+        val ids = if (people.isEmpty()) emptyList() else List(minOf(count, people.size)) { i -> people[(i + option * 3) % people.size] }.distinct()
+        onResult(PollVotersPage(if (offset == 0) ids else emptyList(), count))
+    }
+
+    /** In-chat search: one page of messages containing [query], newest first, from [fromMessageId] (0 = newest). */
+    fun searchChatPage(chatId: Long, query: String, fromMessageId: Long, onResult: (ChatSearchPage) -> Unit) {
+        searchInChat(chatId, query) { found ->
+            val page = if (fromMessageId == 0L) found else found.filter { it.id < fromMessageId }
+            onResult(ChatSearchPage(page, if (fromMessageId == 0L) found.size else page.size, 0L))
+        }
+    }
+
+    /**
+     * Makes sure [messageId] is in [messages] (loading the history around it when needed) before a jump;
+     * [onLoaded] gets false when the message could not be found.
+     */
+    fun loadAroundMessage(chatId: Long, messageId: Long, onLoaded: (Boolean) -> Unit) {
+        loadAround(chatId, messageId) { onLoaded(messages(chatId).any { it.id == messageId }) }
+    }
+
+    /** The message the voice/music player should play after [messageId] in the same chat (Telegram's auto-advance). */
+    fun nextAudioMessage(chatId: Long, messageId: Long, music: Boolean): Message? =
+        messages(chatId).firstOrNull { m ->
+            m.id > messageId && when (val c = m.content) {
+                is MessageContent.Voice -> !music
+                is MessageContent.File -> music && c.music
+                else -> false
+            }
+        }
+    // ---- end Chat polls, audio & search ----
 }
 
 class DemoRepository(private val scope: CoroutineScope) : TelegramRepository {
@@ -993,6 +1042,38 @@ class DemoRepository(private val scope: CoroutineScope) : TelegramRepository {
         calls.removeAll { it.id in ids }
     }
     // ---- end Contacts, media, calls (demo) ----
+
+    // ---- Chat polls, audio & search (demo) ----
+    override fun votePoll(chatId: Long, messageId: Long, optionIds: List<Int>) = updateMessage(chatId, messageId) { m ->
+        val p = m.content as? MessageContent.Poll ?: return@updateMessage m
+        if (p.chosen.isNotEmpty() || p.closed || optionIds.isEmpty()) return@updateMessage m
+        val chosen = optionIds.distinct().sorted()
+        val votes = p.votes.mapIndexed { i, v -> if (i in chosen) v + 1 else v }
+        val quizAnswer = if (p.quiz) (p.correctOption ?: 0) else null
+        m.copy(
+            content = p.copy(
+                voted = chosen.first(), chosen = chosen, votes = votes, percents = emptyList(),
+                totalVoters = p.voterCount + 1, correctOption = quizAnswer ?: p.correctOption,
+                canGetVoters = !p.anonymous,
+            )
+        )
+    }
+
+    override fun retractPollVote(chatId: Long, messageId: Long) = updateMessage(chatId, messageId) { m ->
+        val p = m.content as? MessageContent.Poll ?: return@updateMessage m
+        if (p.chosen.isEmpty() || p.closed) return@updateMessage m
+        val votes = p.votes.mapIndexed { i, v -> if (i in p.chosen) (v - 1).coerceAtLeast(0) else v }
+        m.copy(content = p.copy(voted = null, chosen = emptyList(), votes = votes, percents = emptyList(), totalVoters = (p.voterCount - 1).coerceAtLeast(0)))
+    }
+
+    override fun stopPoll(chatId: Long, messageId: Long, onDone: (String?) -> Unit) {
+        updateMessage(chatId, messageId) { m ->
+            val p = m.content as? MessageContent.Poll ?: return@updateMessage m
+            m.copy(content = p.copy(closed = true, correctOption = if (p.quiz) (p.correctOption ?: 0) else p.correctOption))
+        }
+        onDone(null)
+    }
+    // ---- end Chat polls, audio & search (demo) ----
 }
 
 /** Sender label for a message in group chats. */

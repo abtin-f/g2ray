@@ -3,6 +3,7 @@ package com.abtin.tglass.features.chat
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
@@ -16,6 +17,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,7 +45,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBackIos
 import androidx.compose.material.icons.automirrored.rounded.Forward
 import androidx.compose.material.icons.automirrored.rounded.Reply
+import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.StopCircle
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
@@ -239,6 +243,13 @@ fun ChatScreen(chatId: Long) {
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var results by remember { mutableStateOf<List<Message>>(emptyList()) }
     var resultIndex by remember { mutableIntStateOf(0) }
+    // Server's count of all matches ("3 of 12"), the next page's start (0 = none) and whether a request is running.
+    var resultTotal by remember { mutableIntStateOf(0) }
+    var resultNextFrom by remember { mutableLongStateOf(0L) }
+    var searchBusy by remember { mutableStateOf(false) }
+    val searchGeneration = remember { intArrayOf(0) }
+    // Poll voters page (View Results).
+    var pollResults by remember { mutableStateOf<PollResultsTarget?>(null) }
     LaunchedEffect(ChatSearchRequest.chatId) {
         if (ChatSearchRequest.chatId == chatId) {
             ChatSearchRequest.chatId = null
@@ -281,16 +292,20 @@ fun ChatScreen(chatId: Long) {
     fun jumpTo(id: Long) {
         val idx = itemIndexOf(id)
         if (idx >= 0) scope.launch {
-            listState.animateScrollToItem(idx)
             highlightId = id
-            kotlinx.coroutines.delay(1200)
-            highlightId = -1
+            listState.animateScrollToItem(idx)
+            // Bring it up from the composer into the lower-middle of the screen, like Telegram.
+            val lift = listState.layoutInfo.viewportSize.height * 0.3f
+            if (idx > 0 && lift > 0f) listState.animateScrollBy(-lift)
+            kotlinx.coroutines.delay(1500)
+            if (highlightId == id) highlightId = -1
         }
     }
 
     /** Scrolls to a message, loading the history around it first if needed. */
     fun jumpToAny(id: Long) {
-        if (messages.any { it.id == id }) jumpTo(id) else repo.loadAround(chatId, id) { pendingJump = id }
+        if (messages.any { it.id == id }) jumpTo(id)
+        else repo.loadAroundMessage(chatId, id) { found -> if (found) pendingJump = id else toast.show("Message not found") }
     }
     LaunchedEffect(pendingJump, messages.size) {
         val id = pendingJump ?: return@LaunchedEffect
@@ -306,20 +321,57 @@ fun ChatScreen(chatId: Long) {
         initialScrollDone = true
         jumpToAny(target)
     }
-    val currentSearch = androidx.compose.runtime.rememberUpdatedState(searchQuery.trim())
+    // In-chat search: TDLib searchChatMessages, newest first; "N of M" with up (older) / down (newer) arrows.
     LaunchedEffect(searchQuery, searchMode) {
+        val gen = ++searchGeneration[0]
         results = emptyList()
         resultIndex = 0
+        resultTotal = 0
+        resultNextFrom = 0L
         val q = searchQuery.trim()
-        if (!searchMode || q.isEmpty()) return@LaunchedEffect
-        kotlinx.coroutines.delay(300)
-        repo.searchInChat(chatId, q) { found ->
-            if (currentSearch.value == q) {
-                results = found
-                found.firstOrNull()?.let { jumpToAny(it.id) }
+        if (!searchMode || q.isEmpty()) {
+            searchBusy = false
+            return@LaunchedEffect
+        }
+        searchBusy = true
+        kotlinx.coroutines.delay(350)
+        repo.searchChatPage(chatId, q, 0L) { page ->
+            if (gen != searchGeneration[0]) return@searchChatPage
+            searchBusy = false
+            results = page.messages
+            resultTotal = maxOf(page.total, page.messages.size)
+            resultNextFrom = page.nextFrom
+            page.messages.firstOrNull()?.let { jumpToAny(it.id) }
+        }
+    }
+
+    /** Shows search result [i] (loading the next page of older results when the end is near). */
+    fun showResult(i: Int) {
+        if (i < 0 || i >= results.size) return
+        resultIndex = i
+        jumpToAny(results[i].id)
+        val q = searchQuery.trim()
+        if (i >= results.size - 3 && resultNextFrom != 0L && !searchBusy && q.isNotEmpty()) {
+            val gen = searchGeneration[0]
+            searchBusy = true
+            repo.searchChatPage(chatId, q, resultNextFrom) { page ->
+                if (gen != searchGeneration[0]) return@searchChatPage
+                searchBusy = false
+                val known = results.map { it.id }.toSet()
+                results = results + page.messages.filter { it.id !in known }
+                resultNextFrom = page.nextFrom
+                resultTotal = maxOf(resultTotal, results.size)
             }
         }
     }
+
+    fun closeSearch() {
+        searchMode = false
+        searchQuery = ""
+        focus.clearFocus()
+        keyboard?.hide()
+    }
+    BackHandler(enabled = searchMode) { closeSearch() }
 
     fun send() {
         val t = text.trim()
@@ -510,6 +562,23 @@ fun ChatScreen(chatId: Long) {
                 if (canDelete) MenuAction("Delete", TgIcons.CtxDelete, destructive = true, quick = true) { confirmDelete(listOf(m.id), k) } else null,
                 // List rows
                 if (!isChannel && k?.canReply != false) MenuAction("Reply", TgIcons.CtxReply) { replyToId = m.id; editingId = null; focusRequester.requestFocus() } else null,
+                pollMenuAction(m, retract = true)?.let { MenuAction("Retract Vote", Icons.AutoMirrored.Outlined.Undo) { repo.retractPollVote(chatId, m.id) } },
+                pollMenuAction(m, retract = false)?.let { quiz ->
+                    MenuAction(if (quiz) "Stop Quiz" else "Stop Poll", Icons.Outlined.StopCircle) {
+                        sheet.show(
+                            SheetRequest(
+                                title = if (quiz) "Stop Quiz?" else "Stop Poll?",
+                                message = "If you stop this ${if (quiz) "quiz" else "poll"} now, nobody will be able to ${if (quiz) "answer" else "vote in"} it anymore. This action cannot be undone.",
+                                actions = listOf(
+                                    SheetAction(if (quiz) "Stop Quiz" else "Stop Poll", destructive = true) {
+                                        repo.stopPoll(chatId, m.id) { err -> if (err != null) toast.show(err) }
+                                    },
+                                ),
+                                alert = true,
+                            )
+                        )
+                    }
+                },
                 if (k?.canPin ?: true) MenuAction(if (m.pinned) "Unpin" else "Pin", if (m.pinned) TgIcons.CtxUnpin else TgIcons.CtxPin) { repo.togglePinMessage(chatId, m.id) } else null,
                 if (k?.canForward != false) MenuAction("Forward", TgIcons.CtxForward) { forward(listOf(m.id)) } else null,
                 if (m.outgoing && (hasText || captionable) && k?.canEdit != false) MenuAction("Edit", TgIcons.CtxEdit) { editingId = m.id; replyToId = null; text = m.text ?: ""; focusRequester.requestFocus() } else null,
@@ -613,7 +682,11 @@ fun ChatScreen(chatId: Long) {
                                     onSwipeReply = { replyToId = m.id; editingId = null; focusRequester.requestFocus() },
                                     onReplyClick = { m.replyToId?.let { jumpToAny(it) } },
                                     onReact = { e -> repo.toggleReaction(chatId, m.id, e) },
-                                    onVote = { o -> repo.vote(chatId, m.id, o) },
+                                    onVote = { o -> repo.votePoll(chatId, m.id, listOf(o)) },
+                                    pollActions = if (m.content is MessageContent.Poll) PollActions(
+                                        vote = { ids -> repo.votePoll(chatId, m.id, ids) },
+                                        viewResults = { focus.clearFocus(); keyboard?.hide(); pollResults = PollResultsTarget(chatId, m.id) },
+                                    ) else null,
                                     onMedia = { nav.push(Route.Media(chatId, m.id)) },
                                     keyboard = repo.inlineKeyboard(chatId, m.id),
                                     busyButton = { r, col -> "${m.id}:$r:$col" in busyButtons },
@@ -639,9 +712,9 @@ fun ChatScreen(chatId: Long) {
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (searchMode) {
-                        ChatSearchField(searchQuery, { searchQuery = it }, Modifier.weight(1f))
+                        ChatSearchField(searchQuery, { searchQuery = it }, Modifier.weight(1f), onSubmit = { focus.clearFocus(); keyboard?.hide() })
                         Spacer(Modifier.width(8.dp))
-                        GlassTextButton("Cancel", { searchMode = false; searchQuery = ""; focus.clearFocus() })
+                        GlassTextButton("Cancel", { closeSearch() })
                     } else if (selecting) {
                         GlassTextButton("Cancel", { selecting = false; selected.clear() })
                         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
@@ -667,8 +740,16 @@ fun ChatScreen(chatId: Long) {
                         }
                     }
                 }
+                // Voice / music / round video playing (global player): Telegram's media panel under the header.
+                if (!searchMode) NowPlayingBar(repo, onOpen = { cid, mid ->
+                    if (cid == chatId) jumpToAny(mid)
+                    else {
+                        ChatJumpRequest.request(cid, mid)
+                        nav.push(Route.Chat(cid))
+                    }
+                })
                 // Pinned message bar
-                if (pinned != null && !selecting) {
+                if (pinned != null && !selecting && !searchMode) {
                     Spacer(Modifier.height(6.dp))
                     GlassBox(onClick = { jumpToAny(pinned.id) }, shape = Capsule(), modifier = Modifier.fillMaxWidth().height(44.dp), contentAlignment = Alignment.CenterStart) {
                         Row(Modifier.padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -699,10 +780,12 @@ fun ChatScreen(chatId: Long) {
                 when {
                     searchMode -> SearchResultsBar(
                         count = results.size,
+                        total = resultTotal,
                         index = resultIndex,
-                        searching = searchQuery.isNotBlank(),
-                        onOlder = { if (resultIndex < results.lastIndex) { resultIndex++; jumpToAny(results[resultIndex].id) } },
-                        onNewer = { if (resultIndex > 0) { resultIndex--; jumpToAny(results[resultIndex].id) } },
+                        query = searchQuery.trim(),
+                        busy = searchBusy,
+                        onOlder = { focus.clearFocus(); keyboard?.hide(); showResult(resultIndex + 1) },
+                        onNewer = { focus.clearFocus(); keyboard?.hide(); showResult(resultIndex - 1) },
                     )
                     selecting -> Row(
                         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
@@ -725,7 +808,7 @@ fun ChatScreen(chatId: Long) {
                             if (d != null) nav.push(Route.Chat(d)) else toast.show("This channel has no discussion group")
                         }) else null,
                         onMute = { repo.toggleMute(chatId) },
-                        onSearch = { searchMode = true },
+                        onSearch = { searchMode = true; selecting = false },
                     )
                     (chat.type == ChatType.Private || chat.type == ChatType.Bot) && repo.isBlocked(chatId) -> {
                         val bot = chat.type == ChatType.Bot
@@ -857,6 +940,8 @@ fun ChatScreen(chatId: Long) {
             forwardIds?.let { ids ->
                 com.abtin.tglass.features.media.ForwardSheet(chatId, ids, onDismiss = { forwardIds = null }, onDone = { selecting = false; selected.clear() })
             }
+
+            PollResultsPage(pollResults, onDismiss = { pollResults = null })
         }
     }
 }
@@ -963,6 +1048,7 @@ private fun MessageRow(
     onAlbumItemClick: (Long) -> Unit = {},
     onSenderClick: (() -> Unit)? = null,
     onShare: (() -> Unit)? = null,
+    pollActions: PollActions? = null,
 ) {
     val c = TgTheme.colors
     val menu = LocalContextMenu.current
@@ -1086,6 +1172,7 @@ private fun MessageRow(
                     album = album,
                     onAlbumItemClick = onAlbumItemClick,
                     onSenderClick = onSenderClick,
+                    pollActions = pollActions,
                 )
             } }
             if (keyboard == null) bubble()
@@ -1185,45 +1272,97 @@ private fun UnreadDivider() {
     }
 }
 
-@Composable
-private fun ChatSearchField(value: String, onValue: (String) -> Unit, modifier: Modifier) {
-    val c = TgTheme.colors
-    val focus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { focus.requestFocus() }
-    GlassBox(onClick = null, shape = Capsule(), modifier = modifier.height(44.dp), contentAlignment = Alignment.CenterStart) {
-        Box(Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
-            if (value.isEmpty()) T("Search", TgTheme.type.body, c.secondaryText)
-            androidx.compose.foundation.text.BasicTextField(
-                value, onValue,
-                Modifier.fillMaxWidth().focusRequester(focus),
-                singleLine = true,
-                textStyle = TgTheme.type.body.copy(color = c.text),
-                cursorBrush = androidx.compose.ui.graphics.SolidColor(c.accent),
-            )
-        }
+/**
+ * Poll entries of the long-press menu. With [retract] true: non-null when the user can take the vote back.
+ * With [retract] false: non-null (whether it is a quiz) when the user can stop the poll (their own open poll).
+ */
+private fun pollMenuAction(m: Message, retract: Boolean): Boolean? {
+    val p = m.content as? MessageContent.Poll ?: return null
+    if (p.closed) return null
+    return if (retract) {
+        val voted = p.chosen.isNotEmpty() || p.voted != null
+        if (voted && !p.quiz && p.canRetract) true else null
+    } else {
+        val sent = m.status != com.abtin.tglass.data.MessageStatus.Sending && m.status != com.abtin.tglass.data.MessageStatus.Failed
+        if (m.outgoing && sent) p.quiz else null
     }
 }
 
 @Composable
-private fun SearchResultsBar(count: Int, index: Int, searching: Boolean, onOlder: () -> Unit, onNewer: () -> Unit) {
+private fun ChatSearchField(value: String, onValue: (String) -> Unit, modifier: Modifier, onSubmit: () -> Unit) {
+    val c = TgTheme.colors
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        // Let the page settle (it may still be sliding back in from the profile) before bringing up the keyboard.
+        kotlinx.coroutines.delay(150)
+        runCatching { focus.requestFocus() }
+    }
+    GlassBox(onClick = null, shape = Capsule(), modifier = modifier.height(44.dp), contentAlignment = Alignment.CenterStart) {
+        Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(TgIcons.IcSearch, c.secondaryText, 18.dp)
+            Spacer(Modifier.width(6.dp))
+            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                if (value.isEmpty()) T("Search", TgTheme.type.body, c.secondaryText, maxLines = 1)
+                androidx.compose.foundation.text.BasicTextField(
+                    value = value,
+                    onValueChange = onValue,
+                    modifier = Modifier.fillMaxWidth().focusRequester(focus),
+                    singleLine = true,
+                    textStyle = TgTheme.type.body.copy(color = c.text, textDirection = androidx.compose.ui.text.style.TextDirection.Content),
+                    cursorBrush = androidx.compose.ui.graphics.SolidColor(c.accent),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
+                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSearch = { onSubmit() }),
+                )
+            }
+            if (value.isNotEmpty()) {
+                Box(
+                    Modifier.size(30.dp).clip(CircleShape).fadeClickable { onValue("") },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(Modifier.size(17.dp).clip(CircleShape).background(c.secondaryText.copy(alpha = 0.6f)), contentAlignment = Alignment.Center) {
+                        Icon(IosIcons.Close, c.background, 9.dp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** iOS search toolbar at the bottom: "3 of 12" (or a spinner / No results) with the up (older) and down (newer) arrows. */
+@Composable
+private fun SearchResultsBar(count: Int, total: Int, index: Int, query: String, busy: Boolean, onOlder: () -> Unit, onNewer: () -> Unit) {
     val c = TgTheme.colors
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         GlassBox(onClick = null, shape = Capsule(), modifier = Modifier.weight(1f).height(46.dp)) {
-            T(
-                when {
-                    !searching -> "Search messages"
-                    count == 0 -> "No results"
-                    else -> "${index + 1} of $count"
-                },
-                TgTheme.type.body, c.text,
-            )
+            if (busy && count == 0) {
+                com.abtin.tglass.ui.components.ActivityIndicator(18.dp, c.secondaryText)
+            } else {
+                T(
+                    when {
+                        query.isEmpty() -> "Search messages"
+                        count == 0 -> "No results"
+                        else -> "${index + 1} of ${maxOf(total, count)}"
+                    },
+                    TgTheme.type.body, if (query.isNotEmpty() && count == 0) c.secondaryText else c.text, maxLines = 1,
+                )
+            }
         }
         Spacer(Modifier.width(8.dp))
-        GlassIconButton(IosIcons.ChevronDown, onOlder, modifier = Modifier.graphicsLayer { rotationZ = 180f }, size = 46.dp, iconSize = 20.dp)
+        val canOlder = index < count - 1
+        val canNewer = index > 0 && count > 0
+        GlassIconButton(
+            IosIcons.ChevronDown, onOlder,
+            modifier = Modifier.graphicsLayer { rotationZ = 180f; alpha = if (canOlder) 1f else 0.4f },
+            size = 46.dp, iconSize = 20.dp, tint = if (canOlder) c.accent else c.secondaryText,
+        )
         Spacer(Modifier.width(8.dp))
-        GlassIconButton(IosIcons.ChevronDown, onNewer, size = 46.dp, iconSize = 20.dp)
+        GlassIconButton(
+            IosIcons.ChevronDown, onNewer,
+            modifier = Modifier.graphicsLayer { alpha = if (canNewer) 1f else 0.4f },
+            size = 46.dp, iconSize = 20.dp, tint = if (canNewer) c.accent else c.secondaryText,
+        )
     }
 }

@@ -1309,7 +1309,7 @@ class TdRepository(context: Context) : TelegramRepository {
             )
         }
         is MessageVideoNote -> videoNoteContent(c)
-        is MessageVoiceNote -> UiContent.Voice(c.voiceNote.duration, waveform(c.voiceNote.waveform), imageOf(c.voiceNote.voice, null))
+        is MessageVoiceNote -> UiContent.Voice(c.voiceNote.duration, waveform(c.voiceNote.waveform), imageOf(c.voiceNote.voice, null), listened = c.isListened)
         is MessageAudio -> UiContent.File(
             name = c.audio.title.ifBlank { c.audio.fileName.ifBlank { "Audio" } },
             size = Formats.size(c.audio.audio.size),
@@ -1346,15 +1346,7 @@ class TdRepository(context: Context) : TelegramRepository {
         is MessageLocation -> UiContent.Location("Location", "%.5f, %.5f".format(Locale.US, c.location.latitude, c.location.longitude))
         is MessageVenue -> UiContent.Location(c.venue.title, c.venue.address)
         is MessageContact -> UiContent.Contact("${c.contact.firstName} ${c.contact.lastName}".trim(), c.contact.phoneNumber, c.contact.userId)
-        is MessagePoll -> UiContent.Poll(
-            question = c.poll.question.text,
-            options = c.poll.options.map { it.text.text },
-            votes = c.poll.options.map { it.voterCount },
-            voted = c.poll.options.indexOfFirst { it.isChosen }.takeIf { it >= 0 },
-            quiz = c.poll.type is PollTypeQuiz,
-            anonymous = c.poll.isAnonymous,
-            multiple = c.poll.allowsMultipleAnswers,
-        )
+        is MessagePoll -> mapPollContent(c)
         is MessageCall -> UiContent.Text(
             (if (c.isVideo) "📹 " else "📞 ") + (if (c.duration > 0) "Call (${Formats.duration(c.duration)})" else "Missed call"),
         )
@@ -1901,7 +1893,7 @@ class TdRepository(context: Context) : TelegramRepository {
             media = null,
             isAnonymous = p.anonymous,
             allowsMultipleAnswers = p.multiple && !p.quiz,
-            allowsRevoting = false,
+            allowsRevoting = !p.quiz,
             membersOnly = false,
             countryCodes = emptyArray(),
             shuffleOptions = false,
@@ -2448,7 +2440,8 @@ class TdRepository(context: Context) : TelegramRepository {
     /** A video message was played (by us or on another device): drop its "not viewed" dot. */
     private fun onContentOpened(chatId: Long, messageId: Long) = updateMessage(chatId, messageId) { m ->
         val c = m.content
-        if (c is UiContent.VideoNote && !c.viewed) m.copy(content = c.copy(viewed = true)) else m
+        if (c is UiContent.VideoNote && !c.viewed) m.copy(content = c.copy(viewed = true))
+        else if (c is UiContent.Voice && !c.listened) m.copy(content = c.copy(listened = true)) else m
     }
 
     override fun openMessageContent(chatId: Long, messageId: Long) {
@@ -3419,6 +3412,99 @@ class TdRepository(context: Context) : TelegramRepository {
         }
     }
     // ---- end Edit Profile & Appearance ----
+
+    // ---- Chat polls, audio & search ----
+
+    private fun pollSenderId(s: MessageSender): Long? = when (s) {
+        is MessageSenderUser -> s.userId
+        is MessageSenderChat -> s.chatId
+        else -> null
+    }
+
+    /** TDLib poll -> UI poll with votes, the user's answers, quiz answer/explanation and closed state. */
+    private fun mapPollContent(c: MessagePoll): UiContent.Poll {
+        val poll = c.poll
+        val options = poll.options
+        val chosen = options.indices.filter { options[it].isChosen }
+        val quiz = poll.type as? PollTypeQuiz
+        return UiContent.Poll(
+            question = poll.question.text,
+            options = options.map { it.text.text },
+            votes = options.map { it.voterCount },
+            voted = chosen.firstOrNull(),
+            quiz = quiz != null,
+            anonymous = poll.isAnonymous,
+            multiple = poll.allowsMultipleAnswers,
+            correctOption = quiz?.correctOptionIds?.firstOrNull(),
+            explanation = quiz?.explanation?.text?.takeIf { it.isNotBlank() },
+            chosen = chosen,
+            closed = poll.isClosed,
+            totalVoters = poll.totalVoterCount,
+            percents = options.map { it.votePercentage },
+            canGetVoters = poll.canGetVoters,
+            canSeeResults = poll.canSeeResults,
+            recentVoters = poll.recentVoterIds.mapNotNull { pollSenderId(it) },
+            canRetract = quiz == null,
+        )
+    }
+
+    override fun votePoll(chatId: Long, messageId: Long, optionIds: List<Int>) {
+        if (optionIds.isEmpty()) return
+        scope.launch { client.setPollAnswer(chatId, messageId, optionIds.distinct().sorted().toIntArray()).orReport() }
+    }
+
+    override fun retractPollVote(chatId: Long, messageId: Long) {
+        scope.launch { client.setPollAnswer(chatId, messageId, IntArray(0)).orReport() }
+    }
+
+    override fun stopPoll(chatId: Long, messageId: Long, onDone: (String?) -> Unit) {
+        scope.launch {
+            val r = client.stopPoll(chatId = chatId, messageId = messageId)
+            onDone(if (r is TdlResult.Failure) humanize(r.message) else null)
+        }
+    }
+
+    override fun pollVoters(chatId: Long, messageId: Long, option: Int, offset: Int, onResult: (com.abtin.tglass.data.PollVotersPage?) -> Unit) {
+        scope.launch {
+            val r = client.getPollVoters(chatId, messageId, option, offset, 50)
+            onResult(
+                if (r is TdlResult.Success) com.abtin.tglass.data.PollVotersPage(r.result.voters.mapNotNull { pollSenderId(it.voterId) }, r.result.totalCount)
+                else null
+            )
+        }
+    }
+
+    override fun searchChatPage(chatId: Long, query: String, fromMessageId: Long, onResult: (com.abtin.tglass.data.ChatSearchPage) -> Unit) {
+        scope.launch {
+            val r = client.searchChatMessages(chatId = chatId, query = query, fromMessageId = fromMessageId, offset = 0, limit = 100)
+            if (r is TdlResult.Success) {
+                val found = r.result.messages.map { mapMessage(it) }
+                // Keep the found messages at hand (findMessage) even before the history around them is loaded.
+                found.forEach { messageCache["$chatId:${it.id}"] = it }
+                val total = if (r.result.totalCount >= 0) r.result.totalCount else found.size
+                onResult(com.abtin.tglass.data.ChatSearchPage(found, maxOf(total, found.size), r.result.nextFromMessageId))
+            } else {
+                android.util.Log.w("TGlass", "searchChatMessages failed: " + (r as TdlResult.Failure).message)
+                onResult(com.abtin.tglass.data.ChatSearchPage(emptyList(), 0, 0L))
+            }
+        }
+    }
+
+    override fun loadAroundMessage(chatId: Long, messageId: Long, onLoaded: (Boolean) -> Unit) {
+        if (messages(chatId).any { it.id == messageId }) return onLoaded(true)
+        scope.launch {
+            messageStore.getOrPut(chatId) { mutableStateListOf() }
+            val r = client.getChatHistory(chatId, messageId, -25, 50, false)
+            if (r is TdlResult.Success) r.result.messages.filterNotNull().forEach { addMessage(it) }
+            if (messages(chatId).none { it.id == messageId }) {
+                // The history call may answer with only what it has cached: fetch the message itself.
+                val one = client.getMessage(chatId, messageId)
+                if (one is TdlResult.Success) addMessage(one.result)
+            }
+            onLoaded(messages(chatId).any { it.id == messageId })
+        }
+    }
+    // ---- end Chat polls, audio & search ----
 }
 
 private const val GIFTS_ENABLED = false

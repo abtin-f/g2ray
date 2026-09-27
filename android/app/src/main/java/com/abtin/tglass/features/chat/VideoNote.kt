@@ -105,6 +105,11 @@ private val NoteAudio = AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setCon
  */
 object VideoNotePlayback {
     var activeKey by mutableStateOf<String?>(null)
+    /** Progress 0..1 and play state of the active one, for the chat's now-playing bar. */
+    var progress by mutableFloatStateOf(0f)
+    var playing by mutableStateOf(false)
+    /** Pauses / resumes the active one (set while it plays with sound). */
+    var togglePause: (() -> Unit)? = null
 }
 
 /** Observable state of one round video's player. */
@@ -149,11 +154,20 @@ internal fun VideoNoteMessage(
                 p.repeatMode = Player.REPEAT_MODE_OFF
                 p.seekTo(0)
                 p.play()
-                while (true) {
-                    val d = p.duration
-                    note.positionMs = p.currentPosition
-                    note.progress = if (d > 0) (p.currentPosition.toFloat() / d).coerceIn(0f, 1f) else 0f
-                    withFrameMillis { }
+                VideoNotePlayback.togglePause = { if (p.playWhenReady) p.pause() else p.play() }
+                try {
+                    while (true) {
+                        val d = p.duration
+                        note.positionMs = p.currentPosition
+                        note.progress = if (d > 0) (p.currentPosition.toFloat() / d).coerceIn(0f, 1f) else 0f
+                        VideoNotePlayback.progress = note.progress
+                        VideoNotePlayback.playing = note.playWhenReady
+                        withFrameMillis { }
+                    }
+                } finally {
+                    VideoNotePlayback.togglePause = null
+                    VideoNotePlayback.progress = 0f
+                    VideoNotePlayback.playing = false
                 }
             } else {
                 note.progress = 0f

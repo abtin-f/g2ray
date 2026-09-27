@@ -62,7 +62,8 @@ sealed interface MessageContent {
         /** GIF-style animation: loops silently. */
         val loop: Boolean = false,
     ) : MessageContent
-    data class Voice(val seconds: Int, val waveform: List<Float>, val media: ImageRef? = null) : MessageContent
+    /** [listened]: false while the recipient has not played it yet (Telegram's small dot next to the duration). */
+    data class Voice(val seconds: Int, val waveform: List<Float>, val media: ImageRef? = null, val listened: Boolean = true) : MessageContent
     /**
      * A round video message ("video note"): [video] is the square MP4, [thumb] its cover (with Telegram's blurred minithumbnail),
      * [viewed] whether the recipient has played it.
@@ -96,7 +97,30 @@ sealed interface MessageContent {
         val multiple: Boolean = false,
         val correctOption: Int? = null,
         val explanation: String? = null,
-    ) : MessageContent
+        /** Every option the user chose (several for multiple-answer polls); [voted] is the first of them. */
+        val chosen: List<Int> = listOfNotNull(voted),
+        /** Nobody can vote any more ("Final Results"). */
+        val closed: Boolean = false,
+        /** People who voted (with multiple answers this is less than the sum of [votes]); -1 = sum of [votes]. */
+        val totalVoters: Int = -1,
+        /** Server-rounded percentages per option (they add up to 100); empty = computed from [votes]. */
+        val percents: List<Int> = emptyList(),
+        /** Voters can be listed ("View Results"): public polls the user can see the results of. */
+        val canGetVoters: Boolean = false,
+        /** False when the results stay hidden until the poll closes. */
+        val canSeeResults: Boolean = true,
+        /** A few recent voters (user / chat ids) for the avatars next to "Public Poll". */
+        val recentVoters: List<Long> = emptyList(),
+        /** The vote can be taken back (Retract Vote); quizzes never allow it. */
+        val canRetract: Boolean = !quiz,
+    ) : MessageContent {
+        val voterCount: Int get() = if (totalVoters >= 0) totalVoters else votes.sum()
+        fun percentOf(i: Int): Int {
+            percents.getOrNull(i)?.let { return it }
+            val total = votes.sum()
+            return if (total > 0) ((votes.getOrElse(i) { 0 } * 100f) / total).roundToIntSafe() else 0
+        }
+    }
     data class Link(val text: String, val site: String, val title: String, val description: String, val entities: List<Entity> = emptyList()) : MessageContent
     data class Service(val text: String) : MessageContent
 }
@@ -327,3 +351,5 @@ object BubbleDemo {
     val incoming = Message(-10, -1, 1, now - 120_000, MessageContent.Text("Do you like the new Liquid Glass look? 😍"), outgoing = false)
     val outgoing = Message(-11, -1, 0, now - 60_000, MessageContent.Text("It looks exactly like iOS!"), outgoing = true, replyToId = -10)
 }
+
+private fun Float.roundToIntSafe(): Int = if (isNaN()) 0 else kotlin.math.round(this).toInt()
