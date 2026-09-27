@@ -185,7 +185,15 @@ fun ProxyEditScreen(id: Int?, prefill: ProxyItem? = null) {
                 SegmentedControl(listOf("MTProto", "SOCKS5"), kinds.indexOf(selected), { kind = it }, Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth())
                 Spacer(Modifier.height(16.dp))
                 Section(header = "Connection") {
-                    ProxyField(server, { server = it.trim() }, "Server")
+                    ProxyField(server, { input ->
+                        // A whole t.me/proxy or tg://socks link pasted here fills in every field.
+                        val link = ProxyItem.fromLink(input.trim())
+                        if (link != null) {
+                            kind = kinds.indexOf(link.kind).coerceAtLeast(0)
+                            server = link.server; port = link.port.toString(); secret = link.secret
+                            user = link.username; pass = link.password
+                        } else server = input.trim()
+                    }, "Server or proxy link")
                     ProxyField(port, { port = it.filter(Char::isDigit).take(5) }, "Port", keyboard = KeyboardType.Number, divider = false)
                 }
                 Spacer(Modifier.height(24.dp))

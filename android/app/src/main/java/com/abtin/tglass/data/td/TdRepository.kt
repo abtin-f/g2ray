@@ -2035,10 +2035,29 @@ class TdRepository(context: Context) : TelegramRepository {
         }
     }
 
+    /** "https://1.2.3.4/ " → "1.2.3.4": people paste addresses with a scheme, path or spaces. */
+    private fun cleanServer(raw: String): String =
+        raw.trim().substringAfter("://").substringBefore('/').substringBefore('?').trim()
+
+    /**
+     * TDLib wants the MTProto secret in hex. Links and channels also hand them out in base64 (standard or URL-safe,
+     * with or without padding, "ee"/"dd" fake-TLS prefixes included), and a '+' often arrives as a space after URL
+     * decoding; anything that is not plain hex is decoded from base64 and re-encoded as hex.
+     */
+    private fun normalizeSecret(raw: String): String {
+        val s = raw.trim().replace(' ', '+').filterNot { it.isWhitespace() }
+        if (s.isEmpty() || s.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }) return s.lowercase()
+        val b64 = s.replace('-', '+').replace('_', '/').trimEnd('=')
+        val padded = b64 + "=".repeat((4 - b64.length % 4) % 4)
+        val bytes = runCatching { android.util.Base64.decode(padded, android.util.Base64.DEFAULT) }.getOrNull()
+            ?: return s
+        return bytes.joinToString("") { "%02x".format(it) }
+    }
+
     private fun toProxy(p: ProxyItem): Proxy = Proxy(
-        p.server.trim(), p.port,
+        cleanServer(p.server), p.port,
         when (p.kind) {
-            ProxyKind.MTProto -> ProxyTypeMtproto(p.secret.trim())
+            ProxyKind.MTProto -> ProxyTypeMtproto(normalizeSecret(p.secret))
             ProxyKind.Http -> ProxyTypeHttp(p.username, p.password, false)
             ProxyKind.Socks5 -> ProxyTypeSocks5(p.username, p.password)
         },
@@ -2061,7 +2080,15 @@ class TdRepository(context: Context) : TelegramRepository {
                 loadProxies()
                 onDone(null)
             } else if (r is TdlResult.Failure) {
-                onDone(if ("PROXY" in r.message.uppercase() || "SECRET" in r.message.uppercase()) "Invalid proxy details: ${r.message}" else humanize(r.message))
+                val msg = r.message
+                onDone(
+                    when {
+                        "SECRET" in msg.uppercase() -> "This proxy's secret isn't valid. Copy the whole proxy link again and paste it here."
+                        "PORT" in msg.uppercase() -> "The port must be a number between 1 and 65535."
+                        "SERVER" in msg.uppercase() || "PROXY" in msg.uppercase() -> "Check the server address of this proxy. ($msg)"
+                        else -> humanize(msg)
+                    },
+                )
             }
         }
     }
