@@ -131,6 +131,8 @@ internal class HeaderState(private val scope: CoroutineScope, private val isAtTo
                 touched = true
                 releaseJob?.cancel()
                 pull = (pull + available.y * 0.5f).coerceAtMost(maxPullPx)
+                // iOS: the round avatar turns into the full-width photo as soon as the pull passes the threshold.
+                if (!expanded && canExpand && pull > thresholdPx) setExpanded(true)
                 return Offset(0f, available.y)
             }
             return Offset.Zero
@@ -158,7 +160,9 @@ internal class HeaderGeometry(
     val height: Dp,
 )
 
-internal val ButtonSize = 54.dp
+/** Telegram iOS 26 profile buttons: 56pt glass circles, 12pt apart, centered under the name. */
+internal val ButtonSize = 56.dp
+internal val ButtonGap = 12.dp
 
 internal fun headerGeometry(width: Dp, statusTop: Dp, p: Float, pull: Dp, hasMusic: Boolean): HeaderGeometry {
     val size0 = 100.dp + (pull * 0.35f).coerceAtMost(44.dp)
@@ -356,8 +360,14 @@ internal fun GiftGlyph(g: ProfileGift, size: Dp) {
     }
 }
 
-/** One round glass button under the name. */
+/** One round glass button under the name. [label] is its accessibility name (iOS 26 shows no caption). */
 internal class ProfileAction(val icon: Int, val label: String, val onClick: () -> Unit)
+
+/**
+ * Size to draw a profile-button drawable at so every glyph comes out ~22dp like Telegram iOS 26: most
+ * `tg_pi_*` icons are a 20-unit glyph in a 40-unit viewport, the video camera fills most of its 30-unit one.
+ */
+private fun profileIconSize(icon: Int): Dp = if (icon == com.abtin.tglass.ui.components.TgIcons.PiVideo) 27.dp else 44.dp
 
 /**
  * The row of glass circle buttons (call, video, mute, search, more). Drawn above the list — outside the
@@ -370,7 +380,7 @@ internal fun ProfileActionsOverlay(actions: List<ProfileAction>, palette: Profil
             .fillMaxWidth()
             .offset { IntOffset(0, y()) }
             .graphicsLayer { this.alpha = alpha() },
-        horizontalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterHorizontally),
+        horizontalArrangement = Arrangement.spacedBy(ButtonGap, Alignment.CenterHorizontally),
     ) {
         actions.forEach { a ->
             Box(
@@ -380,7 +390,7 @@ internal fun ProfileActionsOverlay(actions: List<ProfileAction>, palette: Profil
                     .profileGlass(Capsule(), palette.button, palette.buttonSolid),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(a.icon, palette.buttonIcon, 28.dp, contentDescription = a.label)
+                Icon(a.icon, palette.buttonIcon, profileIconSize(a.icon), contentDescription = a.label)
             }
         }
     }

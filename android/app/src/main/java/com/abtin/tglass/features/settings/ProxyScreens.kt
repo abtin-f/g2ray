@@ -139,7 +139,7 @@ fun ProxyListScreen() {
                         Cell("Paste Proxy Link", titleColor = c.accent, chevron = false, divider = false, onClick = {
                             val text = (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).primaryClip?.getItemAt(0)?.text?.toString()
                             if (text != null && ProxyItem.fromLink(text) != null) nav.push(Route.ProxyLink(text))
-                            else toast.show("Copy a t.me/proxy or t.me/socks link first")
+                            else toast.error("Copy a t.me/proxy or t.me/socks link first")
                         })
                     }
                 }
@@ -175,7 +175,7 @@ fun ProxyEditScreen(id: Int?, prefill: ProxyItem? = null) {
         val item = ProxyItem(0, server.trim(), port.toInt(), selected, secret.trim(), user.trim(), pass)
         repo.saveProxy(id, item, enable = true) { err ->
             saving = false
-            if (err != null) toast.show(err) else { toast.show("Proxy connected"); nav.pop() }
+            if (err != null) toast.error(err) else { toast.show("Proxy connected"); nav.pop() }
         }
     }
 
@@ -245,7 +245,7 @@ fun ProxyLinkScreen(link: String) {
                 saving = true
                 repo.saveProxy(null, proxy, enable = true) { err ->
                     saving = false
-                    if (err != null) toast.show(err) else { toast.show("Proxy connected"); nav.replaceTop(Route.Proxy) }
+                    if (err != null) toast.error(err) else { toast.show("Proxy connected"); nav.replaceTop(Route.Proxy) }
                 }
             }, Modifier.padding(horizontal = 16.dp), loading = saving)
         }

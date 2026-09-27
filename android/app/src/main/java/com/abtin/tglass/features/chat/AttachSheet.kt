@@ -215,12 +215,12 @@ fun AttachSheet(
         scope.launch {
             val loc = com.abtin.tglass.core.media.Files.currentLocation(context)
             preparing = false
-            if (loc == null) toast.show("Location is not available. Turn on location and try again.")
+            if (loc == null) toast.error("Location is not available. Turn on location and try again.")
             else onSend(listOf(MessageContent.Location("Location", "%.6f, %.6f".format(java.util.Locale.US, loc.latitude, loc.longitude))))
         }
     }
     val locationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
-        if (granted.values.any { it }) sendLocation() else toast.show("Allow location access to share your location")
+        if (granted.values.any { it }) sendLocation() else toast.error("Allow location access to share your location")
     }
     fun requestLocation() {
         val ok = listOf(android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION).any {

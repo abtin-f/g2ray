@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -42,7 +43,24 @@ class ToastState {
         private set
     internal var serial by mutableIntStateOf(0)
 
+    /**
+     * Where errors go instead of a toast: the app sets it to show an iOS alert ([ActionSheetState.showError]).
+     * Errors are never toasts on iOS, so [show] with the error icon and [error] both end up here.
+     */
+    var errorSink: ((String) -> Unit)? = null
+
+    /** An error or warning: shown as a centered iOS alert (see [errorSink]). */
+    fun error(text: String) {
+        val sink = errorSink
+        if (sink != null) sink(text) else show(text, Icons.Rounded.ErrorOutline)
+    }
+
     fun show(text: String, icon: ImageVector = Icons.Rounded.CheckCircle) {
+        val sink = errorSink
+        if (icon == Icons.Rounded.ErrorOutline && sink != null) {
+            sink(text)
+            return
+        }
         this.text = text
         this.icon = icon
         visible = true

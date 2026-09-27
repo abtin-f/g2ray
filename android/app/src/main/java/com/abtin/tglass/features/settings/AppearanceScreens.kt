@@ -209,7 +209,7 @@ internal fun LazyListScope.appearancePage() {
                     Column(
                         Modifier.fadeClickable {
                             if (!sel) {
-                                if (AppIcons.apply(context, i)) s.updateAppIcon(i) else toast.show("Can't change the icon on this device")
+                                if (AppIcons.apply(context, i)) s.updateAppIcon(i) else toast.error("Can't change the icon on this device")
                             }
                         },
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -554,7 +554,7 @@ internal fun LazyListScope.nameColorPage() {
                                 if (id == shown) return@fadeClickable
                                 pending = id
                                 repo.setNameColor(id) { err ->
-                                    if (err != null) toast.show(err)
+                                    if (err != null) toast.error(err)
                                     pending = null
                                 }
                             },

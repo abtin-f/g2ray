@@ -156,7 +156,7 @@ fun EditProfileScreen() {
     fun done() {
         if (saving) return
         if (!changed) { close(); return }
-        if (first.isBlank()) { toast.show("Please enter your first name"); return }
+        if (first.isBlank()) { toast.error("Please enter your first name"); return }
         saving = true
         val profileChanged = first.trim() != me.firstName || last.trim() != me.lastName || bio.trim() != serverBio.trim()
         fun saveBirthday() {
@@ -199,11 +199,11 @@ fun EditProfileScreen() {
         val f = File(dir, "AVATAR_${System.currentTimeMillis()}.jpg")
         val u = FileProvider.getUriForFile(context, "${context.packageName}.files", f)
         cameraUri = u
-        runCatching { camera.launch(u) }.onFailure { toast.show("No camera app") }
+        runCatching { camera.launch(u) }.onFailure { toast.error("No camera app found") }
     }
     fun choosePhoto() {
         runCatching { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
-            .onFailure { toast.show("Can't open the photo picker") }
+            .onFailure { toast.error("Can't open the photo picker") }
     }
     fun photoMenu() {
         sheet.show(SheetRequest(actions = listOfNotNull(
@@ -213,7 +213,7 @@ fun EditProfileScreen() {
                 uploading = true
                 repo.deleteProfilePhoto { err ->
                     uploading = false
-                    if (err != null) toast.show(err) else { localPhoto = null; photoRemoved = true }
+                    if (err != null) toast.error(err) else { localPhoto = null; photoRemoved = true }
                 }
             } else null,
         )))
@@ -332,7 +332,7 @@ fun EditProfileScreen() {
                         source = src,
                         onCancel = { cropSource = null },
                         onDone = { path -> cropSource = null; upload(path) },
-                        onError = { cropSource = null; toast.show("Can't read this photo") },
+                        onError = { cropSource = null; toast.error("Can't read this photo") },
                     )
                 }
             }

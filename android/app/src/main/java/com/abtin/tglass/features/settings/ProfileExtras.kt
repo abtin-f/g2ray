@@ -181,7 +181,7 @@ internal fun LazyListScope.personalChannelPage() {
             busy = true
             repo.setPersonalChannel(id) { err ->
                 busy = false
-                if (err != null) toast.show(err) else nav.pop()
+                if (err != null) toast.error(err) else nav.pop()
             }
         }
         val list = candidates

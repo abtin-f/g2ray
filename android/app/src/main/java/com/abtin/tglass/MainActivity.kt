@@ -64,6 +64,8 @@ import com.abtin.tglass.ui.components.LocalContextMenu
 import com.abtin.tglass.ui.components.LocalToast
 import com.abtin.tglass.ui.components.ToastHost
 import com.abtin.tglass.ui.components.ToastState
+import com.abtin.tglass.ui.components.alert
+import com.abtin.tglass.ui.components.showError
 
 /**
  * Optional launch extras (used by CI to capture screenshots):
@@ -150,6 +152,8 @@ class MainActivity : ComponentActivity() {
         val menu = remember { ContextMenuState() }
         val sheet = remember { ActionSheetState() }
         val toast = remember { ToastState() }
+        // Errors and warnings are iOS alerts, never toasts: every screen's error toast lands here.
+        toast.errorSink = { sheet.showError(it) }
 
         if (live != null) {
             // The login flow follows TDLib's authorization state.
@@ -168,11 +172,12 @@ class MainActivity : ComponentActivity() {
                         settings.updateLoggedIn(false)
                         nav.resetTo(Route.Welcome)
                     }
-                    is AuthStep.Unsupported -> toast.show(auth.what, androidx.compose.material.icons.Icons.Rounded.ErrorOutline)
+                    is AuthStep.Unsupported -> sheet.alert("Not Supported", auth.what)
                     else -> {}
                 }
             }
-            LaunchedEffect(live) { live.errors.collect { toast.show(it, androidx.compose.material.icons.Icons.Rounded.ErrorOutline) } }
+            // The central place TDLib errors reach the user: a friendly iOS alert (Premium required, flood wait, …).
+            LaunchedEffect(live) { live.errors.collect { sheet.showError(it) } }
 
             // Notifications: ask once after signing in, and keep the background connection in sync.
             val notifPermission = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) {}
