@@ -14,6 +14,8 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.SolidColor
@@ -93,7 +95,14 @@ private val GalleryEmojis = listOf("🏔", "🌅", "🏝", "🌃", "🐈", "🍜
 
 /** Attachment panel: device gallery (or demo tiles) with multi-select, camera, caption, and the attachment type bar. */
 @Composable
-fun AttachSheet(visible: Boolean, onDismiss: () -> Unit, onSend: (List<MessageContent>) -> Unit) {
+fun AttachSheet(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    onSend: (List<MessageContent>) -> Unit,
+    /** An entry picked in the "+" menu ([AttachMenu]) to run once; [onActionHandled] clears it. */
+    action: AttachAction? = null,
+    onActionHandled: () -> Unit = {},
+) {
     val c = TgTheme.colors
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -111,14 +120,50 @@ fun AttachSheet(visible: Boolean, onDismiss: () -> Unit, onSend: (List<MessageCo
     val currentChatId = (com.abtin.tglass.core.navigation.LocalNavigator.current.top as? com.abtin.tglass.core.navigation.Route.Chat)?.chatId
     val canPoll = !repo.isLive || currentChatId?.let { repo.chat(it)?.type } != com.abtin.tglass.data.ChatType.Private
 
+    // Photo/video editor (MediaEditor.kt): per-item edits, HD choice (remembered), and which items it pages through.
+    val edits = remember { mutableStateMapOf<Uri, PhotoEdits>() }
+    val sendPrefs = remember { context.getSharedPreferences("tglass", android.content.Context.MODE_PRIVATE) }
+    var hd by remember { mutableStateOf(sendPrefs.getBoolean("sendHd", true)) }
+    var editorOpen by remember { mutableStateOf(false) }
+    var editorItems by remember { mutableStateOf<List<GalleryItem>>(emptyList()) }
+    var editorStart by remember { mutableIntStateOf(0) }
+    fun maxPhotoSide() = if (hd) MediaPrep.MAX_PHOTO else MediaPrep.STANDARD_PHOTO
+    fun allGalleryItems() = captured + gallery.items.filter { g -> captured.none { it.uri == g.uri } }
+    fun openEditor(list: List<GalleryItem>, item: GalleryItem) {
+        if (list.isEmpty()) return
+        editorItems = list
+        editorStart = list.indexOfFirst { it.uri == item.uri }.coerceAtLeast(0)
+        editorOpen = true
+    }
+
     fun sendPicked(items: List<PickedMedia>, text: String?) {
         if (items.isEmpty() || preparing) return
         preparing = true
         scope.launch {
-            val contents = MediaPrep.prepare(context, items, text)
+            val contents = MediaPrep.prepare(context, items, text, maxPhotoSide())
             preparing = false
             if (contents.isEmpty()) return@launch
             selected.clear(); caption = ""
+            onSend(contents)
+        }
+    }
+
+    /** Sends gallery items, rendering the editor's changes into new photos first (the rest goes the usual way). */
+    fun sendGallery(items: List<GalleryItem>, text: String?) {
+        if (items.isEmpty() || preparing) return
+        preparing = true
+        val specs = items.map { g -> if (g.video) null else edits[g.uri]?.spec()?.takeIf { !it.isEmpty } }
+        val maxSide = maxPhotoSide()
+        scope.launch {
+            val picked = items.mapIndexed { i, g ->
+                val spec = specs[i]
+                val rendered = if (spec != null) renderEditedPhoto(context, g.uri, spec, maxSide) else null
+                if (rendered != null) PickedMedia(rendered, false) else g.picked()
+            }
+            val contents = MediaPrep.prepare(context, picked, text, maxSide)
+            preparing = false
+            if (contents.isEmpty()) return@launch
+            selected.clear(); caption = ""; edits.clear(); editorOpen = false
             onSend(contents)
         }
     }
@@ -137,7 +182,9 @@ fun AttachSheet(visible: Boolean, onDismiss: () -> Unit, onSend: (List<MessageCo
         if (ok && u != null) {
             val item = GalleryItem(u, false, 0)
             captured.add(0, item)
-            selected.add(item)
+            if (selected.size < 10) selected.add(item)
+            // Like Telegram: a fresh shot opens in the editor right away.
+            openEditor(allGalleryItems(), item)
         }
     }
     fun openCamera() {
@@ -181,6 +228,21 @@ fun AttachSheet(visible: Boolean, onDismiss: () -> Unit, onSend: (List<MessageCo
         }
         if (ok) sendLocation()
         else locationPermission.launch(arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION))
+    }
+
+    // Entries of the "+" menu run through the same pickers as this panel's own type bar.
+    LaunchedEffect(action) {
+        when (action) {
+            null, AttachAction.Gallery -> {}
+            AttachAction.File -> runCatching { documentLauncher.launch(arrayOf("*/*")) }
+            AttachAction.Music -> runCatching { documentLauncher.launch(arrayOf("audio/*")) }
+            AttachAction.Location -> requestLocation()
+            AttachAction.Contact -> contactOpen = true
+            AttachAction.Poll -> pollOpen = true
+            AttachAction.Camera -> openCamera()
+            AttachAction.Gift -> onSend(listOf(MessageContent.Sticker("🎁")))
+        }
+        if (action != null) onActionHandled()
     }
 
     LaunchedEffect(visible, gallery.access, gallery.version) {
@@ -234,10 +296,15 @@ fun AttachSheet(visible: Boolean, onDismiss: () -> Unit, onSend: (List<MessageCo
                                 }
                             }
                         }
-                        val real = captured + gallery.items.filter { g -> captured.none { it.uri == g.uri } }
+                        val real = allGalleryItems()
                         items(real, key = { it.uri.toString() }) { item ->
                             val index = selected.indexOf(item)
-                            GalleryTile(item, index, onToggle = { if (index >= 0) selected.remove(item) else if (selected.size < 10) selected.add(item) })
+                            GalleryTile(
+                                item, index,
+                                onToggle = { if (index >= 0) selected.remove(item) else if (selected.size < 10) selected.add(item) },
+                                onOpen = { openEditor(real, item) },
+                                edited = edits[item.uri]?.isEmpty == false,
+                            )
                         }
                         if (!gallery.access && !repo.isLive) {
                             items(GalleryEmojis.indices.toList()) { i ->
@@ -272,7 +339,7 @@ fun AttachSheet(visible: Boolean, onDismiss: () -> Unit, onSend: (List<MessageCo
                             Box(
                                 Modifier.height(44.dp).clip(Capsule()).background(c.accent).bounceClickable {
                                     if (selected.isNotEmpty()) {
-                                        sendPicked(selected.map { it.picked() }, caption)
+                                        sendGallery(selected.toList(), caption)
                                     } else {
                                         val items = selectedDemo.map { i -> MessageContent.Photo(i, listOf(1.33f, 0.75f, 1f, 1.5f)[i % 4], caption.ifBlank { null }, GalleryEmojis[i]) }
                                         selectedDemo.clear(); caption = ""
@@ -322,6 +389,24 @@ fun AttachSheet(visible: Boolean, onDismiss: () -> Unit, onSend: (List<MessageCo
             onSend(listOf(MessageContent.Contact(u.name, u.phone, u.id)))
         },
     )
+    MediaEditor(
+        visible = editorOpen,
+        items = editorItems,
+        startIndex = editorStart,
+        selected = selected,
+        onToggleSelect = { item ->
+            val i = selected.indexOfFirst { it.uri == item.uri }
+            if (i >= 0) selected.removeAt(i) else if (selected.size < 10) selected.add(item)
+        },
+        edits = edits,
+        caption = caption,
+        onCaption = { caption = it },
+        hd = hd,
+        onHd = { on -> hd = on; sendPrefs.edit().putBoolean("sendHd", on).apply() },
+        sending = preparing,
+        onDismiss = { editorOpen = false },
+        onSend = { current -> sendGallery(if (selected.isEmpty()) listOf(current) else selected.toList(), caption) },
+    )
 }
 
 @Composable
@@ -341,7 +426,7 @@ private fun SelectionCircle(index: Int, modifier: Modifier) {
 }
 
 @Composable
-private fun GalleryTile(item: GalleryItem, index: Int, onToggle: () -> Unit) {
+private fun GalleryTile(item: GalleryItem, index: Int, onToggle: () -> Unit, onOpen: () -> Unit, edited: Boolean = false) {
     val px = with(LocalDensity.current) { 130.dp.roundToPx() }
     val thumb = rememberGalleryThumb(item, px)
     val scale by animateFloatAsState(if (index >= 0) 0.9f else 1f, spring(dampingRatio = 0.6f, stiffness = 500f), label = "tileScale")
@@ -350,7 +435,7 @@ private fun GalleryTile(item: GalleryItem, index: Int, onToggle: () -> Unit) {
             .aspectRatio(1f)
             .clip(RoundedRectangle(6.dp))
             .background(TgTheme.colors.searchField)
-            .clickable(remember { MutableInteractionSource() }, null, onClick = onToggle),
+            .clickable(remember { MutableInteractionSource() }, null, onClick = onOpen),
     ) {
         if (thumb != null) {
             Image(thumb, null, Modifier.fillMaxSize().graphicsLayer { scaleX = scale; scaleY = scale }, contentScale = ContentScale.Crop)
@@ -360,7 +445,16 @@ private fun GalleryTile(item: GalleryItem, index: Int, onToggle: () -> Unit) {
                 T(com.abtin.tglass.ui.components.formatDuration((item.durationMs / 1000).toInt()), TgTheme.type.caption2, Color.White, weight = FontWeight.SemiBold)
             }
         }
-        SelectionCircle(index, Modifier.align(Alignment.TopEnd))
+        if (edited) {
+            Box(Modifier.align(Alignment.BottomEnd).padding(5.dp).size(20.dp).clip(CircleShape).background(Color.Black.copy(0.45f)), contentAlignment = Alignment.Center) {
+                Icon(com.abtin.tglass.features.media.MediaIcons.Adjust, Color.White, 14.dp)
+            }
+        }
+        // The circle selects; the rest of the tile opens the editor (Telegram iOS).
+        SelectionCircle(
+            index,
+            Modifier.align(Alignment.TopEnd).clickable(remember { MutableInteractionSource() }, null, onClick = onToggle).padding(4.dp),
+        )
     }
 }
 

@@ -116,6 +116,8 @@ data class Message(
     val views: Int? = null,
     val forwardedFrom: String? = null,
     val pinned: Boolean = false,
+    /** TDLib media album (Message.mediaAlbumId): photos/videos/files sent together; 0 if none. */
+    val albumId: Long = 0,
 ) {
     val text: String?
         get() = when (val c = content) {

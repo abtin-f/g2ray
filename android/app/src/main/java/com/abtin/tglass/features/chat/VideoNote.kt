@@ -3,6 +3,8 @@ package com.abtin.tglass.features.chat
 import android.net.Uri
 import android.os.SystemClock
 import android.view.TextureView
+import androidx.compose.ui.platform.LocalView
+import android.view.Surface
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -28,7 +30,11 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.VolumeOff
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -56,6 +62,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
@@ -85,6 +93,11 @@ import java.io.File
 
 /** Diameter of a round video message in the chat (Telegram-iOS). */
 private val NoteSize = 220.dp
+
+/** Diameter while it plays with sound: Telegram-iOS enlarges the circle. */
+private val NoteSizePlaying = 276.dp
+
+private val NoteAudio = AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build()
 
 /**
  * The video message currently playing with sound ("chatId:messageId"); every other one on screen loops muted.
@@ -130,6 +143,8 @@ internal fun VideoNoteMessage(
             val p = note.player
             if (active) {
                 VoicePlayer.stop()
+                // Take audio focus only while it plays with sound (the muted loops must not pause other apps).
+                p.setAudioAttributes(NoteAudio, true)
                 p.volume = 1f
                 p.repeatMode = Player.REPEAT_MODE_OFF
                 p.seekTo(0)
@@ -143,6 +158,7 @@ internal fun VideoNoteMessage(
             } else {
                 note.progress = 0f
                 note.positionMs = 0
+                p.setAudioAttributes(NoteAudio, false)
                 p.volume = 0f
                 p.repeatMode = Player.REPEAT_MODE_ONE
                 if (p.playbackState == Player.STATE_ENDED) p.seekTo(0)
@@ -167,12 +183,13 @@ internal fun VideoNoteMessage(
         }
     }
 
+    val diameter by animateDpAsState(if (active) NoteSizePlaying else NoteSize, spring(dampingRatio = 0.75f, stiffness = 380f), label = "noteSize")
     Column(modifier.padding(horizontal = 4.dp), horizontalAlignment = if (m.outgoing) Alignment.End else Alignment.Start) {
         if (m.forwardedFrom != null || replyTo != null) {
             Column(
                 Modifier
                     .padding(bottom = 4.dp)
-                    .widthIn(max = NoteSize)
+                    .widthIn(max = diameter)
                     .clip(RoundedRectangle(14.dp))
                     .background(colors.fill)
                     .padding(horizontal = 8.dp, vertical = 5.dp)
@@ -192,21 +209,21 @@ internal fun VideoNoteMessage(
                 }
             }
         }
-        Box(Modifier.size(NoteSize), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(diameter), contentAlignment = Alignment.Center) {
             Box(
                 Modifier
-                    .size(NoteSize)
+                    .size(diameter)
                     .clip(CircleShape)
                     .background(colors.meta.copy(alpha = 0.25f))
                     .bounceClickable { onTap() },
                 contentAlignment = Alignment.Center,
             ) {
-                TgImage(v.thumb, Modifier.size(NoteSize), maxPx = 480)
-                if (note != null) NoteSurface(note.player, Modifier.size(NoteSize))
+                TgImage(v.thumb, Modifier.size(diameter), maxPx = 480)
+                if (note != null) NoteSurface(note.player, Modifier.size(diameter))
             }
             if (active) {
                 val progress = note?.progress ?: 0f
-                Canvas(Modifier.size(NoteSize)) {
+                Canvas(Modifier.size(diameter)) {
                     val w = 3.5.dp.toPx()
                     val topLeft = Offset(w / 2, w / 2)
                     val arcSize = Size(size.width - w, size.height - w)
@@ -317,25 +334,30 @@ private fun NoteSurface(player: ExoPlayer, modifier: Modifier) {
         player.addListener(listener)
         onDispose { player.removeListener(listener) }
     }
-    AndroidView(
-        factory = { TextureView(it).also { tv -> player.setVideoTextureView(tv) } },
-        modifier = modifier.graphicsLayer {
-            // The TextureView stretches the picture to its bounds; scale the long side back out (clipped by the circle).
-            scaleX = if (aspect > 1f) aspect else 1f
-            scaleY = if (aspect < 1f) 1f / aspect else 1f
-        },
-    )
+    // Keyed by the player: a new file gets a new view attached to its player.
+    key(player) {
+        AndroidView(
+            factory = { TextureView(it).also { tv -> player.setVideoTextureView(tv) } },
+            modifier = modifier.graphicsLayer {
+                // The TextureView stretches the picture to its bounds; scale the long side back out (clipped by the circle).
+                scaleX = if (aspect > 1f) aspect else 1f
+                scaleY = if (aspect < 1f) 1f / aspect else 1f
+            },
+            onRelease = { tv -> player.clearVideoTextureView(tv) },
+        )
+    }
 }
 
 /**
  * Full-screen camera overlay while a video message is being recorded (Telegram-iOS): the chat dims and blurs, and the
- * front camera shows in a big circle with a red ring filling up to the 60 s limit. The composer stays on top of it.
+ * front camera shows in a big circle that springs in, with a ring filling up to the 60 s limit and the elapsed time
+ * under it. The composer stays on top of it.
  */
 @Composable
 fun VideoNoteRecordingOverlay(recorder: VideoNoteRecorder, modifier: Modifier = Modifier) {
     val backdrop = LocalBackdrop.current
     val level = LocalAppSettings.current.glassLevel
-    AnimatedVisibility(recorder.active, modifier = modifier, enter = fadeIn(tween(200)), exit = fadeOut(tween(200))) {
+    AnimatedVisibility(recorder.active, modifier = modifier, enter = fadeIn(tween(220)), exit = fadeOut(tween(220))) {
         val blurred = backdrop != null && (level == GlassLevel.Full || level == GlassLevel.Medium)
         Box(
             Modifier
@@ -344,8 +366,8 @@ fun VideoNoteRecordingOverlay(recorder: VideoNoteRecorder, modifier: Modifier = 
                     if (blurred && backdrop != null) Modifier.drawBackdrop(
                         backdrop = backdrop,
                         shape = { RoundedRectangle(0.dp) },
-                        effects = { blur(24.dp.toPx()) },
-                        onDrawSurface = { drawRect(Color.Black.copy(alpha = 0.35f)) },
+                        effects = { blur(28.dp.toPx()) },
+                        onDrawSurface = { drawRect(Color.Black.copy(alpha = 0.3f)) },
                     ) else Modifier.background(Color.Black.copy(alpha = 0.6f))
                 )
                 // Swallow touches on the chat behind.
@@ -353,8 +375,10 @@ fun VideoNoteRecordingOverlay(recorder: VideoNoteRecorder, modifier: Modifier = 
             contentAlignment = Alignment.Center,
         ) {
             val context = LocalContext.current
+            val view = LocalView.current
             val lifecycle = LocalLifecycleOwner.current
-            // TextureView-backed (COMPATIBLE) so the circle clip applies to the camera picture.
+            // TextureView-backed (COMPATIBLE) so the circle clip applies to the camera picture; PreviewView mirrors
+            // the front camera like a mirror, and the recording is mirrored the same way.
             val previewView = remember {
                 PreviewView(context).apply {
                     implementationMode = PreviewView.ImplementationMode.COMPATIBLE
@@ -362,32 +386,49 @@ fun VideoNoteRecordingOverlay(recorder: VideoNoteRecorder, modifier: Modifier = 
                 }
             }
             val active = recorder.active
-            LaunchedEffect(previewView, active) { if (active) recorder.bind(lifecycle, previewView.surfaceProvider) }
+            LaunchedEffect(previewView, active) {
+                if (active) recorder.bind(lifecycle, previewView.surfaceProvider, view.display?.rotation ?: Surface.ROTATION_0)
+            }
             var now by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
             LaunchedEffect(Unit) {
                 while (true) withFrameMillis { now = SystemClock.elapsedRealtime() }
             }
             val started = recorder.startedAt
-            val progress = if (started > 0) ((now - started).toFloat() / VideoNoteRecorder.MaxMs).coerceIn(0f, 1f) else 0f
-            Box(
-                Modifier
-                    .padding(bottom = 90.dp)
-                    .fillMaxWidth(0.8f)
-                    .widthIn(max = 360.dp)
-                    .aspectRatio(1f),
-                contentAlignment = Alignment.Center,
-            ) {
-                AndroidView(
-                    factory = { previewView },
-                    modifier = Modifier.fillMaxSize().padding(8.dp).clip(CircleShape).background(Color.Black),
-                )
-                if (started == 0L) ActivityIndicator(28.dp, Color.White)
-                Canvas(Modifier.fillMaxSize()) {
-                    val w = 4.dp.toPx()
-                    val topLeft = Offset(w / 2, w / 2)
-                    val arcSize = Size(size.width - w, size.height - w)
-                    drawArc(Color.White.copy(alpha = 0.25f), 0f, 360f, false, topLeft = topLeft, size = arcSize, style = Stroke(w))
-                    drawArc(Color(0xFFFF3B30), -90f, 360f * progress, false, topLeft = topLeft, size = arcSize, style = Stroke(w, cap = StrokeCap.Round))
+            val elapsed = if (started > 0) now - started else 0L
+            val progress = (elapsed.toFloat() / VideoNoteRecorder.MaxMs).coerceIn(0f, 1f)
+            val appear = remember { Animatable(0.6f) }
+            LaunchedEffect(Unit) { appear.animateTo(1f, spring(dampingRatio = 0.6f, stiffness = 320f)) }
+            Column(Modifier.padding(bottom = 96.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    Modifier
+                        .graphicsLayer { scaleX = appear.value; scaleY = appear.value }
+                        .fillMaxWidth(0.82f)
+                        .widthIn(max = 380.dp)
+                        .aspectRatio(1f),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    AndroidView(
+                        factory = { previewView },
+                        modifier = Modifier.fillMaxSize().padding(7.dp).clip(CircleShape).background(Color.Black),
+                    )
+                    if (started == 0L) ActivityIndicator(28.dp, Color.White)
+                    Canvas(Modifier.fillMaxSize()) {
+                        val w = 3.5.dp.toPx()
+                        val topLeft = Offset(w / 2, w / 2)
+                        val arcSize = Size(size.width - w, size.height - w)
+                        drawArc(Color.White.copy(alpha = 0.22f), 0f, 360f, false, topLeft = topLeft, size = arcSize, style = Stroke(w))
+                        drawArc(Color.White, -90f, 360f * progress, false, topLeft = topLeft, size = arcSize, style = Stroke(w, cap = StrokeCap.Round))
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
+                val secs = (elapsed / 1000).toInt()
+                Row(
+                    Modifier.clip(Capsule()).background(Color.Black.copy(alpha = 0.35f)).padding(horizontal = 10.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.size(7.dp).clip(CircleShape).background(Color(0xFFFF3B30)))
+                    Spacer(Modifier.width(6.dp))
+                    T(formatDuration(secs) + " / " + formatDuration(VideoNoteRecorder.MaxSeconds), TgTheme.type.footnote, Color.White, weight = FontWeight.SemiBold, maxLines = 1)
                 }
             }
         }

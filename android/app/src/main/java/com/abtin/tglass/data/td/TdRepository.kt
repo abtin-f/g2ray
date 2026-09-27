@@ -1242,6 +1242,7 @@ class TdRepository(context: Context) : TelegramRepository {
             views = if (m.isChannelPost) m.interactionInfo?.viewCount else null,
             forwardedFrom = m.forwardInfo?.origin?.let { originName(it) },
             pinned = m.isPinned,
+            albumId = m.mediaAlbumId,
         )
     }
 
@@ -2831,6 +2832,224 @@ class TdRepository(context: Context) : TelegramRepository {
         }
     }
     // ---- end Settings (real) ----
+
+    // ---- Composer ----
+    /** User id of the @gif inline bot, resolved once. */
+    private var gifBotId = 0L
+
+    override fun searchGifs(chatId: Long, query: String, onResult: (List<GifItem>) -> Unit) {
+        scope.launch {
+            if (gifBotId == 0L) {
+                val bot = client.searchPublicChat("gif")
+                if (bot is TdlResult.Success) {
+                    val type = bot.result.type
+                    if (type is ChatTypePrivate) gifBotId = type.userId
+                }
+            }
+            val botId = gifBotId
+            if (botId == 0L) {
+                onResult(emptyList())
+                return@launch
+            }
+            val r = client.getInlineQueryResults(botUserId = botId, chatId = chatId, userLocation = null, query = query, offset = "")
+            if (r !is TdlResult.Success) {
+                onResult(emptyList())
+                return@launch
+            }
+            onResult(r.result.results.mapNotNull { res ->
+                val a = (res as? InlineQueryResultAnimation)?.animation ?: return@mapNotNull null
+                val still = a.thumbnail?.takeIf { it.format is ThumbnailFormatJpeg || it.format is ThumbnailFormatPng || it.format is ThumbnailFormatWebp }
+                GifItem(a.animation.id, still?.let { imageOf(it.file, a.minithumbnail, it.width, it.height) }, a.width, a.height, a.duration)
+            })
+        }
+    }
+    // ---- end Composer ----
+
+    // ---- Message menu ----
+    override fun loadAvailableReactions(chatId: Long, messageId: Long, onResult: (com.abtin.tglass.data.AvailableReactionsInfo?) -> Unit) {
+        scope.launch {
+            when (val r = client.getMessageAvailableReactions(chatId, messageId, 8)) {
+                is TdlResult.Failure -> onResult(null)
+                is TdlResult.Success -> {
+                    val res = r.result
+                    val premium = me.premium
+                    // Custom-emoji and paid reactions can't be drawn here; premium-only ones need Premium.
+                    fun emojis(list: Array<AvailableReaction>): List<String> = list.mapNotNull { a ->
+                        if (a.needsPremium && !premium) null else (a.type as? ReactionTypeEmoji)?.emoji
+                    }
+                    val top = emojis(res.topReactions)
+                    val all = (top + emojis(res.recentReactions) + emojis(res.popularReactions)).distinct()
+                    onResult(
+                        com.abtin.tglass.data.AvailableReactionsInfo(
+                            top = top.ifEmpty { all },
+                            all = all,
+                            available = all.isNotEmpty() && res.unavailabilityReason == null,
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    override fun loadMessageCaps(chatId: Long, messageId: Long, onResult: (com.abtin.tglass.data.MessageCaps?) -> Unit) {
+        scope.launch {
+            when (val r = client.getMessageProperties(chatId, messageId)) {
+                is TdlResult.Failure -> onResult(null)
+                is TdlResult.Success -> {
+                    val p = r.result
+                    onResult(
+                        com.abtin.tglass.data.MessageCaps(
+                            canReply = p.canBeReplied,
+                            canEdit = p.canBeEdited,
+                            canForward = p.canBeForwarded,
+                            canPin = p.canBePinned,
+                            canSave = p.canBeSaved,
+                            canGetLink = p.canGetLink,
+                            canReport = p.canReportChat,
+                            canDeleteForSelf = p.canBeDeletedOnlyForSelf,
+                            canDeleteForAll = p.canBeDeletedForAllUsers,
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    override fun loadMessageLink(chatId: Long, messageId: Long, onResult: (String?) -> Unit) {
+        scope.launch {
+            val r = client.getMessageLink(chatId, messageId, 0, 0, "", false, false)
+            onResult(if (r is TdlResult.Success) r.result.link else null)
+        }
+    }
+
+    override fun reportMessages(chatId: Long, messageIds: List<Long>, optionId: ByteArray?, onResult: (com.abtin.tglass.data.ReportStep) -> Unit) {
+        scope.launch {
+            var option = optionId ?: ByteArray(0)
+            repeat(3) {
+                when (val r = client.reportChat(chatId, option, messageIds.toLongArray(), "")) {
+                    is TdlResult.Failure -> {
+                        onResult(com.abtin.tglass.data.ReportStep.Failed(humanize(r.message)))
+                        return@launch
+                    }
+                    is TdlResult.Success -> when (val res = r.result) {
+                        is ReportChatResultOk -> {
+                            onResult(com.abtin.tglass.data.ReportStep.Done)
+                            return@launch
+                        }
+                        is ReportChatResultOptionRequired -> {
+                            onResult(
+                                com.abtin.tglass.data.ReportStep.Options(
+                                    res.title.ifBlank { "Report" },
+                                    res.options.map { com.abtin.tglass.data.ReportChoice(it.id, it.text) },
+                                )
+                            )
+                            return@launch
+                        }
+                        is ReportChatResultTextRequired -> {
+                            if (!res.isOptional) {
+                                onResult(com.abtin.tglass.data.ReportStep.Failed("Telegram needs more details for this report."))
+                                return@launch
+                            }
+                            // Details are optional: send the report without them.
+                            option = res.optionId
+                        }
+                        else -> {
+                            onResult(com.abtin.tglass.data.ReportStep.Failed("These messages can't be reported from here."))
+                            return@launch
+                        }
+                    }
+                }
+            }
+            onResult(com.abtin.tglass.data.ReportStep.Failed("These messages can't be reported from here."))
+        }
+    }
+    // ---- end Message menu ----
+
+    // ---- Chat bubbles & links ----
+    override fun resolveLink(url: String, onResult: (com.abtin.tglass.data.ResolvedLink) -> Unit) {
+        val full = if (url.startsWith("http", true) || url.startsWith("tg:", true)) url else "https://$url"
+        scope.launch {
+            val type = client.getInternalLinkType(full)
+            if (type !is TdlResult.Success) {
+                onResult(com.abtin.tglass.data.ResolvedLink(external = true))
+                return@launch
+            }
+            onResult(resolveInternalLink(type.result))
+        }
+    }
+
+    private suspend fun resolveInternalLink(t: InternalLinkType): com.abtin.tglass.data.ResolvedLink {
+        fun fail(msg: String) = com.abtin.tglass.data.ResolvedLink(error = msg)
+        suspend fun byUsername(name: String): com.abtin.tglass.data.ResolvedLink {
+            val r = client.searchPublicChat(name)
+            return if (r is TdlResult.Success) com.abtin.tglass.data.ResolvedLink(chatId = r.result.id) else fail("No one uses @$name")
+        }
+        return when (t) {
+            is InternalLinkTypePublicChat -> byUsername(t.chatUsername)
+            is InternalLinkTypeBotStart -> byUsername(t.botUsername)
+            is InternalLinkTypeBotStartInGroup -> byUsername(t.botUsername)
+            is InternalLinkTypeSavedMessages -> com.abtin.tglass.data.ResolvedLink(chatId = myId)
+            is InternalLinkTypeMessage -> {
+                val r = client.getMessageLinkInfo(t.url)
+                when {
+                    r !is TdlResult.Success -> fail("This message isn't available")
+                    r.result.chatId == 0L -> fail("This message isn't available")
+                    else -> com.abtin.tglass.data.ResolvedLink(chatId = r.result.chatId, messageId = r.result.message?.id)
+                }
+            }
+            is InternalLinkTypeChatInvite -> {
+                val r = client.checkChatInviteLink(t.inviteLink)
+                if (r !is TdlResult.Success) return fail("This invite link is invalid or expired")
+                val info = r.result
+                // Already a member (or the chat can be previewed): just open it.
+                if (info.chatId != 0L && (info.accessibleFor > 0 || chatMap[info.chatId]?.joined == true)) {
+                    com.abtin.tglass.data.ResolvedLink(chatId = info.chatId)
+                } else {
+                    com.abtin.tglass.data.ResolvedLink(
+                        invite = com.abtin.tglass.data.InviteInfo(
+                            link = t.inviteLink,
+                            title = info.title,
+                            memberCount = info.memberCount,
+                            channel = info.type is InviteLinkChatTypeChannel,
+                            requestNeeded = info.createsJoinRequest,
+                        ),
+                    )
+                }
+            }
+            is InternalLinkTypeUserPhoneNumber -> {
+                val u = client.searchUserByPhoneNumber(t.phoneNumber, false)
+                if (u !is TdlResult.Success) return fail("No Telegram account with this number")
+                val c = client.createPrivateChat(u.result.id, false)
+                if (c is TdlResult.Success) com.abtin.tglass.data.ResolvedLink(chatId = c.result.id) else fail("Can't open this chat")
+            }
+            else -> com.abtin.tglass.data.ResolvedLink(external = true)
+        }
+    }
+
+    override fun joinByInviteLink(link: String, onDone: (chatId: Long?, error: String?) -> Unit) {
+        scope.launch {
+            when (val r = client.joinChatByInviteLink(link)) {
+                is TdlResult.Success -> when (val res = r.result) {
+                    is ChatJoinResultSuccess -> onDone(res.chatId, null)
+                    is ChatJoinResultRequestSent -> onDone(null, "Request to join sent")
+                    else -> onDone(null, "Can't join this chat")
+                }
+                is TdlResult.Failure -> onDone(null, humanize(r.message))
+            }
+        }
+    }
+
+    override fun loadDiscussionChat(chatId: Long, onResult: (Long?) -> Unit) {
+        val t = chatStates[chatId]?.type as? ChatTypeSupergroup ?: return onResult(null)
+        if (!t.isChannel) return onResult(null)
+        scope.launch {
+            val r = client.getSupergroupFullInfo(t.supergroupId)
+            val linked = (r as? TdlResult.Success)?.result?.linkedChatId?.takeIf { it != 0L }
+            if (linked != null && chatMap[linked] == null) client.getChat(linked)
+            onResult(linked)
+        }
+    }
+    // ---- end Chat bubbles & links ----
 
     // ---- Edit Profile & Appearance ----
     private var profileBirthdate by mutableStateOf<com.abtin.tglass.data.ProfileBirthdate?>(null)

@@ -695,3 +695,9 @@ fun TgThemeProvider(settings: AppSettings, content: @Composable () -> Unit) {
         content = content,
     )
 }
+
+/** Shows [content] with the dark palette regardless of the app theme (full-screen media viewer and editor). */
+@Composable
+fun ProvideDarkColors(content: @Composable () -> Unit) {
+    CompositionLocalProvider(LocalTgColors provides DarkColors, content = content)
+}

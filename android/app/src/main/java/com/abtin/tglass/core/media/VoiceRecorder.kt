@@ -58,7 +58,8 @@ class VoiceRecorder(private val context: Context) {
     fun sample(): Float {
         val r = recorder ?: return 0f
         val amp = runCatching { r.maxAmplitude }.getOrDefault(0)
-        val level = (amp / 18_000f).coerceIn(0f, 1f)
+        // Loudness on a perceptual (dB) scale: about -50 dBFS (silence) .. 0 dBFS → 0..1.
+        val level = if (amp <= 0) 0f else ((20f * kotlin.math.log10(amp / 32767f) + 50f) / 50f).coerceIn(0f, 1f)
         levels += level
         return level
     }
@@ -84,6 +85,6 @@ class VoiceRecorder(private val context: Context) {
             val from = i * src.size / n
             val to = maxOf(from + 1, (i + 1) * src.size / n).coerceAtMost(src.size)
             src.subList(from, to).maxOrNull() ?: 0f
-        }.map { (it * 1.4f).coerceIn(0.08f, 1f) }
+        }.map { (it * it * 1.3f).coerceIn(0.08f, 1f) }
     }
 }
