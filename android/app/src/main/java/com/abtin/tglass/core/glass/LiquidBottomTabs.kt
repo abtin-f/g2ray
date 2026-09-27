@@ -140,7 +140,7 @@ fun LiquidBottomTabs(
             snapshotFlow { currentIndex }
                 .drop(1)
                 .collectLatest { index ->
-                    dampedDragAnimation.animateToValue(index.toFloat())
+                    dampedDragAnimation.animateToValue(index.toFloat(), stretch = true)
                     onTabSelected(index)
                 }
         }
@@ -190,7 +190,8 @@ fun LiquidBottomTabs(
         CompositionLocalProvider(
             LocalLiquidBottomTabScale provides {
                 lerp(1f, 1.2f, dampedDragAnimation.pressProgress)
-            }
+            },
+            LocalLiquidBottomTabLayer provides LiquidBottomTabLayer.Tinted,
         ) {
             Row(
                 Modifier
@@ -284,5 +285,26 @@ fun LiquidBottomTabs(
                 .height(56f.dp)
                 .fillMaxWidth(1f / tabsCount)
         )
+
+        // Things that must stay untinted and sit above the selection pill (unread badges).
+        CompositionLocalProvider(
+            LocalLiquidBottomTabScale provides {
+                lerp(1f, 1.2f, dampedDragAnimation.pressProgress)
+            },
+            LocalLiquidBottomTabLayer provides LiquidBottomTabLayer.Overlay,
+        ) {
+            Row(
+                Modifier
+                    .clearAndSetSemantics {}
+                    .graphicsLayer {
+                        translationX = panelOffset
+                    }
+                    .height(56f.dp)
+                    .fillMaxWidth()
+                    .padding(horizontal = 4f.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                content = content
+            )
+        }
     }
 }

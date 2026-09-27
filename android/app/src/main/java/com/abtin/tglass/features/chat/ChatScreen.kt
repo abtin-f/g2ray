@@ -47,8 +47,11 @@ import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.PushPin
+import androidx.compose.material.icons.outlined.Report
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.PushPin
@@ -99,13 +102,16 @@ import com.abtin.tglass.core.navigation.Route
 import com.abtin.tglass.data.Chat
 import com.abtin.tglass.data.ChatType
 import com.abtin.tglass.data.Message
+import com.abtin.tglass.data.MessageCaps
 import com.abtin.tglass.data.MessageContent
 import com.abtin.tglass.data.TelegramRepository
 import com.abtin.tglass.data.senderName
 import com.abtin.tglass.features.chatlist.ChatAvatar
 import com.abtin.tglass.features.main.LocalRepository
 import com.abtin.tglass.ui.components.ContextMenuRequest
+import com.abtin.tglass.ui.components.AllFreeReactions
 import com.abtin.tglass.ui.components.DefaultReactions
+import com.abtin.tglass.ui.components.MenuReactions
 import com.abtin.tglass.ui.components.GlassTextButton
 import com.abtin.tglass.ui.components.Haptics
 import com.abtin.tglass.ui.components.Icon
@@ -199,6 +205,8 @@ fun ChatScreen(chatId: Long) {
     var editingId by rememberSaveable { mutableStateOf<Long?>(null) }
     var panelOpen by rememberSaveable { mutableStateOf(false) }
     var attachOpen by rememberSaveable { mutableStateOf(false) }
+    var attachMenuOpen by remember { mutableStateOf(false) }
+    var attachAction by remember { mutableStateOf<AttachAction?>(null) }
     var selecting by rememberSaveable { mutableStateOf(false) }
     val selected = remember { mutableStateListOf<Long>() }
     var highlightId by remember { mutableLongStateOf(-1L) }
@@ -443,64 +451,94 @@ fun ChatScreen(chatId: Long) {
         }
     }
 
+    // ---- Message menu (long press): forward sheet, delete alert, reactions ----
+    var forwardIds by remember { mutableStateOf<List<Long>?>(null) }
+    val saveMedia = rememberMediaSaver(repo, toast)
+
     fun forward(ids: List<Long>) {
-        val targets = repo.chats.filter { !it.archived && it.type != ChatType.Channel }.take(6)
-        sheet.show(SheetRequest(title = "Forward to…", actions = targets.map { t ->
-            SheetAction(t.title) {
-                repo.forward(chatId, ids, t.id)
-                toast.show("Forwarded to ${t.title}")
-            }
-        }))
+        focus.clearFocus()
+        keyboard?.hide()
+        forwardIds = ids
     }
 
-    fun confirmDelete(ids: List<Long>) {
+    fun confirmDelete(ids: List<Long>, caps: MessageCaps? = null) {
         val chosen = messages.filter { it.id in ids }
-        val done = { selected.clear(); selecting = false }
-        val one = ids.size == 1
-        // Telegram lets you delete for everyone in private chats and for your own messages elsewhere.
-        val canRevoke = repo.isLive && chat.type != ChatType.Saved &&
-            (chat.type == ChatType.Private || chat.type == ChatType.Bot || chosen.all { it.outgoing })
-        val actions = if (canRevoke) listOf(
-            SheetAction(if (chat.type == ChatType.Private) "Delete for Me and ${chat.title.substringBefore(' ')}" else "Delete for Everyone", destructive = true) {
-                repo.deleteMessages(chatId, ids.toSet(), forEveryone = true); done()
-            },
-            SheetAction("Delete for Me", destructive = true) { repo.deleteMessages(chatId, ids.toSet(), forEveryone = false); done() },
-        ) else listOf(
-            SheetAction(if (one) "Delete Message" else "Delete ${ids.size} Messages", destructive = true) {
-                repo.deleteMessages(chatId, ids.toSet(), forEveryone = chat.type == ChatType.Channel); done()
-            },
-        )
-        sheet.show(SheetRequest(title = if (canRevoke) (if (one) "Delete this message?" else "Delete ${ids.size} messages?") else null, actions = actions))
+        if (chosen.isEmpty()) return
+        sheet.show(deleteAlert(repo, chat, chosen, caps) { selected.clear(); selecting = false })
     }
 
     fun openMenu(m: Message, bounds: Rect) {
         focus.clearFocus()
         keyboard?.hide()
-        val hasText = m.text != null
+        val hasText = !m.text.isNullOrEmpty()
         // Photos, videos, GIFs and files can get a caption even when they have none yet (round video notes can't).
         val captionable = when (m.content) {
             is MessageContent.Photo -> true
             is MessageContent.File -> true
             else -> false
         }
-        val actions = listOfNotNull(
-            if (!isChannel) MenuAction("Reply", TgIcons.CtxReply) { replyToId = m.id; editingId = null; focusRequester.requestFocus() } else null,
-            if (hasText) MenuAction("Copy", TgIcons.CtxCopy) { copy(m) } else null,
-            if (m.outgoing && (hasText || captionable)) MenuAction("Edit", TgIcons.CtxEdit) { editingId = m.id; replyToId = null; text = m.text ?: ""; focusRequester.requestFocus() } else null,
-            MenuAction(if (m.pinned) "Unpin" else "Pin", if (m.pinned) TgIcons.CtxUnpin else TgIcons.CtxPin) { repo.togglePinMessage(chatId, m.id) },
-            MenuAction("Forward", TgIcons.CtxForward) { forward(listOf(m.id)) },
-            if (chat.type != ChatType.Saved) MenuAction("Save to Saved Messages", TgIcons.CtxSave) { repo.forward(chatId, listOf(m.id), repo.savedChatId); toast.show("Saved to Saved Messages") } else null,
-            MenuAction("Select", TgIcons.CtxSelect) { selecting = true; selected.clear(); selected.add(m.id) },
-            MenuAction("Delete", TgIcons.CtxDelete, destructive = true, groupStart = true) { confirmDelete(listOf(m.id)) },
-        )
+        val isMedia = galleryFileOf(m) != null
+        // Permissions from TDLib arrive a moment later and refine the menu (null = unknown → Telegram's usual rules).
+        val caps = mutableStateOf<MessageCaps?>(null)
+        repo.loadMessageCaps(chatId, m.id) { caps.value = it }
+        val reactions = if (m.content is MessageContent.Service) null else MenuReactions(
+            top = DefaultReactions,
+            all = (DefaultReactions + AllFreeReactions).distinct(),
+            chosen = m.reactions.filter { it.chosen }.map { it.emoji }.toSet(),
+        ).also { r ->
+            // Live: wait for the chat's own list (it pops in); demo answers at once.
+            r.available = !repo.isLive
+            repo.loadAvailableReactions(chatId, m.id) { info ->
+                if (info != null) {
+                    r.top = info.top
+                    r.all = info.all
+                    r.available = info.available
+                } else {
+                    r.available = true
+                }
+            }
+        }
+        val actionsFor: () -> List<MenuAction> = {
+            val k = caps.value
+            val canDelete = k?.let { it.canDeleteForSelf || it.canDeleteForAll } ?: (!isChannel || chat.canPost)
+            val canLink = (isChannel || isGroup) && (k?.canGetLink ?: (chat.username != null))
+            val canReport = !m.outgoing && (isChannel || isGroup) && (k?.canReport ?: !repo.isLive)
+            listOfNotNull(
+                // Top row of the card (Telegram iOS 26): Select · Copy · Delete
+                MenuAction("Select", TgIcons.CtxSelect, quick = true) { selecting = true; selected.clear(); selected.add(m.id) },
+                if (hasText) MenuAction("Copy", TgIcons.CtxCopy, quick = true) { copy(m) } else null,
+                if (canDelete) MenuAction("Delete", TgIcons.CtxDelete, destructive = true, quick = true) { confirmDelete(listOf(m.id), k) } else null,
+                // List rows
+                if (!isChannel && k?.canReply != false) MenuAction("Reply", TgIcons.CtxReply) { replyToId = m.id; editingId = null; focusRequester.requestFocus() } else null,
+                if (k?.canPin ?: true) MenuAction(if (m.pinned) "Unpin" else "Pin", if (m.pinned) TgIcons.CtxUnpin else TgIcons.CtxPin) { repo.togglePinMessage(chatId, m.id) } else null,
+                if (k?.canForward != false) MenuAction("Forward", TgIcons.CtxForward) { forward(listOf(m.id)) } else null,
+                if (m.outgoing && (hasText || captionable) && k?.canEdit != false) MenuAction("Edit", TgIcons.CtxEdit) { editingId = m.id; replyToId = null; text = m.text ?: ""; focusRequester.requestFocus() } else null,
+                if (canLink) MenuAction("Copy Link", Icons.Outlined.Link) {
+                    repo.loadMessageLink(chatId, m.id) { link ->
+                        if (link == null) toast.show("This message has no link")
+                        else {
+                            (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("link", link))
+                            toast.show("Link copied to clipboard")
+                        }
+                    }
+                } else null,
+                if (isMedia && k?.canSave != false) MenuAction(
+                    if ((m.content as? MessageContent.Photo)?.let { it.video || it.loop } == true) "Save Video" else "Save Photo",
+                    Icons.Outlined.Download,
+                ) { saveMedia(m) } else null,
+                if (chat.type != ChatType.Saved && k?.canForward != false) MenuAction("Save to Saved Messages", TgIcons.CtxSave) { repo.forward(chatId, listOf(m.id), repo.savedChatId); toast.show("Saved to Saved Messages") } else null,
+                if (canReport) MenuAction("Report", Icons.Outlined.Report, destructive = true, groupStart = true) { reportMessagesFlow(repo, sheet, toast, chatId, listOf(m.id)) } else null,
+            )
+        }
         menu.show(
             ContextMenuRequest(
                 key = "msg-${m.id}",
                 anchor = bounds,
                 alignEnd = m.outgoing,
-                actions = actions,
-                reactions = if (m.content is MessageContent.Service) null else DefaultReactions,
+                actions = actionsFor(),
+                menuReactions = reactions,
                 onReact = { e -> repo.toggleReaction(chatId, m.id, e) },
+                dynamicActions = actionsFor,
             ) {
                 Box(Modifier.fillMaxSize(), contentAlignment = if (m.outgoing) Alignment.TopEnd else Alignment.TopStart) {
                     val idx = messages.indexOfFirst { it.id == m.id }
@@ -515,6 +553,7 @@ fun ChatScreen(chatId: Long) {
             }
         )
     }
+    // ---- end Message menu ----
 
     val videoNoteRecorder = com.abtin.tglass.core.media.rememberVideoNoteRecorder()
 
@@ -733,7 +772,7 @@ fun ChatScreen(chatId: Long) {
                                     panelOpen = true
                                 }
                             },
-                            onAttach = { focus.clearFocus(); keyboard?.hide(); panelOpen = false; attachOpen = true },
+                            onAttach = { focus.clearFocus(); keyboard?.hide(); panelOpen = false; attachMenuOpen = true },
                             onSend = { send() },
                             onVoice = { secs, path, wave ->
                                 repo.sendContent(
@@ -778,14 +817,30 @@ fun ChatScreen(chatId: Long) {
                                 onEmoji = { e -> text += e },
                                 onSticker = { e -> repo.sendContent(chatId, MessageContent.Sticker(e), replyToId); replyToId = null },
                                 onGif = { i -> repo.sendContent(chatId, MessageContent.Photo(i + 3, 1.4f, null, "🎞"), replyToId); replyToId = null },
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
                                 onStickerItem = { st -> repo.sendSticker(chatId, st, replyToId); replyToId = null },
                                 onGifItem = { g -> repo.sendGif(chatId, g, replyToId); replyToId = null },
+                                onBackspace = { text = dropLastGrapheme(text) },
+                                onSwitchKeyboard = { panelOpen = false; focusRequester.requestFocus(); keyboard?.show() },
+                                chatId = chatId,
                             )
                         }
                     }
                 }
             }
+
+            // "+" menu (iOS 26 glass popup above the composer)
+            AttachMenu(
+                visible = attachMenuOpen,
+                bottom = (with(density) { bottomHeight.toDp() } - 8.dp).coerceAtLeast(0.dp),
+                canPoll = !repo.isLive || chat.type != ChatType.Private,
+                demo = !repo.isLive,
+                onDismiss = { attachMenuOpen = false },
+                onPick = { a ->
+                    attachMenuOpen = false
+                    if (a == AttachAction.Gallery || a == AttachAction.Camera) attachOpen = true
+                    if (a != AttachAction.Gallery) attachAction = a
+                },
+            )
 
             AttachSheet(
                 visible = attachOpen,
@@ -795,7 +850,13 @@ fun ChatScreen(chatId: Long) {
                     repo.sendMedia(chatId, items, replyToId)
                     replyToId = null
                 },
+                action = attachAction,
+                onActionHandled = { attachAction = null },
             )
+
+            forwardIds?.let { ids ->
+                com.abtin.tglass.features.media.ForwardSheet(chatId, ids, onDismiss = { forwardIds = null }, onDone = { selecting = false; selected.clear() })
+            }
         }
     }
 }
@@ -1004,11 +1065,9 @@ private fun MessageRow(
                 Modifier
                     .onGloballyPositioned { bounds[0] = it.boundsInRoot() }
                     .graphicsLayer { alpha = if (menu.activeKey == key) 0f else 1f }
+                    .messageLongPress(enabled = !selecting) { onLongPress(bounds[0]) }
                     .pointerInput(selecting) {
-                        if (!selecting) detectTapGestures(
-                            onLongPress = { onLongPress(bounds[0]) },
-                            onDoubleTap = { Haptics.tap(view); onReact("👍") },
-                        )
+                        if (!selecting) detectTapGestures(onDoubleTap = { Haptics.tap(view); onReact("👍") })
                     }
             ) {
                 MessageBubble(

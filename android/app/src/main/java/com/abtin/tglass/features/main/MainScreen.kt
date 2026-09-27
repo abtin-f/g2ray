@@ -17,6 +17,11 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.draw.clip
+import com.kyant.shapes.Capsule
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.Call
@@ -35,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
@@ -43,6 +49,8 @@ import com.abtin.tglass.core.design.TgTheme
 import com.abtin.tglass.core.glass.GlassIconButton
 import com.abtin.tglass.core.glass.LiquidBottomTab
 import com.abtin.tglass.core.glass.LiquidBottomTabs
+import com.abtin.tglass.core.glass.LiquidBottomTabLayer
+import com.abtin.tglass.core.glass.LocalLiquidBottomTabLayer
 import com.abtin.tglass.core.glass.LocalBackdrop
 import com.abtin.tglass.data.TelegramRepository
 import com.abtin.tglass.features.calls.CallsScreen
@@ -138,7 +146,8 @@ fun MainScreen() {
                         TgIcons.IcSearch,
                         onClick = { tab = 2; tabBar.searchRequests++ },
                         size = 64.dp,
-                        iconSize = 26.dp,
+                        iconSize = 28.dp,
+                        contentDescription = "Search",
                     )
                 }
             }
@@ -149,14 +158,51 @@ fun MainScreen() {
 @Composable
 private fun androidx.compose.foundation.layout.RowScope.TabItem(animation: Int, label: String, selected: Boolean, badge: Int = 0, onClick: () -> Unit) {
     val c = TgTheme.colors
+    val layer = LocalLiquidBottomTabLayer.current
+    val overlay = layer == LiquidBottomTabLayer.Overlay
     LiquidBottomTab(onClick = onClick) {
-        Box {
-            // Telegram-iOS tab icons are Lottie animations that play when the tab gets selected.
-            LottieIcon(animation, c.text, 30.dp, playKey = if (selected) label else null, play = selected)
-            if (badge > 0) {
-                Badge(badge, modifier = Modifier.align(Alignment.TopEnd).offset(x = 14.dp, y = (-3).dp).wrapContentSize(unbounded = true))
+        // The icon slot is shorter than the Lottie canvas: Telegram's tab animations leave ~25% empty margin
+        // around the glyph, so a 44dp canvas gives the ~24pt glyph of the iOS 26 tab bar.
+        Box(Modifier.size(width = 44.dp, height = 28.dp), contentAlignment = Alignment.Center) {
+            if (!overlay) {
+                Box(Modifier.requiredSize(44.dp)) {
+                    // Telegram-iOS tab icons are Lottie animations that play when the tab gets selected.
+                    LottieIcon(animation, c.text, 44.dp, playKey = if (selected) label else null, play = selected)
+                }
+            } else if (badge > 0) {
+                // Drawn above the selection pill so it stays red instead of being tinted blue.
+                TabBadge(badge, Modifier.align(Alignment.TopCenter).offset(x = 15.dp, y = (-4).dp).wrapContentSize(unbounded = true))
             }
         }
-        T(label, TgTheme.type.caption2.copy(fontSize = 10.sp, lineHeight = 12.sp), c.text, maxLines = 1, weight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+        T(
+            label,
+            TgTheme.type.caption2.copy(fontSize = 10.5.sp, lineHeight = 13.sp),
+            if (overlay) Color.Transparent else c.text,
+            maxLines = 1,
+            weight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+        )
+    }
+}
+
+/** iOS tab bar badge: a red capsule (UITabBarItem.badgeValue), not the blue chat-list counter. */
+@Composable
+private fun TabBadge(count: Int, modifier: Modifier = Modifier) {
+    val c = TgTheme.colors
+    Box(
+        modifier
+            .defaultMinSize(minWidth = 18.dp)
+            .height(18.dp)
+            .clip(Capsule())
+            .background(c.destructive)
+            .padding(horizontal = 5.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        T(
+            com.abtin.tglass.ui.components.formatCount(count),
+            TgTheme.type.footnote.copy(fontSize = 12.sp, lineHeight = 14.sp),
+            Color.White,
+            maxLines = 1,
+            weight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+        )
     }
 }

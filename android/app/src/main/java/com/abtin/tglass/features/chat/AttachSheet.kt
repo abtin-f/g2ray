@@ -93,7 +93,14 @@ private val GalleryEmojis = listOf("🏔", "🌅", "🏝", "🌃", "🐈", "🍜
 
 /** Attachment panel: device gallery (or demo tiles) with multi-select, camera, caption, and the attachment type bar. */
 @Composable
-fun AttachSheet(visible: Boolean, onDismiss: () -> Unit, onSend: (List<MessageContent>) -> Unit) {
+fun AttachSheet(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    onSend: (List<MessageContent>) -> Unit,
+    /** An entry picked in the "+" menu ([AttachMenu]) to run once; [onActionHandled] clears it. */
+    action: AttachAction? = null,
+    onActionHandled: () -> Unit = {},
+) {
     val c = TgTheme.colors
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -181,6 +188,21 @@ fun AttachSheet(visible: Boolean, onDismiss: () -> Unit, onSend: (List<MessageCo
         }
         if (ok) sendLocation()
         else locationPermission.launch(arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION))
+    }
+
+    // Entries of the "+" menu run through the same pickers as this panel's own type bar.
+    LaunchedEffect(action) {
+        when (action) {
+            null, AttachAction.Gallery -> {}
+            AttachAction.File -> runCatching { documentLauncher.launch(arrayOf("*/*")) }
+            AttachAction.Music -> runCatching { documentLauncher.launch(arrayOf("audio/*")) }
+            AttachAction.Location -> requestLocation()
+            AttachAction.Contact -> contactOpen = true
+            AttachAction.Poll -> pollOpen = true
+            AttachAction.Camera -> openCamera()
+            AttachAction.Gift -> onSend(listOf(MessageContent.Sticker("🎁")))
+        }
+        if (action != null) onActionHandled()
     }
 
     LaunchedEffect(visible, gallery.access, gallery.version) {
