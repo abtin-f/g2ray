@@ -1242,6 +1242,7 @@ class TdRepository(context: Context) : TelegramRepository {
             views = if (m.isChannelPost) m.interactionInfo?.viewCount else null,
             forwardedFrom = m.forwardInfo?.origin?.let { originName(it) },
             pinned = m.isPinned,
+            albumId = m.mediaAlbumId,
         )
     }
 
@@ -2963,6 +2964,92 @@ class TdRepository(context: Context) : TelegramRepository {
         }
     }
     // ---- end Message menu ----
+
+    // ---- Chat bubbles & links ----
+    override fun resolveLink(url: String, onResult: (com.abtin.tglass.data.ResolvedLink) -> Unit) {
+        val full = if (url.startsWith("http", true) || url.startsWith("tg:", true)) url else "https://$url"
+        scope.launch {
+            val type = client.getInternalLinkType(full)
+            if (type !is TdlResult.Success) {
+                onResult(com.abtin.tglass.data.ResolvedLink(external = true))
+                return@launch
+            }
+            onResult(resolveInternalLink(type.result))
+        }
+    }
+
+    private suspend fun resolveInternalLink(t: InternalLinkType): com.abtin.tglass.data.ResolvedLink {
+        fun fail(msg: String) = com.abtin.tglass.data.ResolvedLink(error = msg)
+        suspend fun byUsername(name: String): com.abtin.tglass.data.ResolvedLink {
+            val r = client.searchPublicChat(name)
+            return if (r is TdlResult.Success) com.abtin.tglass.data.ResolvedLink(chatId = r.result.id) else fail("No one uses @$name")
+        }
+        return when (t) {
+            is InternalLinkTypePublicChat -> byUsername(t.chatUsername)
+            is InternalLinkTypeBotStart -> byUsername(t.botUsername)
+            is InternalLinkTypeBotStartInGroup -> byUsername(t.botUsername)
+            is InternalLinkTypeSavedMessages -> com.abtin.tglass.data.ResolvedLink(chatId = myId)
+            is InternalLinkTypeMessage -> {
+                val r = client.getMessageLinkInfo(t.url)
+                when {
+                    r !is TdlResult.Success -> fail("This message isn't available")
+                    r.result.chatId == 0L -> fail("This message isn't available")
+                    else -> com.abtin.tglass.data.ResolvedLink(chatId = r.result.chatId, messageId = r.result.message?.id)
+                }
+            }
+            is InternalLinkTypeChatInvite -> {
+                val r = client.checkChatInviteLink(t.inviteLink)
+                if (r !is TdlResult.Success) return fail("This invite link is invalid or expired")
+                val info = r.result
+                // Already a member (or the chat can be previewed): just open it.
+                if (info.chatId != 0L && (info.accessibleFor > 0 || chatMap[info.chatId]?.joined == true)) {
+                    com.abtin.tglass.data.ResolvedLink(chatId = info.chatId)
+                } else {
+                    com.abtin.tglass.data.ResolvedLink(
+                        invite = com.abtin.tglass.data.InviteInfo(
+                            link = t.inviteLink,
+                            title = info.title,
+                            memberCount = info.memberCount,
+                            channel = info.type is InviteLinkChatTypeChannel,
+                            requestNeeded = info.createsJoinRequest,
+                        ),
+                    )
+                }
+            }
+            is InternalLinkTypeUserPhoneNumber -> {
+                val u = client.searchUserByPhoneNumber(t.phoneNumber, false)
+                if (u !is TdlResult.Success) return fail("No Telegram account with this number")
+                val c = client.createPrivateChat(u.result.id, false)
+                if (c is TdlResult.Success) com.abtin.tglass.data.ResolvedLink(chatId = c.result.id) else fail("Can't open this chat")
+            }
+            else -> com.abtin.tglass.data.ResolvedLink(external = true)
+        }
+    }
+
+    override fun joinByInviteLink(link: String, onDone: (chatId: Long?, error: String?) -> Unit) {
+        scope.launch {
+            when (val r = client.joinChatByInviteLink(link)) {
+                is TdlResult.Success -> when (val res = r.result) {
+                    is ChatJoinResultSuccess -> onDone(res.chatId, null)
+                    is ChatJoinResultRequestSent -> onDone(null, "Request to join sent")
+                    else -> onDone(null, "Can't join this chat")
+                }
+                is TdlResult.Failure -> onDone(null, humanize(r.message))
+            }
+        }
+    }
+
+    override fun loadDiscussionChat(chatId: Long, onResult: (Long?) -> Unit) {
+        val t = chatStates[chatId]?.type as? ChatTypeSupergroup ?: return onResult(null)
+        if (!t.isChannel) return onResult(null)
+        scope.launch {
+            val r = client.getSupergroupFullInfo(t.supergroupId)
+            val linked = (r as? TdlResult.Success)?.result?.linkedChatId?.takeIf { it != 0L }
+            if (linked != null && chatMap[linked] == null) client.getChat(linked)
+            onResult(linked)
+        }
+    }
+    // ---- end Chat bubbles & links ----
 }
 
 /** Process-wide TDLib instance (TDLib must not be created twice for the same database). */
