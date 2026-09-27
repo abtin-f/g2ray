@@ -515,6 +515,63 @@ interface TelegramRepository {
         } else rename()
     }
     // ---- end Profile ----
+
+    // ---- Chat bubbles & links ----
+    /** Resolves a Telegram link (t.me/…, telegram.me/…, tg://…) to what the app should open. */
+    fun resolveLink(url: String, onResult: (ResolvedLink) -> Unit) {
+        val link = TelegramLinks.parse(url) ?: return onResult(ResolvedLink(external = true))
+        when {
+            link.username != null -> resolveUsername(link.username) { id ->
+                onResult(if (id != null) ResolvedLink(chatId = id, messageId = link.messageId) else ResolvedLink(error = "No one uses @${link.username}"))
+            }
+            link.invite != null -> onResult(ResolvedLink(error = "Invite links need a real account"))
+            link.phone != null -> {
+                val digits = link.phone.filter { it.isDigit() }
+                val u = users.values.firstOrNull { it.phone.filter { ch -> ch.isDigit() } == digits }
+                onResult(if (u != null) ResolvedLink(chatId = privateChatWith(u.id)) else ResolvedLink(error = "No Telegram account with this number"))
+            }
+            else -> onResult(ResolvedLink(error = "This message isn't available"))
+        }
+    }
+
+    /** Joins the chat behind an invite link; [onDone] gets the chat id or an error. */
+    fun joinByInviteLink(link: String, onDone: (chatId: Long?, error: String?) -> Unit) = onDone(null, "Invite links need a real account")
+
+    /** The discussion group linked to a channel (its comments), or null. */
+    fun loadDiscussionChat(chatId: Long, onResult: (Long?) -> Unit) = onResult(null)
+    // ---- end Chat bubbles & links ----
+    // ---- Composer ----
+    /** GIF search for the emoji panel (Telegram's @gif inline bot). The demo has no server, so nothing is found. */
+    fun searchGifs(chatId: Long, query: String, onResult: (List<GifItem>) -> Unit) = onResult(emptyList())
+    // ---- end Composer ----
+
+    // ---- Message menu ----
+
+    /** Reactions offered for a message (emoji only); [onResult] gets null when they could not be loaded. */
+    fun loadAvailableReactions(chatId: Long, messageId: Long, onResult: (AvailableReactionsInfo?) -> Unit) =
+        onResult(AvailableReactionsInfo(top = TopReactions, all = (TopReactions + FreeReactions).distinct()))
+
+    /** What the user may do with a message; null = unknown (the menu then uses its own rules). */
+    fun loadMessageCaps(chatId: Long, messageId: Long, onResult: (MessageCaps?) -> Unit) = onResult(null)
+
+    /** t.me link to a message (public or private); null when the message has none. */
+    fun loadMessageLink(chatId: Long, messageId: Long, onResult: (String?) -> Unit) =
+        onResult(chat(chatId)?.username?.let { "https://t.me/$it/$messageId" })
+
+    /**
+     * Reports messages to Telegram's moderators. Call with [optionId] null first; when the result is
+     * [ReportStep.Options] call again with the chosen [ReportChoice.id].
+     */
+    fun reportMessages(chatId: Long, messageIds: List<Long>, optionId: ByteArray?, onResult: (ReportStep) -> Unit) {
+        if (optionId == null) onResult(
+            ReportStep.Options(
+                "Report",
+                listOf("Spam", "Violence", "Child Abuse", "Illegal Drugs", "Personal Details", "Other")
+                    .mapIndexed { i, t -> ReportChoice(byteArrayOf(i.toByte()), t) },
+            )
+        ) else onResult(ReportStep.Done)
+    }
+    // ---- end Message menu ----
 }
 
 class DemoRepository(private val scope: CoroutineScope) : TelegramRepository {
@@ -621,6 +678,9 @@ class DemoRepository(private val scope: CoroutineScope) : TelegramRepository {
             msg(101, 0, 60 * 25 - 2, text("Morning! How was the trip?")),
             msg(101, 1, 60 * 25 - 4, MessageContent.Photo(3, 1.33f, "Darband was beautiful 🏔", "🏔"), listOf(Reaction("❤️", 1, true))),
             msg(101, 1, 60 * 25 - 5, text("We should go together next time")),
+            msg(101, 1, 60 * 25 - 5, MessageContent.Photo(11, 1.5f, null, "🌄")).copy(albumId = 501),
+            msg(101, 1, 60 * 25 - 5, MessageContent.Photo(12, 0.8f, null, "🌲")).copy(albumId = 501),
+            msg(101, 1, 60 * 25 - 5, MessageContent.Photo(13, 1.0f, null, "🏕")).copy(albumId = 501),
             msg(101, 0, 60 * 24, text("Definitely! Let me know when")),
             s1,
             msg(101, 0, 178, text("Yes!! The Liquid Glass design is insane"), reply = s1.id),
