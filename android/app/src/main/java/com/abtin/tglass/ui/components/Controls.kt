@@ -47,10 +47,13 @@ fun IOSSlider(
     range: ClosedFloatingPointRange<Float>,
     modifier: Modifier = Modifier,
     steps: Int = 0,
+    /** Called once the finger lifts (after a tap or a drag). */
+    onValueChangeFinished: () -> Unit = {},
 ) {
     val c = TgTheme.colors
     val view = LocalView.current
     val latest = rememberUpdatedState(value)
+    val finished = rememberUpdatedState(onValueChangeFinished)
     BoxWithConstraints(modifier.fillMaxWidth().height(32.dp), contentAlignment = Alignment.CenterStart) {
         val thumb = 28.dp
         val widthPx = constraints.maxWidth.toFloat()
@@ -69,10 +72,14 @@ fun IOSSlider(
                 detectTapGestures { o ->
                     val v = snap(fromX(o.x))
                     if (v != latest.value) { Haptics.tick(view); onValueChange(v) }
+                    finished.value()
                 }
             }
             .pointerInput(range, steps) {
-                detectHorizontalDragGestures { change, _ ->
+                detectHorizontalDragGestures(
+                    onDragEnd = { finished.value() },
+                    onDragCancel = { finished.value() },
+                ) { change, _ ->
                     change.consume()
                     val v = snap(fromX(change.position.x))
                     if (v != latest.value) { if (steps > 0) Haptics.tick(view); onValueChange(v) }

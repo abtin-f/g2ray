@@ -422,8 +422,8 @@ fun ChatScreen(chatId: Long) {
         keyboard?.hide()
         val hasText = m.text != null
         // Photos, videos, GIFs and files can get a caption even when they have none yet (round video notes can't).
-        val captionable = when (val ct = m.content) {
-            is MessageContent.Photo -> ct.emoji != "📹"
+        val captionable = when (m.content) {
+            is MessageContent.Photo -> true
             is MessageContent.File -> true
             else -> false
         }

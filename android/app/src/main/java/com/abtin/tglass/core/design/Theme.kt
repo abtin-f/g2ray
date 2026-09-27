@@ -262,6 +262,12 @@ val LocalAppSettings = staticCompositionLocalOf<AppSettings> { error("AppSetting
 private val LocalTgColors = staticCompositionLocalOf { LightColors }
 private val LocalTgTypography = staticCompositionLocalOf { typography(1f) }
 
+/** Shows [content] with another text size (the live preview while the Text Size slider is dragged). */
+@Composable
+fun ProvideTextScale(scale: Float, content: @Composable () -> Unit) {
+    CompositionLocalProvider(LocalTgTypography provides typography(scale), content = content)
+}
+
 object TgTheme {
     val colors: TgColors
         @Composable @ReadOnlyComposable get() = LocalTgColors.current

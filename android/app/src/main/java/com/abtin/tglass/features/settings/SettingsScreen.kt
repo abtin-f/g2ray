@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -43,6 +44,7 @@ import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -57,9 +59,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.sp
 import com.abtin.tglass.core.design.GlassLevel
 import com.abtin.tglass.core.design.LocalAppSettings
+import com.abtin.tglass.core.design.ProvideTextScale
 import com.abtin.tglass.core.design.ThemeMode
 import com.abtin.tglass.core.design.TgTheme
 import com.abtin.tglass.core.design.WallpaperPresets
@@ -305,27 +309,34 @@ private fun LazyListScope.appearance() {
     item {
         val s = LocalAppSettings.current
         val c = TgTheme.colors
+        // The slider only changes a local value while dragging: the preview follows it live and the whole app is
+        // re-laid out once, when the finger lifts (otherwise every step re-measures every screen and the slider).
+        var scale by remember { mutableFloatStateOf(s.textScale) }
+        var corners by remember { mutableFloatStateOf(s.bubbleRadius) }
         Section(header = "Preview") {
-            Box(Modifier.fillMaxWidth().height(170.dp).clip(RoundedRectangle(26.dp))) {
-                ChatWallpaper()
-                Column(Modifier.fillMaxSize().padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    MessageBubble(BubbleDemo.incoming, BubbleGroup(false, false, false, false), null, 1, null, null, false, 260.dp)
-                    Row { Spacer(Modifier.weight(1f)); MessageBubble(BubbleDemo.outgoing, BubbleGroup(false, false, false, false), null, 0, BubbleDemo.incoming, "Sara", false, 260.dp) }
+            Box(Modifier.fillMaxWidth().heightIn(min = 170.dp).clip(RoundedRectangle(26.dp))) {
+                Box(Modifier.matchParentSize()) { ChatWallpaper() }
+                ProvideTextScale(scale) {
+                    Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        MessageBubble(BubbleDemo.incoming, BubbleGroup(false, false, false, false), null, 1, null, null, false, 260.dp, radiusOverride = corners)
+                        Row { Spacer(Modifier.weight(1f)); MessageBubble(BubbleDemo.outgoing, BubbleGroup(false, false, false, false), null, 0, BubbleDemo.incoming, "Sara", false, 260.dp, radiusOverride = corners) }
+                    }
                 }
             }
         }
         Spacer(Modifier.height(24.dp))
         Section(header = "Text Size", footer = "Adjusts text size across the whole app.") {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                T("A", TgTheme.type.footnote, c.text)
-                IOSSlider(s.textScale, { s.updateTextScale(it) }, 0.85f..1.3f, Modifier.weight(1f).padding(horizontal = 12.dp), steps = 8)
-                T("A", TgTheme.type.title3, c.text)
+                // Fixed sizes: labels that grew with the setting would resize the slider under the finger.
+                T("A", TextStyle(fontSize = 13.sp), c.text)
+                IOSSlider(scale, { scale = it }, 0.85f..1.3f, Modifier.weight(1f).padding(horizontal = 12.dp), steps = 8, onValueChangeFinished = { if (scale != s.textScale) s.updateTextScale(scale) })
+                T("A", TextStyle(fontSize = 20.sp), c.text)
             }
         }
         Spacer(Modifier.height(24.dp))
         Section(header = "Message Corners") {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                IOSSlider(s.bubbleRadius, { s.updateBubbleRadius(it) }, 6f..22f, Modifier.weight(1f), steps = 7)
+                IOSSlider(corners, { corners = it }, 6f..22f, Modifier.weight(1f), steps = 7, onValueChangeFinished = { if (corners != s.bubbleRadius) s.updateBubbleRadius(corners) })
             }
         }
         Spacer(Modifier.height(24.dp))

@@ -203,6 +203,8 @@ fun MessageBubble(
     onReact: (String) -> Unit = {},
     onVote: (Int) -> Unit = {},
     onMediaClick: () -> Unit = {},
+    /** Corner radius override (the Appearance preview while its slider is dragged). */
+    radiusOverride: Float? = null,
 ) {
     val c = TgTheme.colors
     val content = m.content
@@ -214,7 +216,7 @@ fun MessageBubble(
         VideoNoteMessage(m, content, replyTo, replyName, onReplyClick, modifier)
         return
     }
-    val radius = LocalAppSettings.current.bubbleRadius.dp
+    val radius = (radiusOverride ?: LocalAppSettings.current.bubbleRadius).dp
     val shape = remember(m.outgoing, group, radius) {
         BubbleShape(m.outgoing, !group.groupedBottom, radius, (radius.value / 2f).coerceAtLeast(4f).dp, group.groupedTop, group.groupedBottom)
     }
