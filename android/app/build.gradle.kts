@@ -13,8 +13,8 @@ android {
         applicationId = "com.abtin.tglass"
         minSdk = 26
         targetSdk = 36
-        versionCode = 13
-        versionName = "0.11.1"
+        versionCode = 14
+        versionName = "0.12.0"
 
         // Optional: bake Telegram API credentials into the build (otherwise they are entered in the app).
         val apiId = (project.findProperty("TG_API_ID") as String?) ?: System.getenv("TG_API_ID")
