@@ -438,6 +438,39 @@ interface TelegramRepository {
     /** The user's public t.me link (username, or a temporary link when there is none). */
     fun loadMyLink(onResult: (String?) -> Unit) = onResult(me.username?.let { "https://t.me/$it" })
     // ---- end Settings (real) ----
+
+    // ---- Composer ----
+    /** GIF search for the emoji panel (Telegram's @gif inline bot). The demo has no server, so nothing is found. */
+    fun searchGifs(chatId: Long, query: String, onResult: (List<GifItem>) -> Unit) = onResult(emptyList())
+    // ---- end Composer ----
+
+    // ---- Message menu ----
+
+    /** Reactions offered for a message (emoji only); [onResult] gets null when they could not be loaded. */
+    fun loadAvailableReactions(chatId: Long, messageId: Long, onResult: (AvailableReactionsInfo?) -> Unit) =
+        onResult(AvailableReactionsInfo(top = TopReactions, all = (TopReactions + FreeReactions).distinct()))
+
+    /** What the user may do with a message; null = unknown (the menu then uses its own rules). */
+    fun loadMessageCaps(chatId: Long, messageId: Long, onResult: (MessageCaps?) -> Unit) = onResult(null)
+
+    /** t.me link to a message (public or private); null when the message has none. */
+    fun loadMessageLink(chatId: Long, messageId: Long, onResult: (String?) -> Unit) =
+        onResult(chat(chatId)?.username?.let { "https://t.me/$it/$messageId" })
+
+    /**
+     * Reports messages to Telegram's moderators. Call with [optionId] null first; when the result is
+     * [ReportStep.Options] call again with the chosen [ReportChoice.id].
+     */
+    fun reportMessages(chatId: Long, messageIds: List<Long>, optionId: ByteArray?, onResult: (ReportStep) -> Unit) {
+        if (optionId == null) onResult(
+            ReportStep.Options(
+                "Report",
+                listOf("Spam", "Violence", "Child Abuse", "Illegal Drugs", "Personal Details", "Other")
+                    .mapIndexed { i, t -> ReportChoice(byteArrayOf(i.toByte()), t) },
+            )
+        ) else onResult(ReportStep.Done)
+    }
+    // ---- end Message menu ----
 }
 
 class DemoRepository(private val scope: CoroutineScope) : TelegramRepository {

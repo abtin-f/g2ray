@@ -32,6 +32,8 @@ class DampedDragAnimation(
 
     private val valueAnimationSpec =
         spring(1f, 1000f, visibilityThreshold)
+    private val stretchValueAnimationSpec =
+        spring(0.8f, 380f, visibilityThreshold)
     private val velocityAnimationSpec =
         spring(0.5f, 300f, visibilityThreshold * 10f)
     private val pressProgressAnimationSpec =
@@ -114,11 +116,23 @@ class DampedDragAnimation(
         }
     }
 
-    fun animateToValue(value: Float) {
+    /**
+     * Moves to [value] with the pressed (magnified) look. With [stretch] the move is a slower spring that feeds
+     * the velocity, so the glass stretches along the way like the iOS 26 tab bar pill when a tab is tapped.
+     */
+    fun animateToValue(value: Float, stretch: Boolean = false) {
         animationScope.launch {
             mutatorMutex.mutate {
                 press()
                 val targetValue = value.coerceIn(valueRange)
+                if (stretch) {
+                    launch {
+                        valueAnimation.animateTo(targetValue, stretchValueAnimationSpec) { updateVelocity() }
+                        velocityAnimation.animateTo(0f, velocityAnimationSpec)
+                    }
+                    release()
+                    return@mutate
+                }
                 launch { valueAnimation.animateTo(targetValue, valueAnimationSpec) }
                 if (velocity != 0f) {
                     launch { velocityAnimation.animateTo(0f, velocityAnimationSpec) }
