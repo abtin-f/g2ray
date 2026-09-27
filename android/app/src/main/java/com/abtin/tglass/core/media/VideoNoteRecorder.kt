@@ -54,10 +54,12 @@ fun RecordedVideoNote.toContent(): MessageContent.VideoNote = MessageContent.Vid
 
 /**
  * Records Telegram video messages with CameraX: front camera, ~480p, cropped to a square through a 1:1 [ViewPort]
- * (so the preview circle shows exactly what is recorded), audio on, into the app cache.
+ * (so the preview circle shows exactly what is recorded), mirrored like the preview, audio on, into the app cache.
  *
- * Flow: [open] shows the camera overlay ([active]); the overlay's PreviewView calls [bind], which opens the camera and
- * starts recording; [stop] finishes (send) or discards (cancel) and reports the result once the file is finalized.
+ * Flow: [open] shows the camera overlay ([active]) and registers the result callback; the overlay's PreviewView calls
+ * [bind], which opens the camera and starts recording; [stop] finishes (send) or discards (cancel). The callback gets
+ * the finished note (or null) exactly once per [open] — also when the recording ends by itself (60 s limit, camera
+ * lost). [active] stays true until the file is finalized, so a new recording can't start on top of the old one.
  * All calls on the main thread.
  */
 class VideoNoteRecorder(context: Context) {
@@ -65,7 +67,7 @@ class VideoNoteRecorder(context: Context) {
     private val main = ContextCompat.getMainExecutor(app)
     private val scope = MainScope()
 
-    /** True while the camera overlay should be shown (from [open] until the recording is finished or cancelled). */
+    /** True from [open] until the recording is finished, finalized and reported. */
     var active by mutableStateOf(false)
         private set
 
@@ -73,50 +75,59 @@ class VideoNoteRecorder(context: Context) {
     var startedAt by mutableLongStateOf(0L)
         private set
 
+    /** Duration actually written to the file so far (from CameraX status events). */
+    private var recordedMs by mutableLongStateOf(0L)
+
     private var provider: ProcessCameraProvider? = null
     private var recording: Recording? = null
     private var session = 0
     private var stopRequested = false
     private var sendRequested = false
-    private var onDone: ((RecordedVideoNote?) -> Unit)? = null
+    private var onResult: ((RecordedVideoNote?) -> Unit)? = null
 
     /** Milliseconds recorded so far. */
-    fun elapsedMs(): Long = if (startedAt > 0) SystemClock.elapsedRealtime() - startedAt else 0L
+    fun elapsedMs(): Long {
+        if (startedAt <= 0) return 0L
+        return maxOf(recordedMs, SystemClock.elapsedRealtime() - startedAt)
+    }
 
-    fun open() {
+    /** Starts a recording session; [result] gets the finished note, or null when it was cancelled or failed. */
+    fun open(result: (RecordedVideoNote?) -> Unit) {
         if (active) return
         session++
         active = true
         startedAt = 0
+        recordedMs = 0
         stopRequested = false
         sendRequested = false
-        onDone = null
+        recording = null
+        onResult = result
     }
 
-    /** Opens the camera for the overlay's preview and starts recording. */
-    fun bind(owner: LifecycleOwner, surfaceProvider: Preview.SurfaceProvider) {
-        if (!active) return
+    /** Opens the camera for the overlay's preview and starts recording. [rotation] is the display's Surface.ROTATION_*. */
+    fun bind(owner: LifecycleOwner, surfaceProvider: Preview.SurfaceProvider, rotation: Int = Surface.ROTATION_0) {
+        if (!active || stopRequested || provider != null && recording != null) return
         val s = session
         val future = ProcessCameraProvider.getInstance(app)
         future.addListener({
-            if (s != session || !active) return@addListener
+            if (s != session || !active || stopRequested) return@addListener
             val p = runCatching { future.get() }.getOrNull()
             if (p == null) {
-                closeCamera()
-                deliver(null)
+                finish(null)
                 return@addListener
             }
             provider = p
-            val preview = Preview.Builder().build()
+            val preview = Preview.Builder().setTargetRotation(rotation).build()
             preview.setSurfaceProvider(surfaceProvider)
             val recorder = Recorder.Builder()
                 .setQualitySelector(QualitySelector.from(Quality.SD, FallbackStrategy.lowerQualityOrHigherThan(Quality.SD)))
                 .build()
             val capture = VideoCapture.Builder(recorder)
                 .setMirrorMode(MirrorMode.MIRROR_MODE_ON_FRONT_ONLY)
+                .setTargetRotation(rotation)
                 .build()
             val group = UseCaseGroup.Builder()
-                .setViewPort(ViewPort.Builder(Rational(1, 1), Surface.ROTATION_0).build())
+                .setViewPort(ViewPort.Builder(Rational(1, 1), rotation).build())
                 .addUseCase(preview)
                 .addUseCase(capture)
                 .build()
@@ -126,8 +137,7 @@ class VideoNoteRecorder(context: Context) {
                 p.bindToLifecycle(owner, if (front) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA, group)
             }.isSuccess
             if (!bound) {
-                closeCamera()
-                deliver(null)
+                finish(null)
                 return@addListener
             }
             startRecording(recorder, s)
@@ -138,78 +148,85 @@ class VideoNoteRecorder(context: Context) {
     private fun startRecording(recorder: Recorder, s: Int) {
         val dir = File(app.cacheDir, "video_notes").apply { mkdirs() }
         val out = File(dir, "note_${System.currentTimeMillis()}.mp4")
-        var pending = recorder.prepareRecording(app, FileOutputOptions.Builder(out).build())
+        // Safety net in case the UI misses the limit; the file then still gets sent.
+        val options = FileOutputOptions.Builder(out).setDurationLimitMillis(MaxMs + 500).build()
+        var pending = recorder.prepareRecording(app, options)
         if (ContextCompat.checkSelfPermission(app, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
             pending = pending.withAudioEnabled()
         }
         val started = runCatching { pending.start(main) { event -> onEvent(event, s, out) } }.getOrNull()
         if (started == null) {
             out.delete()
-            closeCamera()
-            deliver(null)
+            finish(null)
             return
         }
         recording = started
     }
 
     private fun onEvent(event: VideoRecordEvent, s: Int, out: File) {
-        if (event is VideoRecordEvent.Start) {
-            if (s == session) startedAt = SystemClock.elapsedRealtime()
-            return
-        }
-        if (event !is VideoRecordEvent.Finalize) return
         if (s != session) {
-            out.delete()
+            // A stale session (should not happen, [open] waits for finalization): just clean up.
+            if (event is VideoRecordEvent.Finalize) out.delete()
             return
         }
-        val error = event.error
-        val usable = error == VideoRecordEvent.Finalize.ERROR_NONE ||
-            error == VideoRecordEvent.Finalize.ERROR_SOURCE_INACTIVE ||
-            error == VideoRecordEvent.Finalize.ERROR_DURATION_LIMIT_REACHED ||
-            error == VideoRecordEvent.Finalize.ERROR_FILE_SIZE_LIMIT_REACHED
-        val send = stopRequested && sendRequested && usable && out.length() > 0
-        recording = null
-        closeCamera()
-        if (!send) {
-            out.delete()
-            deliver(null)
-            return
-        }
-        scope.launch {
-            val result = withContext(Dispatchers.IO) { describe(out) }
-            if (result == null) out.delete()
-            deliver(result)
+        when (event) {
+            is VideoRecordEvent.Start -> startedAt = SystemClock.elapsedRealtime()
+            is VideoRecordEvent.Status -> recordedMs = event.recordingStats.recordedDurationNanos / 1_000_000L
+            is VideoRecordEvent.Finalize -> {
+                val error = event.error
+                val usable = error == VideoRecordEvent.Finalize.ERROR_NONE ||
+                    error == VideoRecordEvent.Finalize.ERROR_SOURCE_INACTIVE ||
+                    error == VideoRecordEvent.Finalize.ERROR_DURATION_LIMIT_REACHED ||
+                    error == VideoRecordEvent.Finalize.ERROR_FILE_SIZE_LIMIT_REACHED
+                // Stopped by the user: their choice. Stopped by the time limit: send, like Telegram.
+                val wanted = if (stopRequested) sendRequested else error == VideoRecordEvent.Finalize.ERROR_DURATION_LIMIT_REACHED
+                recording = null
+                closeCamera()
+                if (!(wanted && usable && out.length() > 0)) {
+                    out.delete()
+                    finish(null)
+                    return
+                }
+                scope.launch {
+                    val result = withContext(Dispatchers.IO) { describe(out) }
+                    if (result == null) out.delete()
+                    finish(result)
+                }
+            }
+            else -> {}
         }
     }
 
-    /** Finishes the recording: [send] keeps and reports it through [onResult], otherwise it is deleted (and null reported). */
-    fun stop(send: Boolean, onResult: (RecordedVideoNote?) -> Unit) {
+    /** Finishes the recording: [send] keeps and reports it, otherwise it is deleted (and null reported). */
+    fun stop(send: Boolean) {
         if (!active || stopRequested) return
         stopRequested = true
         sendRequested = send
-        onDone = onResult
         val r = recording
         if (r == null) {
-            // The camera had not started yet: nothing was recorded.
+            // The camera had not started recording yet: nothing was recorded.
             closeCamera()
-            deliver(null)
+            finish(null)
             return
         }
-        recording = null
         r.stop()
     }
 
-    fun cancel() = stop(false) {}
+    fun cancel() = stop(false)
 
     private fun closeCamera() {
         runCatching { provider?.unbindAll() }
-        active = false
+        provider = null
         startedAt = 0
     }
 
-    private fun deliver(result: RecordedVideoNote?) {
-        val cb = onDone
-        onDone = null
+    /** Reports the result once and ends the session. */
+    private fun finish(result: RecordedVideoNote?) {
+        closeCamera()
+        recording = null
+        val cb = onResult
+        onResult = null
+        active = false
         cb?.invoke(result)
     }
 
@@ -223,11 +240,15 @@ class VideoNoteRecorder(context: Context) {
             val rot = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
             if (rot == 90 || rot == 270) { val t = w; w = h; h = t }
             val ms = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
-            val seconds = ((ms + 500) / 1000).toInt()
-            if (seconds < 1) return null
+            if (ms < 700) return null
+            val seconds = ((ms + 500) / 1000).toInt().coerceIn(1, MaxSeconds)
             val side = minOf(w, h).takeIf { it > 0 } ?: 384
-            val thumb = runCatching { r.getFrameAtTime(0) }.getOrNull()?.let { squareThumb(it, out) }
-            return RecordedVideoNote(out.absolutePath, seconds.coerceAtMost(MaxSeconds), side.coerceIn(1, 640), thumb?.first, thumb?.second ?: 0)
+            // A frame a little into the video (the very first one is often dark while the sensor adjusts).
+            val at = minOf(400_000L, ms * 1000 / 2)
+            val frame = runCatching { r.getFrameAtTime(at, MediaMetadataRetriever.OPTION_CLOSEST_SYNC) }.getOrNull()
+                ?: runCatching { r.getFrameAtTime(0) }.getOrNull()
+            val thumb = frame?.let { squareThumb(it, out) }
+            return RecordedVideoNote(out.absolutePath, seconds, side.coerceIn(1, 640), thumb?.first, thumb?.second ?: 0)
         } catch (e: Exception) {
             return null
         } finally {
@@ -242,6 +263,9 @@ class VideoNoteRecorder(context: Context) {
         val scaled = if (side > size) Bitmap.createScaledBitmap(square, size, size, true) else square
         val file = File(out.parentFile, out.nameWithoutExtension + "_thumb.jpg")
         FileOutputStream(file).use { scaled.compress(Bitmap.CompressFormat.JPEG, 80, it) }
+        if (scaled !== square) scaled.recycle()
+        if (square !== frame) square.recycle()
+        frame.recycle()
         file.absolutePath to size
     }.getOrNull()
 

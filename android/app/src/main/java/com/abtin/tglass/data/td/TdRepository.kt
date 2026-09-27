@@ -2831,6 +2831,38 @@ class TdRepository(context: Context) : TelegramRepository {
         }
     }
     // ---- end Settings (real) ----
+
+    // ---- Composer ----
+    /** User id of the @gif inline bot, resolved once. */
+    private var gifBotId = 0L
+
+    override fun searchGifs(chatId: Long, query: String, onResult: (List<GifItem>) -> Unit) {
+        scope.launch {
+            if (gifBotId == 0L) {
+                val bot = client.searchPublicChat("gif")
+                if (bot is TdlResult.Success) {
+                    val type = bot.result.type
+                    if (type is ChatTypePrivate) gifBotId = type.userId
+                }
+            }
+            val botId = gifBotId
+            if (botId == 0L) {
+                onResult(emptyList())
+                return@launch
+            }
+            val r = client.getInlineQueryResults(botUserId = botId, chatId = chatId, userLocation = null, query = query, offset = "")
+            if (r !is TdlResult.Success) {
+                onResult(emptyList())
+                return@launch
+            }
+            onResult(r.result.results.mapNotNull { res ->
+                val a = (res as? InlineQueryResultAnimation)?.animation ?: return@mapNotNull null
+                val still = a.thumbnail?.takeIf { it.format is ThumbnailFormatJpeg || it.format is ThumbnailFormatPng || it.format is ThumbnailFormatWebp }
+                GifItem(a.animation.id, still?.let { imageOf(it.file, a.minithumbnail, it.width, it.height) }, a.width, a.height, a.duration)
+            })
+        }
+    }
+    // ---- end Composer ----
 }
 
 /** Process-wide TDLib instance (TDLib must not be created twice for the same database). */

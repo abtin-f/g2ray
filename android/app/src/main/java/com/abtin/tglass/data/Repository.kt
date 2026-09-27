@@ -438,6 +438,11 @@ interface TelegramRepository {
     /** The user's public t.me link (username, or a temporary link when there is none). */
     fun loadMyLink(onResult: (String?) -> Unit) = onResult(me.username?.let { "https://t.me/$it" })
     // ---- end Settings (real) ----
+
+    // ---- Composer ----
+    /** GIF search for the emoji panel (Telegram's @gif inline bot). The demo has no server, so nothing is found. */
+    fun searchGifs(chatId: Long, query: String, onResult: (List<GifItem>) -> Unit) = onResult(emptyList())
+    // ---- end Composer ----
 }
 
 class DemoRepository(private val scope: CoroutineScope) : TelegramRepository {
