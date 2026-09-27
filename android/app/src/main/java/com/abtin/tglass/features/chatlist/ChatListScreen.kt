@@ -17,6 +17,11 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
+import com.abtin.tglass.ui.components.TgAnimations
+import kotlin.math.roundToInt
 import com.abtin.tglass.core.glass.LocalBackdrop
 import com.abtin.tglass.ui.components.GlassButtonGroup
 import com.abtin.tglass.ui.components.IosIcons
@@ -131,6 +136,7 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
     val repo = LocalRepository.current
     val nav = LocalNavigator.current
     val sheet = LocalActionSheet.current
+    val toast = com.abtin.tglass.ui.components.LocalToast.current
     val c = TgTheme.colors
     val focus = LocalFocusManager.current
     val density = LocalDensity.current
@@ -180,34 +186,77 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
             animate(storiesPx, storiesMax, animationSpec = spring(dampingRatio = 0.85f, stiffness = 380f)) { v, _ -> storiesPx = v }
         }
     }
+    // Hidden archive (Telegram-iOS): the "Archived Chats" row sits hidden above the chats; pulling the list down
+    // at the top (after the stories are fully expanded) reveals it. Released past half its height it stays
+    // revealed until the list is scrolled up again.
+    val context = androidx.compose.ui.platform.LocalContext.current
+    remember { ArchivePrefs.init(context) }
+    val archiveRowPx = with(density) { com.abtin.tglass.core.design.LocalAppSettings.current.chatListSize.row.dp.toPx() }
+    val archiveRowMax = rememberUpdatedState(archiveRowPx)
+    var archivePx by remember { mutableFloatStateOf(0f) }
+    val archiveRevealable = rememberUpdatedState(
+        ArchivePrefs.hidden && folder == 0 && !editing && !searching && repo.chats.any { it.archived }
+    )
+    LaunchedEffect(archiveRevealable.value) { if (!archiveRevealable.value) archivePx = 0f }
+    val view = androidx.compose.ui.platform.LocalView.current
+    // Read through derivedStateOf so pulling does not recompose the whole screen every frame.
+    val archiveFull by remember { androidx.compose.runtime.derivedStateOf { archivePx > 0f && archivePx >= archiveRowMax.value - 0.5f } }
+    LaunchedEffect(archiveFull) { if (archiveFull) com.abtin.tglass.ui.components.Haptics.tick(view) }
+
     val storiesConnection = remember(storiesMax) {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                if (available.y < 0f && storiesPx > 0f) {
-                    val d = maxOf(available.y, -storiesPx)
-                    storiesPx += d
-                    return Offset(0f, d)
+                if (available.y < 0f) {
+                    // Scrolling up: the revealed archive goes first, then the expanded stories.
+                    var left = available.y
+                    if (archivePx > 0f) {
+                        val d = maxOf(left, -archivePx)
+                        archivePx += d
+                        left -= d
+                    }
+                    if (left < 0f && storiesPx > 0f) {
+                        val d = maxOf(left, -storiesPx)
+                        storiesPx += d
+                        left -= d
+                    }
+                    return Offset(0f, available.y - left)
                 }
                 return Offset.Zero
             }
 
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-                if (!hasStories.value) return Offset.Zero
-                if (available.y > 0f && source == NestedScrollSource.UserInput && storiesPx < storiesMax) {
+                if (available.y <= 0f || source != NestedScrollSource.UserInput) return Offset.Zero
+                if (hasStories.value && storiesPx < storiesMax) {
                     val d = minOf(available.y * 0.6f, storiesMax - storiesPx)
                     storiesPx += d
+                    return Offset(0f, available.y)
+                }
+                val rowMax = archiveRowMax.value
+                if (archiveRevealable.value && archivePx < rowMax) {
+                    // Rubber-band resistance like UIScrollView overscroll.
+                    val d = minOf(available.y * 0.55f, rowMax - archivePx)
+                    archivePx += d
                     return Offset(0f, available.y)
                 }
                 return Offset.Zero
             }
 
             override suspend fun onPreFling(available: Velocity): Velocity {
-                if (storiesPx in 0.5f..(storiesMax - 0.5f)) {
-                    val target = if (available.y > 600f || (available.y > -600f && storiesPx > storiesMax * 0.45f)) storiesMax else 0f
-                    animate(storiesPx, target, animationSpec = spring(dampingRatio = 0.82f, stiffness = 420f)) { v, _ -> storiesPx = v }
-                    return available
+                val rowMax = archiveRowMax.value
+                val archiveMid = archivePx in 0.5f..(rowMax - 0.5f)
+                val storiesMid = storiesPx in 0.5f..(storiesMax - 0.5f)
+                if (!archiveMid && !storiesMid) return Velocity.Zero
+                kotlinx.coroutines.coroutineScope {
+                    if (archiveMid) launch {
+                        val target = if (available.y > 600f || (available.y > -600f && archivePx > rowMax * 0.5f)) rowMax else 0f
+                        animate(archivePx, target, animationSpec = spring(dampingRatio = 0.85f, stiffness = 420f)) { v, _ -> archivePx = v }
+                    }
+                    if (storiesMid) launch {
+                        val target = if (available.y > 600f || (available.y > -600f && storiesPx > storiesMax * 0.45f)) storiesMax else 0f
+                        animate(storiesPx, target, animationSpec = spring(dampingRatio = 0.82f, stiffness = 420f)) { v, _ -> storiesPx = v }
+                    }
                 }
-                return Velocity.Zero
+                return available
             }
         }
     }
@@ -248,7 +297,29 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
                     if (folders.size > 1) FolderTabs(folders, folder, { folder = it }, unreadFor = { f -> all.count { ch -> inFolder(ch, f) && (ch.unread > 0 || ch.markedUnread) && !ch.muted } })
                 }
                 if (archived.isNotEmpty() && folder == 0 && !editing) {
-                    item(key = "archive") { ArchiveRow(archived, repo) { nav.push(Route.Archive) } }
+                    item(key = "archive") {
+                        val hidden = ArchivePrefs.hidden
+                        ArchiveItem(
+                            archived = archived,
+                            repo = repo,
+                            hidden = hidden,
+                            // Hidden: only the pulled-down part is laid out (bottom-aligned, clipped), so the row
+                            // slides out from under the folders capsule as the list is pulled.
+                            modifier = if (hidden) Modifier.revealHeight({ archivePx }, { archiveRowPx }) else Modifier,
+                            onHide = {
+                                ArchivePrefs.updateHidden(true)
+                                scope.launch {
+                                    animate(archivePx, 0f, animationSpec = spring(dampingRatio = 0.9f, stiffness = 420f)) { v, _ -> archivePx = v }
+                                }
+                                toast.show("Archive hidden. Pull down the chat list to see it.", IosIcons.ArrowUp)
+                            },
+                            onPin = {
+                                archivePx = 0f
+                                ArchivePrefs.updateHidden(false)
+                            },
+                            onClick = { nav.push(Route.Archive) },
+                        )
+                    }
                 }
                 if (chats.isEmpty()) {
                     item(key = "empty") {
@@ -507,29 +578,108 @@ fun ChatListItem(
     }
 }
 
+/** Lays out only [shown] px of the content's height, keeping its bottom edge (a row pulled out from above). */
+private fun Modifier.revealHeight(shown: () -> Float, full: () -> Float): Modifier = this
+    .clipToBounds()
+    .layout { measurable, constraints ->
+        val p = measurable.measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
+        val h = shown().coerceIn(0f, p.height.toFloat()).roundToInt()
+        layout(p.width, h) {
+            p.placeWithLayer(0, h - p.height) { alpha = (shown() / full().coerceAtLeast(1f)).coerceIn(0f, 1f) }
+        }
+    }
+
+/**
+ * The "Archived Chats" row with its iOS actions: swipe left → Hide / Pin, long press → the same in a menu
+ * (plus Mark All as Read).
+ */
 @Composable
-private fun ArchiveRow(archived: List<Chat>, repo: TelegramRepository, onClick: () -> Unit) {
+private fun ArchiveItem(
+    archived: List<Chat>,
+    repo: TelegramRepository,
+    hidden: Boolean,
+    modifier: Modifier,
+    onHide: () -> Unit,
+    onPin: () -> Unit,
+    onClick: () -> Unit,
+) {
     val c = TgTheme.colors
-    Box(Modifier.fillMaxWidth()) {
+    val menu = LocalContextMenu.current
+    val bounds = remember { arrayOf(Rect.Zero) }
+    val key = "archive-row"
+    val anyUnread = archived.any { it.unread > 0 || it.markedUnread }
+    val trailing = listOf(
+        if (hidden) SwipeAction("Pin", TgIcons.CtxPin, c.green, TgAnimations.Pin, onPin)
+        else SwipeAction("Hide", TgIcons.CtxArchive, Color(0xFFAAAAAF), null, onHide),
+    )
+    Box(
+        modifier
+            .onGloballyPositioned { bounds[0] = it.boundsInRoot() }
+            .graphicsLayer { alpha = if (menu.activeKey == key) 0f else 1f }
+    ) {
+        SwipeableRow(leading = emptyList(), trailing = trailing) {
+            ArchiveRow(archived, repo, onClick = onClick, onLongClick = {
+                menu.show(
+                    ContextMenuRequest(
+                        key = key,
+                        anchor = bounds[0],
+                        alignEnd = false,
+                        actions = listOfNotNull(
+                            if (hidden) MenuAction("Pin to Top", TgIcons.CtxPin, onClick = onPin)
+                            else MenuAction("Hide", IosIcons.ArrowUp, onClick = onHide),
+                            if (anyUnread) MenuAction("Mark All as Read", TgIcons.CtxRead) {
+                                archived.forEach { ch -> if (ch.unread > 0 || ch.markedUnread) repo.toggleRead(ch.id) }
+                            } else null,
+                        ),
+                    ) {
+                        ArchiveRow(archived, repo, onClick = { menu.dismiss(); onClick() })
+                    }
+                )
+            })
+        }
+    }
+}
+
+@Composable
+private fun ArchiveRow(archived: List<Chat>, repo: TelegramRepository, onClick: () -> Unit, onLongClick: (() -> Unit)? = null) {
+    val c = TgTheme.colors
+    val size = com.abtin.tglass.core.design.LocalAppSettings.current.chatListSize
+    val unread = archived.count { it.unread > 0 || it.markedUnread }
+    Box(Modifier.fillMaxWidth().background(c.background)) {
         Row(
             Modifier
                 .fillMaxWidth()
-                .iosClickable(onClick = onClick)
-                .height(com.abtin.tglass.core.design.LocalAppSettings.current.chatListSize.row.dp)
+                .iosClickable(onLongClick = onLongClick, onClick = onClick)
+                .height(size.row.dp)
                 .padding(start = 14.dp, end = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Avatar("Archive", 0, com.abtin.tglass.core.design.LocalAppSettings.current.chatListSize.avatar.dp, iconRes = TgIcons.IcArchiveLarge, iconColors = Color(0xFFDEDEE5) to Color(0xFFC5C6CC))
+            Avatar("Archive", 0, size.avatar.dp, iconRes = TgIcons.IcArchiveLarge, iconColors = Color(0xFFDEDEE5) to Color(0xFFC5C6CC))
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    T("Archived Chats", TgTheme.type.headline, c.text, modifier = Modifier.weight(1f))
-                    repo.lastMessage(archived.first().id)?.let { T(formatListDate(it.date), TgTheme.type.subheadline.copy(fontSize = 14.sp), c.secondaryText) }
+                    T("Archived Chats", TgTheme.type.headline.copy(fontSize = size.titleSp.sp, lineHeight = (size.titleSp + 4f).sp), c.text, maxLines = 1, modifier = Modifier.weight(1f))
+                    archived.firstOrNull()?.let { repo.lastMessage(it.id) }?.let {
+                        T(formatListDate(it.date), TgTheme.type.subheadline.copy(fontSize = (size.previewSp - 0.5f).sp), c.secondaryText, maxLines = 1)
+                    }
                 }
-                T(archived.joinToString(", ") { it.title }, TgTheme.type.subheadline, c.secondaryText, maxLines = 2)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    T(
+                        archived.joinToString(", ") { it.title },
+                        TgTheme.type.subheadline.copy(fontSize = size.previewSp.sp, lineHeight = (size.previewSp * 1.2f).sp),
+                        c.secondaryText,
+                        maxLines = 2,
+                        modifier = Modifier.weight(1f),
+                    )
+                    // Archived chats are usually muted, so Telegram shows their unread count in a gray badge.
+                    if (unread > 0) {
+                        Spacer(Modifier.width(6.dp))
+                        com.abtin.tglass.ui.components.Badge(unread, muted = true)
+                    }
+                }
             }
         }
-        Separator(Modifier.align(Alignment.BottomStart), startPadding = 86.dp)
+        Separator(Modifier.align(Alignment.BottomStart), startPadding = (14 + size.avatar + 10).dp)
     }
 }
 
