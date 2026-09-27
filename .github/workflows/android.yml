@@ -57,7 +57,9 @@ jobs:
         run: |
           cp android/app/build/outputs/apk/release/app-release.apk TGlass.apk
           mkdir -p /tmp/builds && cp TGlass.apk /tmp/builds/
-          (cd /tmp/builds && git init -q && git checkout -q -b builds && git add TGlass.apk \
+          # R8 mapping, to decode stack traces from the in-app crash reports.
+          cp android/app/build/outputs/mapping/release/mapping.txt /tmp/builds/mapping.txt || true
+          (cd /tmp/builds && git init -q && git checkout -q -b builds && git add -A \
             && git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -qm "TGlass APK from ${{ github.sha }}" \
             && git push -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" builds)
           # The pre-release is a convenience download; the builds branch above is the source of truth.
