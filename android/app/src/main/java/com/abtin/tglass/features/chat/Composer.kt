@@ -338,7 +338,7 @@ fun Composer(
             // Mic / send
             val sendMode = text.isNotBlank() || editing != null || preview != null
             Box(Modifier.size(ComposerHeight), contentAlignment = Alignment.Center) {
-                AnimatedVisibility(
+                androidx.compose.animation.AnimatedVisibility(
                     !sendMode && !(recording && locked),
                     enter = fadeIn() + scaleIn(initialScale = 0.4f),
                     exit = fadeOut() + scaleOut(targetScale = 0.4f),
@@ -435,7 +435,7 @@ fun Composer(
                         }
                     }
                 }
-                AnimatedVisibility(
+                androidx.compose.animation.AnimatedVisibility(
                     sendMode && !recording,
                     enter = fadeIn() + scaleIn(initialScale = 0.4f),
                     exit = fadeOut() + scaleOut(targetScale = 0.4f),
