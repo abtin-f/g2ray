@@ -204,6 +204,8 @@ fun ChatScreen(chatId: Long) {
     var editingId by rememberSaveable { mutableStateOf<Long?>(null) }
     var panelOpen by rememberSaveable { mutableStateOf(false) }
     var attachOpen by rememberSaveable { mutableStateOf(false) }
+    var attachMenuOpen by remember { mutableStateOf(false) }
+    var attachAction by remember { mutableStateOf<AttachAction?>(null) }
     var selecting by rememberSaveable { mutableStateOf(false) }
     val selected = remember { mutableStateListOf<Long>() }
     var highlightId by remember { mutableLongStateOf(-1L) }
@@ -711,7 +713,7 @@ fun ChatScreen(chatId: Long) {
                                     panelOpen = true
                                 }
                             },
-                            onAttach = { focus.clearFocus(); keyboard?.hide(); panelOpen = false; attachOpen = true },
+                            onAttach = { focus.clearFocus(); keyboard?.hide(); panelOpen = false; attachMenuOpen = true },
                             onSend = { send() },
                             onVoice = { secs, path, wave ->
                                 repo.sendContent(
@@ -756,14 +758,30 @@ fun ChatScreen(chatId: Long) {
                                 onEmoji = { e -> text += e },
                                 onSticker = { e -> repo.sendContent(chatId, MessageContent.Sticker(e), replyToId); replyToId = null },
                                 onGif = { i -> repo.sendContent(chatId, MessageContent.Photo(i + 3, 1.4f, null, "🎞"), replyToId); replyToId = null },
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
                                 onStickerItem = { st -> repo.sendSticker(chatId, st, replyToId); replyToId = null },
                                 onGifItem = { g -> repo.sendGif(chatId, g, replyToId); replyToId = null },
+                                onBackspace = { text = dropLastGrapheme(text) },
+                                onSwitchKeyboard = { panelOpen = false; focusRequester.requestFocus(); keyboard?.show() },
+                                chatId = chatId,
                             )
                         }
                     }
                 }
             }
+
+            // "+" menu (iOS 26 glass popup above the composer)
+            AttachMenu(
+                visible = attachMenuOpen,
+                bottom = (with(density) { bottomHeight.toDp() } - 8.dp).coerceAtLeast(0.dp),
+                canPoll = !repo.isLive || chat.type != ChatType.Private,
+                demo = !repo.isLive,
+                onDismiss = { attachMenuOpen = false },
+                onPick = { a ->
+                    attachMenuOpen = false
+                    if (a == AttachAction.Gallery || a == AttachAction.Camera) attachOpen = true
+                    if (a != AttachAction.Gallery) attachAction = a
+                },
+            )
 
             AttachSheet(
                 visible = attachOpen,
@@ -773,6 +791,8 @@ fun ChatScreen(chatId: Long) {
                     repo.sendMedia(chatId, items, replyToId)
                     replyToId = null
                 },
+                action = attachAction,
+                onActionHandled = { attachAction = null },
             )
 
             forwardIds?.let { ids ->
