@@ -3024,6 +3024,10 @@ class TdRepository(context: Context) : TelegramRepository {
     override fun profileGifts(chatId: Long): List<com.abtin.tglass.data.ProfileGift> = profileGiftStore[chatId] ?: emptyList()
 
     override fun loadProfileGifts(chatId: Long) {
+        // Disabled: tdl-coroutines 13.0.0 treats Gift.background as required, but the server sends gifts without it.
+        // The deserializer then throws on TDLib's receiver thread and the whole app crashes (reported from a device:
+        // "Key background is missing in the map"). Re-enable once the library handles the optional field.
+        if (GIFTS_ENABLED.not()) return
         val st = chatStates[chatId] ?: return
         val owner: MessageSender = when (val t = st.type) {
             is ChatTypePrivate -> MessageSenderUser(t.userId)
@@ -3416,6 +3420,8 @@ class TdRepository(context: Context) : TelegramRepository {
     }
     // ---- end Edit Profile & Appearance ----
 }
+
+private const val GIFTS_ENABLED = false
 
 /** Process-wide TDLib instance (TDLib must not be created twice for the same database). */
 object Td {
