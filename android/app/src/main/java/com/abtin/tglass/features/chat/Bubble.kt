@@ -64,6 +64,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
@@ -80,6 +81,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.abtin.tglass.core.design.LocalAppSettings
 import com.abtin.tglass.core.design.TgTheme
+import com.abtin.tglass.core.emoji.EmojiGlyph
+import com.abtin.tglass.core.emoji.appleEmojiInlineContent
+import com.abtin.tglass.core.emoji.appleEmojiPlaceholders
+import com.abtin.tglass.core.emoji.rememberAppleEmojiText
 import com.abtin.tglass.data.Entity
 import com.abtin.tglass.data.EntityType
 import com.abtin.tglass.data.Message
@@ -589,11 +594,14 @@ fun TextWithMeta(text: AnnotatedString, style: TextStyle, meta: @Composable () -
     val holder = remember { arrayOfNulls<TextLayoutResult>(1) }
     val measurer = rememberTextMeasurer()
     val resolved = if (style.textDirection == TextDirection.Unspecified) style.copy(textDirection = TextDirection.Content) else style
-    val policy = remember(text, resolved, maxTextWidth, measurer) { TextMetaPolicy(text, resolved, maxTextWidth, measurer, holder) }
+    // Inline Apple emoji (added by rememberRichText) need their placeholders when measuring too.
+    val inlineMap = remember(text) { appleEmojiInlineContent(text) }
+    val placeholders = remember(text) { appleEmojiPlaceholders(text) }
+    val policy = remember(text, resolved, maxTextWidth, measurer) { TextMetaPolicy(text, resolved, maxTextWidth, measurer, holder, placeholders) }
     Layout(
         modifier = modifier,
         content = {
-            BasicText(text, style = resolved, onTextLayout = { holder[0] = it })
+            BasicText(text, style = resolved, onTextLayout = { holder[0] = it }, inlineContent = inlineMap)
             // Always one child here, even when [meta] draws nothing (0×0 then).
             Box { meta() }
         },
@@ -636,6 +644,7 @@ private class TextMetaPolicy(
     private val maxTextWidth: Dp,
     private val measurer: TextMeasurer,
     private val holder: Array<TextLayoutResult?>,
+    private val placeholders: List<AnnotatedString.Range<Placeholder>> = emptyList(),
 ) : MeasurePolicy {
     override fun MeasureScope.measure(measurables: List<Measurable>, constraints: Constraints): MeasureResult {
         val limit = if (maxTextWidth != Dp.Unspecified) maxTextWidth.roundToPx() else Constraints.Infinity
@@ -659,7 +668,7 @@ private class TextMetaPolicy(
         val gap = 6.dp.roundToPx()
         if (maxTextWidth == Dp.Unspecified) return measurables[0].maxIntrinsicWidth(height) + gap + metaW
         val limit = maxTextWidth.roundToPx().coerceAtLeast(1)
-        val l = measurer.measure(text, style, constraints = Constraints(maxWidth = limit), layoutDirection = layoutDirection, density = this)
+        val l = measurer.measure(text, style, placeholders = placeholders, constraints = Constraints(maxWidth = limit), layoutDirection = layoutDirection, density = this)
         val metaH = measurables[1].minIntrinsicHeight(metaW)
         return fitMeta(l, l.size.width, l.size.height, limit, 0, metaW, metaH, gap).width
     }
@@ -857,7 +866,7 @@ private fun StickerMessage(m: Message, s: MessageContent.Sticker, modifier: Modi
     Column(modifier.padding(horizontal = 4.dp), horizontalAlignment = if (m.outgoing) Alignment.End else Alignment.Start) {
         val still: @Composable () -> Unit = {
             if (s.image != null) TgImage(s.image, Modifier.size(160.dp), maxPx = 512, contentScale = ContentScale.Fit)
-            else BasicText(s.emoji, style = TextStyle(fontSize = 110.sp, lineHeight = 124.sp))
+            else EmojiGlyph(s.emoji, 140.dp)
         }
         if (anim != null) com.abtin.tglass.ui.components.TgsSticker(animPath, Modifier.size(160.dp), still)
         else still()
@@ -870,7 +879,11 @@ private fun StickerMessage(m: Message, s: MessageContent.Sticker, modifier: Modi
 private fun BigEmojiMessage(m: Message, text: String, count: Int, modifier: Modifier, onReact: (String) -> Unit) {
     val size = when (count) { 1 -> 64; 2 -> 50; else -> 42 }
     Column(modifier.padding(horizontal = 6.dp), horizontalAlignment = if (m.outgoing) Alignment.End else Alignment.Start) {
-        BasicText(text.trim(), style = TextStyle(fontSize = size.sp, lineHeight = (size * 1.2f).sp))
+        val emoji = rememberAppleEmojiText(text.trim())
+        BasicText(
+            emoji, style = TextStyle(fontSize = size.sp, lineHeight = (size * 1.2f).sp),
+            inlineContent = remember(emoji) { appleEmojiInlineContent(emoji) },
+        )
         FreeformFooter(m, onReact)
     }
 }
@@ -1210,7 +1223,8 @@ private fun LinkBody(m: Message, l: MessageContent.Link, colors: BubbleColors, t
     val url = entities.firstOrNull { it.type == EntityType.TextUrl }?.url
         ?: entities.firstOrNull { it.type == EntityType.Url }?.let { e -> l.text.substring(e.start.coerceIn(0, l.text.length), e.end.coerceIn(0, l.text.length)) }
     Column(Modifier.padding(start = 11.dp, end = 11.dp, top = top, bottom = 6.dp).widthIn(max = textMax)) {
-        BasicText(richFor(m, l.text, l.entities, colors), style = bodyStyle(colors))
+        val rich = richFor(m, l.text, l.entities, colors)
+        BasicText(rich, style = bodyStyle(colors), inlineContent = remember(rich) { appleEmojiInlineContent(rich) })
         Spacer(Modifier.height(6.dp))
         Column(
             Modifier
@@ -1241,7 +1255,7 @@ private fun ReactionChip(r: Reaction, colors: BubbleColors, onReact: (String) ->
             .padding(start = 7.dp, end = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        BasicText(r.emoji, style = TextStyle(fontSize = 15.sp, lineHeight = 18.sp))
+        EmojiGlyph(r.emoji, 19.dp)
         Spacer(Modifier.width(4.dp))
         T(formatCount(r.count), TgTheme.type.footnote.copy(fontSize = 13.sp), if (r.chosen) colors.reactionActiveFg else colors.reactionFg, weight = FontWeight.SemiBold, maxLines = 1)
     }

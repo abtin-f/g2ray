@@ -506,6 +506,6 @@ private fun ReactionItem(emoji: String, chosen: Boolean, popDelay: Long, onClick
         if (chosen) {
             Box(Modifier.size(42.dp).clip(Capsule()).background(if (c.isDark) Color.White.copy(0.2f) else c.accent.copy(alpha = 0.16f)))
         }
-        T(emoji, TgTheme.type.body.copy(fontSize = 30.sp, lineHeight = 36.sp), align = TextAlign.Center, maxLines = 1)
+        com.abtin.tglass.core.emoji.EmojiGlyph(emoji, 34.dp)
     }
 }

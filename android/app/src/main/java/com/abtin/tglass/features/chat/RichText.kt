@@ -13,6 +13,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import com.abtin.tglass.core.emoji.appendWithAppleEmoji
+import com.abtin.tglass.core.emoji.appleEmojiKey
 import com.abtin.tglass.data.Entity
 import com.abtin.tglass.data.EntityType
 
@@ -56,10 +58,14 @@ fun rememberRichText(
 ): AnnotatedString {
     val handler = LocalLinkHandler.current
     val all = remember(text, entities) { entities.ifEmpty { detectEntities(text) } }
-    return remember(text, all, link, codeBackground, spoilerColor, spoilersRevealed, handler, underlineLinks) {
+    val emojiKey = appleEmojiKey()
+    return remember(text, all, link, codeBackground, spoilerColor, spoilersRevealed, handler, underlineLinks, emojiKey) {
         val linkStyle = SpanStyle(color = link, textDecoration = if (underlineLinks) TextDecoration.Underline else null)
         buildAnnotatedString {
-            append(text)
+            // Apple emoji inline (same offsets); hidden spoilers keep their glyphs so the emoji stay covered.
+            appendWithAppleEmoji(text) { s, e ->
+                !spoilersRevealed && all.any { it.type == EntityType.Spoiler && it.start < e && s < it.end }
+            }
             for (e in all) {
                 val start = e.start.coerceIn(0, text.length)
                 val end = e.end.coerceIn(start, text.length)

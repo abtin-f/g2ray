@@ -1,7 +1,16 @@
 package com.abtin.tglass.features.chat
 
 import android.content.Context
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -35,6 +44,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -45,6 +55,10 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -56,6 +70,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -64,6 +80,7 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.abtin.tglass.core.design.TgTheme
+import com.abtin.tglass.core.emoji.EmojiGlyph
 import com.abtin.tglass.core.glass.GlassBox
 import com.abtin.tglass.data.GifItem
 import com.abtin.tglass.data.StickerItem
@@ -202,10 +219,22 @@ fun EmojiPanel(
         modifier = modifier.fillMaxWidth().height(height).padding(start = 4.dp, end = 4.dp, bottom = 4.dp),
         contentAlignment = Alignment.TopCenter,
     ) {
-        when (tab) {
-            TabEmoji -> EmojiTab(onEmoji)
-            TabStickers -> StickersTab(onSticker, onStickerItem)
-            else -> GifsTab(chatId, onGif, onGifItem)
+        // iOS-like switch: the new page fades in sliding slightly from the side of its button.
+        AnimatedContent(
+            targetState = tab,
+            transitionSpec = {
+                val dir = if (targetState > initialState) 1 else -1
+                (fadeIn(tween(220, delayMillis = 40)) + slideInHorizontally(tween(300)) { w -> dir * w / 10 }) togetherWith
+                    (fadeOut(tween(140)) + slideOutHorizontally(tween(300)) { w -> -dir * w / 10 })
+            },
+            label = "panelTab",
+            modifier = Modifier.fillMaxSize(),
+        ) { t ->
+            when (t) {
+                TabEmoji -> EmojiTab(onEmoji)
+                TabStickers -> StickersTab(onSticker, onStickerItem)
+                else -> GifsTab(chatId, onGif, onGifItem)
+            }
         }
         PanelBar(tab, { tab = it }, onSwitchKeyboard, onBackspace, Modifier.align(Alignment.BottomCenter))
     }
@@ -289,7 +318,7 @@ private fun EmojiTab(onEmoji: (String) -> Unit) {
                         },
                         contentAlignment = Alignment.Center,
                     ) {
-                        T(e, TgTheme.type.body.copy(fontSize = 29.sp, lineHeight = 34.sp), maxLines = 1)
+                        EmojiGlyph(e, 33.dp)
                     }
                 }
             }
@@ -320,6 +349,9 @@ private fun StickersTab(onDemoSticker: (String) -> Unit, onSticker: (StickerItem
     }
     val grid = rememberLazyGridState()
     val current by remember(headers) { derivedStateOf { currentSection(grid, headers) } }
+    val visible by rememberVisibleIndices(grid)
+    // Lottie is drawn on the CPU: animate a limited number of on-screen stickers at a time.
+    val slots = remember { PlaybackSlots(10) }
     Column(Modifier.fillMaxSize()) {
         LazyRow(
             contentPadding = PaddingValues(horizontal = 8.dp),
@@ -334,7 +366,7 @@ private fun StickersTab(onDemoSticker: (String) -> Unit, onSticker: (StickerItem
                         s.key == "recent" -> Icon(IosIcons.Clock, if (current == i) c.text.copy(alpha = 0.75f) else c.secondaryText, 21.dp)
                         s.items.firstOrNull()?.image != null ->
                             TgImage(s.items.first().image, Modifier.size(26.dp), maxPx = 96, contentScale = ContentScale.Fit)
-                        else -> T(s.items.firstOrNull()?.emoji ?: s.demo.firstOrNull() ?: "🙂", TgTheme.type.body.copy(fontSize = 20.sp, lineHeight = 24.sp))
+                        else -> EmojiGlyph(s.items.firstOrNull()?.emoji ?: s.demo.firstOrNull() ?: "🙂", 24.dp)
                     }
                 }
             }
@@ -349,21 +381,20 @@ private fun StickersTab(onDemoSticker: (String) -> Unit, onSticker: (StickerItem
             contentPadding = PaddingValues(start = 6.dp, end = 6.dp, bottom = BarSpace),
             modifier = Modifier.fillMaxWidth().weight(1f),
         ) {
-            sections.forEach { s ->
+            sections.forEachIndexed { si, s ->
                 item(key = "h:${s.key}", span = { GridItemSpan(maxLineSpan) }, contentType = "header") { SectionHeader(s.title) }
+                val first = headers[si] + 1
                 if (s.demo.isNotEmpty()) {
                     items(s.demo.size, key = { i -> "${s.key}:$i" }, contentType = { "sticker" }) { i ->
                         Box(Modifier.aspectRatio(1f).bounceClickable { onDemoSticker(s.demo[i]) }, contentAlignment = Alignment.Center) {
-                            T(s.demo[i], TgTheme.type.body.copy(fontSize = 44.sp, lineHeight = 50.sp))
+                            EmojiGlyph(s.demo[i], 50.dp)
                         }
                     }
                 } else {
                     items(s.items.size, key = { i -> "${s.key}:$i" }, contentType = { "sticker" }) { i ->
                         val st = s.items[i]
-                        Box(Modifier.aspectRatio(1f).bounceClickable { onSticker(st) }.padding(4.dp), contentAlignment = Alignment.Center) {
-                            if (st.image != null) TgImage(st.image, Modifier.fillMaxSize(), maxPx = 192, contentScale = ContentScale.Fit)
-                            else T(st.emoji, TgTheme.type.body.copy(fontSize = 34.sp, lineHeight = 40.sp))
-                        }
+                        val play = rememberPlaybackSlot(slots, (first + i) in visible)
+                        StickerCell(st, play, Modifier.aspectRatio(1f).bounceClickable { onSticker(st) }.padding(4.dp))
                     }
                 }
             }
@@ -435,7 +466,7 @@ private fun GifsTab(chatId: Long, onDemoGif: (Int) -> Unit, onGif: (GifItem) -> 
                         Modifier.aspectRatio(1f).clip(RoundedRectangle(10.dp)).background(Brush.linearGradient(listOf(a, b))).bounceClickable { onDemoGif(i) },
                         contentAlignment = Alignment.Center,
                     ) {
-                        T(DemoStickers[i % DemoStickers.size], TgTheme.type.body.copy(fontSize = 36.sp, lineHeight = 42.sp))
+                        EmojiGlyph(DemoStickers[i % DemoStickers.size], 42.dp)
                         GifBadge(Modifier.align(Alignment.BottomStart))
                     }
                 }
@@ -445,18 +476,23 @@ private fun GifsTab(chatId: Long, onDemoGif: (Int) -> Unit, onGif: (GifItem) -> 
             }
             else -> {
                 if (results == null) SectionHeader("SAVED GIFS")
+                val gifGrid = rememberLazyGridState()
+                val visible by rememberVisibleIndices(gifGrid)
+                // A few muted ExoPlayers at most; the rest show their still until a slot frees up.
+                val slots = remember { PlaybackSlots(6) }
                 LazyVerticalGrid(
                     GridCells.Fixed(3),
+                    state = gifGrid,
                     contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 4.dp, bottom = BarSpace),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier.fillMaxWidth().weight(1f),
                 ) {
-                    items(shown.size) { i ->
+                    items(shown.size, key = { i -> "g${shown[i].fileId}:$i" }) { i ->
                         val g = shown[i]
+                        val play = rememberPlaybackSlot(slots, i in visible)
                         Box(Modifier.aspectRatio(1f).clip(RoundedRectangle(10.dp)).background(c.searchField).bounceClickable { onGif(g) }) {
-                            TgImage(g.thumb, Modifier.fillMaxSize(), maxPx = 256)
-                            GifBadge(Modifier.align(Alignment.BottomStart))
+                            GifCell(g, play, Modifier.fillMaxSize())
                         }
                     }
                 }
@@ -491,21 +527,53 @@ private fun PanelBar(tab: Int, onTab: (Int) -> Unit, onSwitchKeyboard: () -> Uni
             contentAlignment = Alignment.Center,
         ) { Icon(ComposerIcons.Globe, c.text.copy(alpha = 0.8f), 22.dp) }
         Spacer(Modifier.weight(1f))
+        // The selection capsule slides between the buttons (iOS segmented style).
+        val bounds = remember { mutableStateMapOf<Int, Pair<Float, Float>>() }
+        val pillX = remember { Animatable(0f) }
+        val pillW = remember { Animatable(0f) }
+        val target = bounds[tab]
+        LaunchedEffect(target) {
+            val (x, w) = target ?: return@LaunchedEffect
+            if (pillW.value == 0f) {
+                pillX.snapTo(x)
+                pillW.snapTo(w)
+            } else {
+                launch { pillX.animateTo(x, spring(dampingRatio = 0.78f, stiffness = 420f)) }
+                pillW.animateTo(w, spring(dampingRatio = 0.78f, stiffness = 420f))
+            }
+        }
+        val pillColor = c.text.copy(alpha = 0.1f)
         Row(
             Modifier.height(40.dp).shadow(6.dp, Capsule(), ambientColor = Color.Black.copy(0.1f), spotColor = Color.Black.copy(0.14f))
-                .clip(Capsule()).background(surface).padding(3.dp),
+                .clip(Capsule()).background(surface).padding(3.dp)
+                .drawBehind {
+                    if (pillW.value > 0f) {
+                        val h = 34.dp.toPx()
+                        drawRoundRect(
+                            pillColor,
+                            topLeft = Offset(pillX.value, (size.height - h) / 2f),
+                            size = Size(pillW.value, h),
+                            cornerRadius = CornerRadius(h / 2f, h / 2f),
+                        )
+                    }
+                },
             verticalAlignment = Alignment.CenterVertically,
         ) {
             listOf(TabGifs to "GIFs", TabStickers to "Stickers", TabEmoji to "Emoji").forEach { (t, label) ->
                 val selected = tab == t
-                val bg by animateColorAsState(if (selected) c.text.copy(alpha = 0.1f) else Color.Transparent, label = "panelTab")
                 Box(
-                    Modifier.height(34.dp).clip(Capsule()).background(bg)
+                    Modifier.height(34.dp)
+                        .onPlaced { coords ->
+                            val v = coords.positionInParent().x to coords.size.width.toFloat()
+                            if (bounds[t] != v) bounds[t] = v
+                        }
+                        .clip(Capsule())
                         .fadeClickable { if (!selected) { Haptics.tap(view); onTab(t) } }
                         .padding(horizontal = 12.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    T(label, TgTheme.type.subheadline, if (selected) c.text else c.text.copy(alpha = 0.7f), weight = FontWeight.SemiBold, maxLines = 1)
+                    val fg by animateColorAsState(if (selected) c.text else c.text.copy(alpha = 0.7f), label = "panelTabText")
+                    T(label, TgTheme.type.subheadline, fg, weight = FontWeight.SemiBold, maxLines = 1)
                 }
             }
         }

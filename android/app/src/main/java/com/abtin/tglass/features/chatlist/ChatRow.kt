@@ -192,7 +192,7 @@ private fun ChatPreviewText(chat: Chat, repo: TelegramRepository) {
         chat.typing != null -> TypingText(chat.typing, style, c.accent, Modifier.padding(top = 2.dp))
         chat.draft != null -> Row {
             T("Draft: ", style, c.destructive, maxLines = 1)
-            T(chat.draft ?: "", style, c.secondaryText, maxLines = 2)
+            com.abtin.tglass.core.emoji.EmojiText(chat.draft ?: "", style, c.secondaryText, maxLines = 2)
         }
         last == null -> T("", style)
         chat.type == ChatType.Group && last.content !is MessageContent.Service -> {
@@ -222,7 +222,7 @@ private fun PreviewLine(m: com.abtin.tglass.data.Message, style: androidx.compos
                 else T(content.emoji, style.copy(fontSize = 11.sp, lineHeight = 12.sp))
             }
             Spacer(Modifier.width(5.dp))
-            T(content.caption ?: if (content.video) "Video" else "Photo", style, c.secondaryText, maxLines = 1)
+            com.abtin.tglass.core.emoji.EmojiText(content.caption ?: if (content.video) "Video" else "Photo", style, c.secondaryText, maxLines = 1)
         }
         is MessageContent.Voice -> Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(TgIcons.IcVoiceSmall, c.secondaryText, 18.dp)
@@ -238,7 +238,7 @@ private fun PreviewLine(m: com.abtin.tglass.data.Message, style: androidx.compos
             }
             T("Video message", style, c.secondaryText, maxLines = 1)
         }
-        else -> T(m.preview, style, c.secondaryText, maxLines = lines)
+        else -> com.abtin.tglass.core.emoji.EmojiText(m.preview, style, c.secondaryText, maxLines = lines)
     }
 }
 

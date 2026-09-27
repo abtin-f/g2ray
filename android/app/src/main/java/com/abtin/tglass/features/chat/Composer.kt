@@ -313,16 +313,20 @@ fun Composer(
                     else -> Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 2.dp), verticalAlignment = Alignment.Bottom) {
                         Box(Modifier.weight(1f).padding(vertical = 10.dp), contentAlignment = Alignment.CenterStart) {
                             if (text.isEmpty()) T("Message", TgTheme.type.body, c.secondaryText, maxLines = 1)
+                            // Apple emoji drawn over the (transparent) system glyphs.
+                            val (emojiField, emojiTransformation) = com.abtin.tglass.core.emoji.rememberAppleEmojiField(maxLines = 8)
                             BasicTextField(
                                 value = text,
                                 onValueChange = onTextChange,
+                                visualTransformation = emojiTransformation,
+                                onTextLayout = emojiField.onTextLayout,
                                 // Content direction: Persian / Arabic lines go right-to-left.
                                 textStyle = TgTheme.type.body.copy(color = c.text, textDirection = TextDirection.Content),
                                 cursorBrush = SolidColor(c.accent),
                                 minLines = 1,
                                 maxLines = 8,
                                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                                modifier = Modifier.fillMaxWidth().focusRequester(focusRequester).onFocusChanged { onFocus(it.isFocused) },
+                                modifier = Modifier.fillMaxWidth().focusRequester(focusRequester).onFocusChanged { onFocus(it.isFocused) }.then(emojiField.modifier),
                             )
                         }
                         Box(Modifier.height(ComposerHeight).width(40.dp).fadeClickable(onClick = onTogglePanel), contentAlignment = Alignment.Center) {

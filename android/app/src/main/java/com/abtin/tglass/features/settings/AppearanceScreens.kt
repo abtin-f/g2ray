@@ -245,6 +245,24 @@ internal fun LazyListScope.appearancePage() {
     }
     appearanceGap()
     item {
+        val context = LocalContext.current
+        com.abtin.tglass.core.emoji.appleEmojiKey()
+        val apple = com.abtin.tglass.core.emoji.AppleEmoji.appleStyle
+        Section(
+            header = "Emoji Style",
+            footer = "Apple emoji look like Telegram for iPhone. They are downloaded once as you see them and kept on this device; until then, and with System, your phone's emoji are used.",
+        ) {
+            Box(Modifier.padding(12.dp)) {
+                SegmentedControl(
+                    listOf("Apple", "System"), if (apple) 0 else 1,
+                    { com.abtin.tglass.core.emoji.AppleEmoji.setAppleStyle(context, it == 0) },
+                    Modifier.fillMaxWidth(),
+                )
+            }
+        }
+    }
+    appearanceGap()
+    item {
         val s = LocalAppSettings.current
         val nav = LocalNavigator.current
         Section(header = "Chat List", footer = "Compact matches Telegram for iPhone. Larger sizes show bigger photos and text.") {
