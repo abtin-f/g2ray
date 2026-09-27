@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
@@ -112,6 +113,9 @@ internal fun ProfileTabBar(
             Box(Modifier.matchParentSize().graphicsLayer { alpha = pinnedAlpha }.profileGlass(Capsule(), palette.button, palette.buttonSolid))
         }
         Row(Modifier.fillMaxSize().horizontalScroll(scroll), verticalAlignment = Alignment.CenterVertically) {
+          // At least as wide as the bar with the tabs centered: a few tabs (e.g. only Media and Files) sit in
+          // the middle like on iOS; when they don't fit this is just their width and the row scrolls.
+          Box(Modifier.widthIn(min = with(density) { viewport.toDp() }), contentAlignment = Alignment.Center) {
             Box(Modifier.padding(horizontal = 4.dp), contentAlignment = Alignment.CenterStart) {
                 // Pill position: between the two tabs around the (animated, finger-driven) index.
                 val pos = position().coerceIn(0f, (tabs.size - 1).coerceAtLeast(0).toFloat())
@@ -156,6 +160,7 @@ internal fun ProfileTabBar(
                     }
                 }
             }
+          }
         }
     }
 }
@@ -280,7 +285,7 @@ internal fun SharedRow(m: Message, palette: ProfilePalette, divider: Boolean) {
     fun act(p: String) {
         when (content) {
             is MessageContent.File -> if (content.music) player.toggle(context, key, p, content.duration)
-                else if (!com.abtin.tglass.core.media.Files.open(context, p, content.mime)) toast.show("No app can open this file")
+                else if (!com.abtin.tglass.core.media.Files.open(context, p, content.mime)) toast.error("No app can open this file")
             is MessageContent.Voice -> player.toggle(context, key, p, content.seconds)
             is MessageContent.VideoNote -> player.toggle(context, key, p, content.seconds)
             else -> {}

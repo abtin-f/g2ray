@@ -400,7 +400,7 @@ fun ChatScreen(chatId: Long) {
 
     val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
     fun openUsername(name: String) = repo.resolveUsername(name) { id ->
-        if (id != null) nav.push(Route.Chat(id)) else toast.show("No one uses @${name.removePrefix("@")}")
+        if (id != null) nav.push(Route.Chat(id)) else toast.error("No one uses @${name.removePrefix("@")}")
     }
     fun openInBrowser(url: String) {
         runCatching { uriHandler.openUri(url) }.onFailure { toast.show("Can't open this link") }
@@ -430,13 +430,13 @@ fun ChatScreen(chatId: Long) {
                             bold = true,
                         ) {
                             repo.joinByInviteLink(invite.link) { id, err ->
-                                if (id != null) nav.push(Route.Chat(id)) else if (err != null) toast.show(err)
+                                if (id != null) nav.push(Route.Chat(id)) else if (err != null) toast.error(err)
                             }
                         },
                     ),
                 )
             )
-            r.error != null -> toast.show(r.error)
+            r.error != null -> toast.error(r.error)
             else -> openInBrowser(url)
         }
     }
@@ -814,7 +814,7 @@ fun ChatScreen(chatId: Long) {
                         val bot = chat.type == ChatType.Bot
                         ChatBottomBar(if (bot) "Restart Bot" else "Unblock", {
                             repo.setBlocked(chatId, false) { err ->
-                                if (err != null) toast.show(err) else if (bot) repo.startBot(chatId)
+                                if (err != null) toast.error(err) else if (bot) repo.startBot(chatId)
                             }
                         })
                     }

@@ -65,6 +65,9 @@ import com.abtin.tglass.features.main.LocalRepository
 import com.abtin.tglass.ui.components.GlassTopBar
 import com.abtin.tglass.ui.components.Haptics
 import com.abtin.tglass.ui.components.Icon
+import com.abtin.tglass.ui.components.LocalActionSheet
+import com.abtin.tglass.ui.components.alert
+import com.abtin.tglass.ui.components.showError
 import com.abtin.tglass.ui.components.IosIcons
 import com.abtin.tglass.ui.components.LottieLoop
 import com.abtin.tglass.ui.components.PrimaryButton
@@ -92,6 +95,9 @@ private fun AuthPage(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val c = TgTheme.colors
+    // Sign-in errors (invalid number, wrong password, flood wait…) are iOS alerts, like Telegram for iPhone.
+    val sheet = LocalActionSheet.current
+    LaunchedEffect(error) { if (error != null) sheet.showError(error) }
     Box(Modifier.fillMaxSize().background(c.background)) {
         Column(Modifier.fillMaxSize().statusBarsPadding().imePadding()) {
             Column(
@@ -105,9 +111,6 @@ private fun AuthPage(
                 T(subtitle, TgTheme.type.body, c.secondaryText, align = TextAlign.Center, modifier = Modifier.padding(horizontal = 32.dp))
                 Spacer(Modifier.height(28.dp))
                 content()
-                AnimatedVisibility(error != null, enter = fadeIn(), exit = fadeOut()) {
-                    T(error ?: "", TgTheme.type.subheadline, c.destructive, align = TextAlign.Center, modifier = Modifier.padding(horizontal = 28.dp, vertical = 14.dp))
-                }
             }
             if (button != null) Box(Modifier.padding(horizontal = 24.dp, vertical = 16.dp).navigationBarsPadding()) { button() }
         }
@@ -168,7 +171,7 @@ fun ApiSetupScreen() {
     val config = remember { TdConfig(context) }
     var id by rememberSaveable { mutableStateOf(config.apiId.takeIf { it != 0 }?.toString() ?: "") }
     var hash by rememberSaveable { mutableStateOf(config.apiHash) }
-    var error by remember { mutableStateOf<String?>(null) }
+    val sheet = LocalActionSheet.current
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { focus.requestFocus() }
     val auth = td?.auth
@@ -179,22 +182,20 @@ fun ApiSetupScreen() {
             if (nav.stack.getOrNull(nav.stack.size - 2)?.route == Route.Phone) nav.pop() else nav.replaceTop(Route.Phone)
         }
     }
-    LaunchedEffect(td?.authError) { td?.authError?.let { error = it } }
 
     AuthPage(
         title = "Connect to Telegram",
         subtitle = "TGlass is your own Telegram client. To sign in it needs an API ID from Telegram — create one at my.telegram.org → API development tools. It never leaves this phone.",
         art = { Box(Modifier.size(150.dp), contentAlignment = Alignment.Center) { LottieLoop(TgAnimations.PlaneLogo, 140.dp) } },
-        error = error,
+        error = td?.authError,
         button = {
             PrimaryButton(
                 "Continue",
                 {
                     val apiId = id.toIntOrNull()
                     if (apiId == null || hash.trim().length < 16) {
-                        error = "Please enter a valid API ID and API hash."
+                        sheet.alert("Invalid API ID", "Please enter a valid API ID and API hash from my.telegram.org.")
                     } else {
-                        error = null
                         config.save(apiId, hash)
                         submitted = true
                         if (td != null) td.credentialsChanged() else nav.replaceTop(Route.Phone)

@@ -157,7 +157,7 @@ fun SettingsScreen(backdrop: LayerBackdrop) {
     val uri = androidx.compose.ui.platform.LocalUriHandler.current
     fun open(p: Page) = nav.push(Route.SettingsPage(p))
     fun openUrl(url: String) {
-        runCatching { uri.openUri(url) }.onFailure { toast.show("Can't open $url") }
+        runCatching { uri.openUri(url) }.onFailure { toast.error("Can't open $url") }
     }
     val live = repo.isLive
 
@@ -247,7 +247,7 @@ fun SettingsScreen(backdrop: LayerBackdrop) {
                             actions = listOf(
                                 SheetAction("Ask a Volunteer", bold = true) {
                                     repo.openSupportChat { chatId ->
-                                        if (chatId != null) nav.push(Route.Chat(chatId)) else toast.show("Support chat is not available right now")
+                                        if (chatId != null) nav.push(Route.Chat(chatId)) else toast.error("Support chat is not available right now")
                                     }
                                 },
                                 SheetAction("Telegram FAQ") { openUrl("https://telegram.org/faq") },

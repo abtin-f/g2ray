@@ -71,6 +71,8 @@ import com.abtin.tglass.ui.components.avatarColors
 import com.abtin.tglass.ui.components.formatCount
 import com.abtin.tglass.ui.components.formatDay
 import com.abtin.tglass.ui.components.rememberFileImage
+import com.abtin.tglass.ui.components.alert
+import com.abtin.tglass.ui.components.showError
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import kotlinx.coroutines.launch
@@ -151,14 +153,12 @@ fun ProfileScreen(chatId: Long) {
     // ---- Header state (pull to expand) ----
     val listState = rememberLazyListState()
     val header = remember { HeaderState(scope) { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0 } }
-    header.thresholdPx = with(density) { 80.dp.toPx() }
+    header.thresholdPx = with(density) { 64.dp.toPx() }
     header.maxPullPx = with(density) { 220.dp.toPx() }
-    // People with a photo (and no profile color) open on the big photo, like the owner's reference.
-    val styleReady = details != null
-    val defaultExpanded = hasPhoto && isUserChat && baseStyle != HeaderStyle.Colored
-    LaunchedEffect(hasPhoto, defaultExpanded, styleReady) {
-        header.canExpand = hasPhoto
-        if (styleReady && !header.touched) header.setExpanded(defaultExpanded, animated = false)
+    // Like Telegram iOS the page always opens on the round avatar; the full-width photo only appears when
+    // the user pulls the page down (HeaderState expands past the threshold) — never by itself.
+    androidx.compose.runtime.SideEffect { header.canExpand = hasPhoto }
+    LaunchedEffect(hasPhoto) {
         if (!hasPhoto) header.setExpanded(false)
     }
     val p = header.expand.value.coerceIn(0f, 1f)
@@ -171,7 +171,13 @@ fun ProfileScreen(chatId: Long) {
     val plain = plainPalette(c)
     val basePalette = baseColor?.let { tintedPalette(it) } ?: plain
     val smallBitmap = rememberFileImage(smallAvatar?.let { repo.filePath(it) }, 64)
-    val photoPalette = tintedPalette(rememberPhotoPageColor(smallBitmap, avatarColors(photoPeer).second))
+    val photoPage = rememberPhotoPageColor(smallBitmap, avatarColors(photoPeer).second)
+    // Over the photo the buttons are light frosted glass (white tint over the blurred picture), as in the
+    // iOS 26 reference — on a colored page they are a darker tint of the color instead.
+    val photoPalette = tintedPalette(photoPage).copy(
+        button = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.16f),
+        buttonSolid = androidx.compose.ui.graphics.lerp(photoPage, androidx.compose.ui.graphics.Color.White, 0.18f),
+    )
     val palette = basePalette.lerpTo(photoPalette, p)
     val tinted = baseStyle == HeaderStyle.Colored || p > 0.5f
 
@@ -190,7 +196,7 @@ fun ProfileScreen(chatId: Long) {
         sheet.show(SheetRequest(actions = listOfNotNull(
             SheetAction("Leave $noun", destructive = true) { repo.deleteChat(chat.id); nav.resetTo(Route.Main) },
             if (rights?.owner == true) SheetAction("Delete $noun for everyone", destructive = true) {
-                repo.deleteChatForAll(chat.id) { err -> if (err != null) toast.show(err) else nav.resetTo(Route.Main) }
+                repo.deleteChatForAll(chat.id) { err -> if (err != null) sheet.showError(err) else nav.resetTo(Route.Main) }
             } else null,
         )))
     }
@@ -198,7 +204,7 @@ fun ProfileScreen(chatId: Long) {
         val title = chat.title
         if (repo.isBlocked(chat.id)) {
             repo.setBlocked(chat.id, false) { err ->
-                if (err != null) toast.show(err)
+                if (err != null) sheet.showError(err)
                 else if (isBot) { repo.startBot(chat.id); toast.show("Bot restarted") }
                 else toast.show("$title unblocked")
             }
@@ -207,7 +213,7 @@ fun ProfileScreen(chatId: Long) {
                 title = if (isBot) "Stop and block $title?" else "Block $title?",
                 message = if (isBot) "The bot won't be able to send you messages." else "$title won't be able to message or call you.",
                 actions = listOf(SheetAction(if (isBot) "Stop Bot" else "Block User", destructive = true) {
-                    repo.setBlocked(chat.id, true) { err -> toast.show(err ?: "$title blocked") }
+                    repo.setBlocked(chat.id, true) { err -> if (err != null) sheet.showError(err) else toast.show("$title blocked") }
                 }),
             ))
         }
@@ -225,7 +231,7 @@ fun ProfileScreen(chatId: Long) {
             } else null,
         )
         if (actions.isEmpty()) {
-            toast.show("History can't be cleared in this chat")
+            sheet.alert("Can't Clear History", "The history of this chat can't be cleared.")
             return
         }
         sheet.show(SheetRequest(title = "Are you sure you want to delete all messages in this chat?", message = "This action cannot be undone.", actions = actions))
@@ -234,7 +240,7 @@ fun ProfileScreen(chatId: Long) {
         sheet.show(SheetRequest(
             title = "Report this ${if (isChannel) "channel" else "group"} as spam?",
             actions = listOf(SheetAction("Report Spam", destructive = true) {
-                repo.reportSpam(chat.id) { err -> toast.show(err ?: "Thank you! Your report will be reviewed by our team.") }
+                repo.reportSpam(chat.id) { err -> if (err != null) sheet.showError(err) else toast.show("Thank you! Your report will be reviewed by our team.") }
             }),
         ))
     }
@@ -313,7 +319,7 @@ fun ProfileScreen(chatId: Long) {
         val m = music ?: return
         val f = m.file
         when {
-            f == null -> toast.show("Profile music plays with a real account")
+            f == null -> sheet.alert("Demo Mode", "Profile music plays when you sign in with a real Telegram account.")
             musicPath != null -> player.toggle(context, musicKey, musicPath, m.duration)
             else -> { musicPending = true; repo.requestImage(f) }
         }
@@ -494,11 +500,11 @@ fun ProfileScreen(chatId: Long) {
                         onGift = { g -> showGift(sheet, g) },
                         onOpenChat = { id -> nav.push(Route.Chat(id)) },
                         onOpenUser = { id -> nav.push(Route.UserProfile(id)) },
-                        onAddMembers = { if (canInvite) nav.push(Route.AddMembers(chat.id)) else toast.show("Only admins can add members") },
+                        onAddMembers = { if (canInvite) nav.push(Route.AddMembers(chat.id)) else sheet.alert("Admin Rights Required", "Only admins can add members to this group.") },
                         onRemoveMember = { u ->
                             sheet.show(SheetRequest(title = u.name, actions = listOf(
                                 SheetAction("Remove from Group", destructive = true) {
-                                    repo.removeMember(chat.id, u.id) { err -> toast.show(err ?: "${u.name} removed") }
+                                    repo.removeMember(chat.id, u.id) { err -> if (err != null) sheet.showError(err) else toast.show("${u.name} removed") }
                                 },
                             )))
                         },

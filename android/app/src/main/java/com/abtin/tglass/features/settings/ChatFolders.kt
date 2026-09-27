@@ -140,7 +140,7 @@ fun FolderEditScreen(folderId: Int?) {
         if (folderId != null && draft == null) {
             repo.loadFolder(folderId) { d ->
                 if (d == null) {
-                    toast.show("Couldn't load this folder")
+                    toast.error("Couldn't load this folder")
                     if (nav.top is Route.FolderEdit) nav.pop()
                 } else {
                     draft = d
@@ -158,14 +158,14 @@ fun FolderEditScreen(folderId: Int?) {
         val d = draft ?: return
         if (saving) return
         when {
-            d.name.isBlank() -> toast.show("Please enter a folder name")
-            !d.hasIncluded -> toast.show("Please add at least one chat or chat type to the folder")
+            d.name.isBlank() -> toast.error("Please enter a folder name")
+            !d.hasIncluded -> toast.error("Please add at least one chat or chat type to the folder.")
             folderId != null && d == initial -> leave()
             else -> {
                 saving = true
                 repo.saveFolder(folderId, d.copy(name = d.name.trim())) { err ->
                     saving = false
-                    if (err != null) toast.show(err)
+                    if (err != null) toast.error(err)
                     else {
                         toast.show(if (folderId == null) "Folder created" else "Folder saved")
                         leave()
@@ -231,7 +231,7 @@ fun FolderEditScreen(folderId: Int?) {
                                             actions = listOf(
                                                 SheetAction("Delete Folder", destructive = true) {
                                                     repo.deleteFolder(folderId) { err ->
-                                                        if (err != null) toast.show(err)
+                                                        if (err != null) toast.error(err)
                                                         else {
                                                             toast.show("Folder deleted")
                                                             leave()
