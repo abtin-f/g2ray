@@ -152,7 +152,6 @@ private val Speeds = listOf(0.5f, 1f, 1.5f, 2f)
 fun MediaViewer(chatId: Long, messageId: Long) {
     val repo = LocalRepository.current
     val nav = LocalNavigator.current
-    val toast = LocalToast.current
     LaunchedEffect(chatId) { repo.loadSharedMedia(chatId, MediaKind.Media) }
     val items by remember(chatId, messageId) { derivedStateOf { viewerItems(repo, chatId, messageId) } }
     var forwarding by remember { mutableStateOf<Message?>(null) }
@@ -167,11 +166,8 @@ fun MediaViewer(chatId: Long, messageId: Long) {
         }
     }
     forwarding?.let { fm ->
-        ChatPickerSheet(onDismiss = { forwarding = null }) { target ->
-            forwarding = null
-            repo.forward(fm.chatId, listOf(fm.id), target.id)
-            toast.show("Forwarded to ${target.title}")
-        }
+        // Same entry point as the chat screen's Forward (ChatPickerSheet with several targets + comment).
+        ForwardSheet(fromChatId = fm.chatId, messageIds = listOf(fm.id), onDismiss = { forwarding = null }, onDone = { forwarding = null })
     }
 }
 

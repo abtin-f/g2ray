@@ -153,11 +153,16 @@ fun ExoPlayer.releaseSafely() {
  * Silent players ([muted], e.g. GIF loops) don't take audio focus and don't stop a playing voice note.
  */
 @Composable
-fun rememberVideoPlayer(path: String, loop: Boolean, muted: Boolean = false, autoPlay: Boolean = true): ExoPlayer {
+fun rememberVideoPlayer(path: String, loop: Boolean, muted: Boolean = false, autoPlay: Boolean = true): ExoPlayer =
+    rememberVideoPlayer(Uri.fromFile(File(path)), loop, muted, autoPlay)
+
+/** Same as the path version, for any playable [uri] (e.g. a gallery content:// item in the photo/video editor). */
+@Composable
+fun rememberVideoPlayer(uri: Uri, loop: Boolean, muted: Boolean = false, autoPlay: Boolean = true): ExoPlayer {
     val context = LocalContext.current
-    val player = remember(path, loop) {
+    val player = remember(uri, loop) {
         ExoPlayer.Builder(context.applicationContext).build().apply {
-            setMediaItem(MediaItem.fromUri(Uri.fromFile(File(path))))
+            setMediaItem(MediaItem.fromUri(uri))
             repeatMode = if (loop) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
             volume = if (muted) 0f else 1f
             prepare()

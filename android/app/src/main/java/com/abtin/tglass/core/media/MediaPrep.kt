@@ -23,25 +23,29 @@ data class PickedMedia(val uri: Uri, val video: Boolean)
  * and get a 320 px JPEG thumbnail plus their size and duration.
  */
 object MediaPrep {
-    private const val MAX_PHOTO = 2560
+    const val MAX_PHOTO = 2560
 
-    suspend fun prepare(context: Context, items: List<PickedMedia>, caption: String?): List<MessageContent.Photo> = withContext(Dispatchers.IO) {
+    /** Longest side of a photo sent without "HD" (Telegram's standard quality). */
+    const val STANDARD_PHOTO = 1280
+
+    /** [maxPhotoSide]: 2560 for HD (the default), [STANDARD_PHOTO] for standard quality. */
+    suspend fun prepare(context: Context, items: List<PickedMedia>, caption: String?, maxPhotoSide: Int = MAX_PHOTO): List<MessageContent.Photo> = withContext(Dispatchers.IO) {
         val dir = File(context.cacheDir, "upload").apply { mkdirs() }
         items.mapIndexedNotNull { i, item ->
             runCatching {
                 val cap = caption?.takeIf { i == 0 && it.isNotBlank() }
-                if (item.video) prepareVideo(context, item.uri, dir, cap) else preparePhoto(context, item.uri, dir, cap)
+                if (item.video) prepareVideo(context, item.uri, dir, cap) else preparePhoto(context, item.uri, dir, cap, maxPhotoSide)
             }.getOrNull()
         }
     }
 
-    private fun preparePhoto(context: Context, uri: Uri, dir: File, caption: String?): MessageContent.Photo? {
+    private fun preparePhoto(context: Context, uri: Uri, dir: File, caption: String?, maxSide: Int = MAX_PHOTO): MessageContent.Photo? {
         val resolver = context.contentResolver
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
         if (bounds.outWidth <= 0) return null
         var sample = 1
-        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= MAX_PHOTO) sample *= 2
+        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= maxSide) sample *= 2
         var bmp = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample }) } ?: return null
         val rotation = resolver.openInputStream(uri)?.use {
             when (ExifInterface(it).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
@@ -51,7 +55,7 @@ object MediaPrep {
                 else -> 0f
             }
         } ?: 0f
-        val scale = minOf(1f, MAX_PHOTO.toFloat() / maxOf(bmp.width, bmp.height))
+        val scale = minOf(1f, maxSide.toFloat() / maxOf(bmp.width, bmp.height))
         if (rotation != 0f || scale < 1f) {
             val m = Matrix().apply { postScale(scale, scale); postRotate(rotation) }
             bmp = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
