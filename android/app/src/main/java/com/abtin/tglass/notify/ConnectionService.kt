@@ -20,6 +20,7 @@ class ConnectionService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        com.abtin.tglass.core.CrashReports.install(this)
         Notifier.ensureChannels(this)
         val notification = NotificationCompat.Builder(this, Notifier.CHANNEL_SERVICE)
             .setSmallIcon(R.drawable.ic_notification)

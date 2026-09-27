@@ -71,7 +71,11 @@ sealed interface AuthStep {
 class TdRepository(context: Context) : TelegramRepository {
     private val app = context.applicationContext
     private val config = TdConfig(app)
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    // A failing TDLib request or mapping must not take the whole app down: log it and keep going.
+    private val scope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Main.immediate +
+            kotlinx.coroutines.CoroutineExceptionHandler { _, e -> android.util.Log.e("TGlass", "TDLib task failed", e) },
+    )
 
     private lateinit var client: TdlClient
     private var updatesJob: Job? = null

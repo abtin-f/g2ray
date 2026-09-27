@@ -87,6 +87,20 @@ fun InlineKeyboardView(
     busy: (row: Int, col: Int) -> Boolean,
     onClick: (row: Int, col: Int, button: InlineButton) -> Unit,
 ) {
+    // Drawn inside the message list, which is the backdrop layer the glass bars sample; glass here would sample
+    // itself (endless render tree → native crash), so its buttons use the plain glass surface instead.
+    androidx.compose.runtime.CompositionLocalProvider(com.abtin.tglass.core.glass.LocalBackdrop provides null) {
+        InlineKeyboardContent(keyboard, outgoing, busy, onClick)
+    }
+}
+
+@Composable
+private fun InlineKeyboardContent(
+    keyboard: InlineKeyboard,
+    outgoing: Boolean,
+    busy: (row: Int, col: Int) -> Boolean,
+    onClick: (row: Int, col: Int, button: InlineButton) -> Unit,
+) {
     val c = TgTheme.colors
     Column(
         Modifier

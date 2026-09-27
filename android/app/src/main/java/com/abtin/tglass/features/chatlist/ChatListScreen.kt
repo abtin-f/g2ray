@@ -412,11 +412,11 @@ private fun ChatsTitle(stories: List<Pair<Long, String>>, status: String?, colla
 @Composable
 private fun FolderTabs(folders: List<String>, selected: Int, onSelect: (Int) -> Unit, unreadFor: (Int) -> Int) {
     val c = TgTheme.colors
-    // Telegram iOS 26: the folder tabs sit in one glass capsule, the selected tab in a lighter pill.
-    com.abtin.tglass.core.glass.GlassBox(
-        onClick = null,
-        shape = Capsule(),
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp).height(42.dp),
+    // Telegram iOS 26: the folder tabs sit in one capsule, the selected tab in a lighter pill. The tabs scroll
+    // inside the list that the glass bars sample (layerBackdrop), so the capsule must not be a backdrop glass itself:
+    // that would draw the layer into itself and overflow the RenderThread stack (native crash).
+    Box(
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp).height(42.dp).clip(Capsule()).background(c.searchField),
         contentAlignment = Alignment.CenterStart,
     ) {
     Row(

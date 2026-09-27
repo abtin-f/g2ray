@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -113,6 +114,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        com.abtin.tglass.core.CrashReports.install(this)
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         DebugLaunch.parse(intent)
@@ -225,6 +227,20 @@ class MainActivity : ComponentActivity() {
                         ToastHost(toast)
                         com.abtin.tglass.notify.InAppBannerHost { chatId ->
                             if ((nav.top as? Route.Chat)?.chatId != chatId) nav.push(Route.Chat(chatId))
+                        }
+                        // After a crash: offer the saved stack trace so it can be sent to the developer.
+                        val appContext = LocalContext.current
+                        LaunchedEffect(Unit) {
+                            val report = com.abtin.tglass.core.CrashReports.take(appContext) ?: return@LaunchedEffect
+                            sheet.show(com.abtin.tglass.ui.components.SheetRequest(
+                                title = "TGlass closed unexpectedly",
+                                message = "Copy the error report and send it so the problem can be fixed.",
+                                alert = true,
+                                actions = listOf(com.abtin.tglass.ui.components.SheetAction("Copy Report", bold = true) {
+                                    com.abtin.tglass.core.CrashReports.copy(appContext, report)
+                                    toast.show("Report copied")
+                                }),
+                            ))
                         }
                         // Settings → Passcode Lock: covers everything while the app is locked.
                         if (DebugLaunch.screen == null) com.abtin.tglass.features.settings.PasscodeLockHost()
