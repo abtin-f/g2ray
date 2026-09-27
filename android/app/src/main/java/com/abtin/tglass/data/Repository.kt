@@ -42,6 +42,8 @@ interface TelegramRepository {
     fun togglePinMessage(chatId: Long, messageId: Long)
     fun vote(chatId: Long, messageId: Long, option: Int)
     fun openChat(chatId: Long)
+    /** Makes sure [chat] knows [chatId] (e.g. Saved Messages before it ever reached the chat list). */
+    fun ensureChat(chatId: Long) {}
     fun setDraft(chatId: Long, draft: String?)
 
     fun togglePin(chatId: Long)
@@ -175,6 +177,8 @@ interface TelegramRepository {
     fun updateProfile(firstName: String, lastName: String, bio: String, onDone: (String?) -> Unit) = onDone(null)
     fun updateUsername(username: String, onDone: (String?) -> Unit) = onDone(null)
     fun updateProfilePhoto(path: String, onDone: (String?) -> Unit) = onDone(null)
+    /** Removes the current profile photo; [onDone] gets an error message or null. */
+    fun deleteProfilePhoto(onDone: (String?) -> Unit) = onDone(null)
 
     fun privacy(key: PrivacyKey): PrivacyValue? = when (key) {
         PrivacyKey.PhoneNumber -> PrivacyValue.Contacts

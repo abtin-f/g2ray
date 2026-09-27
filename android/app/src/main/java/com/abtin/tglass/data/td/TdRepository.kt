@@ -386,6 +386,15 @@ class TdRepository(context: Context) : TelegramRepository {
         }
     }
 
+    override fun ensureChat(chatId: Long) {
+        if (chatId == 0L || chatMap[chatId] != null) return
+        scope.launch {
+            // TDLib announces the chat with updateNewChat before answering; a user it never saw needs a private chat.
+            val r = client.getChat(chatId)
+            if (r !is TdlResult.Success && chatId > 0) client.createPrivateChat(chatId, false).orReport()
+        }
+    }
+
     override fun closeChat(chatId: Long) {
         openChats -= chatId
         scope.launch { client.closeChat(chatId) }
@@ -505,8 +514,24 @@ class TdRepository(context: Context) : TelegramRepository {
     override fun updateProfilePhoto(path: String, onDone: (String?) -> Unit) {
         scope.launch {
             val r = client.setProfilePhoto(InputChatPhotoStatic(InputFileLocal(path)), false)
+            if (r is TdlResult.Success) refreshMe()
             onDone(if (r is TdlResult.Failure) humanize(r.message) else null)
         }
+    }
+
+    override fun deleteProfilePhoto(onDone: (String?) -> Unit) {
+        scope.launch {
+            val id = rawUsers[myId]?.profilePhoto?.id
+            if (id == null) { onDone(null); return@launch }
+            val r = client.deleteProfilePhoto(id)
+            if (r is TdlResult.Success) refreshMe()
+            onDone(if (r is TdlResult.Failure) humanize(r.message) else null)
+        }
+    }
+
+    /** Re-reads our own user so a new/removed photo shows at once, without waiting for updateUser. */
+    private suspend fun refreshMe() {
+        client.getMe().let { if (it is TdlResult.Success) onUser(it.result) }
     }
 
     private val privacyValues = mutableStateMapOf<PrivacyKey, PrivacyValue>()

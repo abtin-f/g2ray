@@ -273,6 +273,7 @@ fun SettingsPageScreen(page: Page) {
     when (page) {
         Page.Passcode -> PasscodeSettingsScreen()
         Page.PasscodeSetup -> PasscodeSetupScreen()
+        Page.EditProfile -> EditProfileScreen()
         else -> SettingsScaffold(page.title) {
             when (page) {
                 Page.Appearance -> appearance()
@@ -284,14 +285,13 @@ fun SettingsPageScreen(page: Page) {
                 Page.Devices -> devices()
                 Page.Folders -> folders()
                 Page.Premium -> premium()
-                Page.EditProfile -> editProfile()
                 Page.BlockedUsers -> blockedUsers()
                 Page.TwoStep -> twoStep()
                 Page.StorageUsage -> storageUsage()
                 Page.NetworkUsage -> networkUsage()
                 Page.AutoDownloadCellular, Page.AutoDownloadWifi, Page.AutoDownloadRoaming -> page.downloadNetwork()?.let { autoDownload(it) }
                 Page.QrCode -> myQrCode()
-                Page.Passcode, Page.PasscodeSetup -> {}
+                Page.Passcode, Page.PasscodeSetup, Page.EditProfile -> {}
             }
         }
     }
@@ -708,102 +708,3 @@ private fun LazyListScope.premium() {
     }
 }
 
-private fun LazyListScope.editProfile() {
-    item { EditProfile() }
-}
-
-/** Edit Profile (spec §40): photo, name, bio and username, saved to the account. */
-@Composable
-private fun EditProfile() {
-    val repo = LocalRepository.current
-    val c = TgTheme.colors
-    val toast = com.abtin.tglass.ui.components.LocalToast.current
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
-    val me = repo.me
-    androidx.compose.runtime.LaunchedEffect(me.id) { repo.loadChatInfo(me.id) }
-    val currentBio = repo.chatInfo(me.id)?.about ?: me.bio ?: ""
-    var first by rememberSaveable(me.id) { mutableStateOf(me.firstName) }
-    var last by rememberSaveable(me.id) { mutableStateOf(me.lastName) }
-    var bio by rememberSaveable(me.id, currentBio) { mutableStateOf(currentBio) }
-    var username by rememberSaveable(me.id) { mutableStateOf(me.username ?: "") }
-    var saving by remember { mutableStateOf(false) }
-    var uploading by remember { mutableStateOf(false) }
-    val photoPicker = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        uploading = true
-        scope.launch {
-            val prepared = com.abtin.tglass.core.media.MediaPrep.prepare(context, listOf(com.abtin.tglass.core.media.PickedMedia(uri, false)), null)
-            val path = prepared.firstOrNull()?.image?.path
-            if (path == null) { uploading = false; toast.show("Can't read this photo"); return@launch }
-            repo.updateProfilePhoto(path) { err -> uploading = false; toast.show(err ?: "Photo updated") }
-        }
-    }
-    val changed = first != me.firstName || last != me.lastName || bio != currentBio || username != (me.username ?: "")
-
-    Column(Modifier.fillMaxWidth().padding(bottom = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(contentAlignment = Alignment.Center) {
-            Avatar(me.name, 3, 100.dp, photoPeer = me.id)
-            if (uploading) com.abtin.tglass.ui.components.ActivityIndicator(28.dp, Color.White)
-        }
-        Spacer(Modifier.height(8.dp))
-        T("Set New Photo", TgTheme.type.body, c.accent, modifier = Modifier.fadeClickable {
-            runCatching { photoPicker.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly)) }
-        })
-    }
-    Section(footer = "Enter your name and add an optional profile photo.") {
-        EditField(first, { first = it.take(64) }, "First Name")
-        EditField(last, { last = it.take(64) }, "Last Name", divider = false)
-    }
-    Spacer(Modifier.height(24.dp))
-    Section(header = "Bio", footer = "Any details such as age, occupation or city.\nExample: 23 y.o. designer from San Francisco") {
-        EditField(bio, { bio = it.take(70) }, "Bio", divider = false, trailingHint = "${70 - bio.length}")
-    }
-    Spacer(Modifier.height(24.dp))
-    Section(header = "Username", footer = "You can choose a username on Telegram. People will be able to find you by this username and contact you without knowing your phone number.") {
-        EditField(username, { username = it.filter { ch -> ch.isLetterOrDigit() || ch == '_' }.take(32) }, "username", divider = false, prefix = "@")
-    }
-    Spacer(Modifier.height(24.dp))
-    Section {
-        Cell("Phone Number", value = me.phone, chevron = false, divider = false)
-    }
-    Spacer(Modifier.height(24.dp))
-    Section {
-        Cell(
-            if (saving) "Saving…" else "Save",
-            titleColor = if (changed && !saving) c.accent else c.secondaryText,
-            chevron = false,
-            divider = false,
-            onClick = if (!changed || saving) null else ({
-                saving = true
-                val usernameChanged = username != (me.username ?: "")
-                repo.updateProfile(first.trim(), last.trim(), bio.trim()) { err ->
-                    if (err != null) { saving = false; toast.show(err); return@updateProfile }
-                    if (usernameChanged) repo.updateUsername(username) { uErr -> saving = false; toast.show(uErr ?: "Profile saved") }
-                    else { saving = false; toast.show("Profile saved") }
-                }
-            }),
-        )
-    }
-}
-
-@Composable
-private fun EditField(value: String, onValue: (String) -> Unit, placeholder: String, divider: Boolean = true, prefix: String? = null, trailingHint: String? = null) {
-    val c = TgTheme.colors
-    Box {
-        Row(Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (prefix != null) T(prefix, TgTheme.type.body, c.secondaryText)
-            Box(Modifier.weight(1f)) {
-                if (value.isEmpty()) T(placeholder, TgTheme.type.body, c.tertiaryText)
-                androidx.compose.foundation.text.BasicTextField(
-                    value, onValue, Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    textStyle = TgTheme.type.body.copy(color = c.text),
-                    cursorBrush = androidx.compose.ui.graphics.SolidColor(c.accent),
-                )
-            }
-            if (trailingHint != null) T(trailingHint, TgTheme.type.footnote, c.tertiaryText)
-        }
-        if (divider) com.abtin.tglass.ui.components.Separator(Modifier.align(Alignment.BottomStart), startPadding = 16.dp)
-    }
-}

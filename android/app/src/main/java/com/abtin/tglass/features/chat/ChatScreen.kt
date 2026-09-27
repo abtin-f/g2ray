@@ -179,11 +179,14 @@ fun ChatScreen(chatId: Long) {
     val chat = repo.chat(chatId)
     if (chat == null) {
         // A live chat may still be on its way from the server (e.g. just created); give it a moment.
-        LaunchedEffect(Unit) {
-            kotlinx.coroutines.delay(if (repo.isLive) 4_000L else 0L)
+        LaunchedEffect(chatId) {
+            repo.ensureChat(chatId)
+            kotlinx.coroutines.delay(if (repo.isLive) 10_000L else 0L)
             nav.pop()
         }
-        Box(Modifier.fillMaxSize().background(c.background))
+        Box(Modifier.fillMaxSize().background(c.groupedBackground), contentAlignment = Alignment.Center) {
+            com.abtin.tglass.ui.components.ActivityIndicator(28.dp, c.secondaryText)
+        }
         return
     }
     val backdrop = rememberLayerBackdrop()
