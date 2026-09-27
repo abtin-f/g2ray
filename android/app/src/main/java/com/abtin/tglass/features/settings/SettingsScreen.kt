@@ -109,6 +109,16 @@ enum class Page(val title: String) {
     Devices("Devices"),
     Folders("Chat Folders"),
     Premium("Telegram Premium"),
+    BlockedUsers("Blocked Users"),
+    TwoStep("Two-Step Verification"),
+    Passcode("Passcode Lock"),
+    PasscodeSetup("Passcode"),
+    StorageUsage("Storage Usage"),
+    NetworkUsage("Data Usage"),
+    AutoDownloadCellular("Using Cellular"),
+    AutoDownloadWifi("Using Wi-Fi"),
+    AutoDownloadRoaming("Roaming"),
+    QrCode("QR Code"),
 }
 
 private val Red = Color(0xFFFF3B30)
@@ -133,7 +143,12 @@ fun SettingsScreen(backdrop: LayerBackdrop) {
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val listState = rememberLazyListState()
     val collapse = rememberHeroCollapse(listState)
+    val uri = androidx.compose.ui.platform.LocalUriHandler.current
     fun open(p: Page) = nav.push(Route.SettingsPage(p))
+    fun openUrl(url: String) {
+        runCatching { uri.openUri(url) }.onFailure { toast.show("Can't open $url") }
+    }
+    val live = repo.isLive
 
     Box(Modifier.fillMaxSize().background(c.groupedBackground)) {
         LazyColumn(
@@ -153,14 +168,15 @@ fun SettingsScreen(backdrop: LayerBackdrop) {
             }
             item {
                 Section {
-                    Cell("Set Emoji Status", icon = TgIcons.SetStatus, iconColor = Purple, onClick = { toast.show("Emoji status set ✨") })
+                    // Emoji statuses need a status picker (and Premium); the live app does not offer one yet.
+                    if (!live) Cell("Set Emoji Status", icon = TgIcons.SetStatus, iconColor = Purple, onClick = { toast.show("Emoji status set ✨") })
                     Cell("My Profile", icon = TgIcons.SetProfile, iconColor = Red, divider = false, onClick = { open(Page.EditProfile) })
                 }
                 Spacer(Modifier.height(24.dp))
             }
             item {
                 Section {
-                    Cell("Saved Messages", icon = TgIcons.SetSaved, iconColor = Blue, onClick = { nav.push(Route.Chat(100)) })
+                    Cell("Saved Messages", icon = TgIcons.SetSaved, iconColor = Blue, onClick = { nav.push(Route.Chat(repo.savedChatId)) })
                     Cell("Recent Calls", icon = TgIcons.SetCalls, iconColor = Green, onClick = { nav.push(Route.Calls) })
                     Cell("Devices", icon = TgIcons.SetDevices, iconColor = Orange, value = "${repo.sessions.size}", onClick = { open(Page.Devices) })
                     Cell("Chat Folders", icon = TgIcons.SetFolders, iconColor = Teal, divider = false, onClick = { open(Page.Folders) })
@@ -181,17 +197,41 @@ fun SettingsScreen(backdrop: LayerBackdrop) {
             item {
                 Section {
                     Cell("Telegram Premium", icon = TgIcons.SetPremium, iconColor = Color(0xFF8F68FF), onClick = { open(Page.Premium) })
-                    Cell("My Stars", icon = TgIcons.SetStars, iconColor = Color(0xFFFFB800), onClick = { toast.show("Stars ⭐️") })
-                    Cell("Telegram Business", icon = TgIcons.SetBusiness, iconColor = Color(0xFFFF6B3D), onClick = { toast.show("Business") })
-                    Cell("Send a Gift", icon = TgIcons.SetGift, iconColor = Color(0xFF32C1DE), divider = false, onClick = { toast.show("Gifts are coming soon 🎁") })
+                    if (live) {
+                        // Stars and Business are managed in the official apps; link to what they are.
+                        Cell("My Stars", icon = TgIcons.SetStars, iconColor = Color(0xFFFFB800), onClick = { openUrl("https://telegram.org/blog/telegram-stars") })
+                        Cell("Telegram Business", icon = TgIcons.SetBusiness, iconColor = Color(0xFFFF6B3D), divider = false, onClick = { openUrl("https://telegram.org/blog/telegram-business") })
+                    } else {
+                        Cell("My Stars", icon = TgIcons.SetStars, iconColor = Color(0xFFFFB800), onClick = { toast.show("Stars ⭐️") })
+                        Cell("Telegram Business", icon = TgIcons.SetBusiness, iconColor = Color(0xFFFF6B3D), onClick = { toast.show("Business") })
+                        Cell("Send a Gift", icon = TgIcons.SetGift, iconColor = Color(0xFF32C1DE), divider = false, onClick = { toast.show("Gifts are coming soon 🎁") })
+                    }
                 }
                 Spacer(Modifier.height(24.dp))
             }
             item {
                 Section {
-                    Cell("Ask a Question", icon = TgIcons.CtxSmile, iconColor = Orange, onClick = { toast.show("Opening support chat…") })
-                    Cell("Telegram FAQ", icon = TgIcons.SetFaq, iconColor = Teal, onClick = { toast.show("FAQ") })
-                    Cell("Telegram Features", icon = TgIcons.SetTips, iconColor = Yellow, divider = false, onClick = { toast.show("Features") })
+                    Cell("Ask a Question", icon = TgIcons.CtxSmile, iconColor = Orange, onClick = {
+                        sheet.show(SheetRequest(
+                            title = "Ask a Question",
+                            message = "Telegram support is done by volunteers. Please take a look at the Telegram FAQ first: it has answers to most questions.",
+                            alert = true,
+                            actions = listOf(
+                                SheetAction("Ask a Volunteer", bold = true) {
+                                    repo.openSupportChat { chatId ->
+                                        if (chatId != null) nav.push(Route.Chat(chatId)) else toast.show("Support chat is not available right now")
+                                    }
+                                },
+                                SheetAction("Telegram FAQ") { openUrl("https://telegram.org/faq") },
+                            ),
+                        ))
+                    })
+                    Cell("Telegram FAQ", icon = TgIcons.SetFaq, iconColor = Teal, onClick = { openUrl("https://telegram.org/faq") })
+                    Cell("Telegram Features", icon = TgIcons.SetTips, iconColor = Yellow, divider = false, onClick = {
+                        repo.resolveUsername("TelegramTips") { chatId ->
+                            if (chatId != null) nav.push(Route.Chat(chatId)) else openUrl("https://t.me/TelegramTips")
+                        }
+                    })
                 }
                 Spacer(Modifier.height(24.dp))
             }
@@ -200,6 +240,7 @@ fun SettingsScreen(backdrop: LayerBackdrop) {
                     Cell("Log Out", titleColor = c.destructive, chevron = false, divider = false, onClick = {
                         sheet.show(SheetRequest(title = "Log out?", message = "You will return to the welcome screen.", alert = true, actions = listOf(SheetAction("Log Out", destructive = true) {
                             repo.logOut()
+                            PasscodeLock.disable()
                             settings.updateLoggedIn(false)
                             settings.updateDemoMode(false)
                             nav.resetTo(Route.Welcome)
@@ -213,16 +254,46 @@ fun SettingsScreen(backdrop: LayerBackdrop) {
         GlassTopBar(
             title = null,
             fade = c.groupedBackground,
-            left = { GlassIconButton(IosIcons.QrCode, { toast.show("QR code") }, iconSize = 22.dp) },
+            left = { GlassIconButton(IosIcons.QrCode, { open(Page.QrCode) }, iconSize = 22.dp) },
             center = { CollapsedTitle(me.name, 3, collapse, photoPeer = me.id) },
             right = { GlassTextButton("Edit", { open(Page.EditProfile) }) },
         )
     }
 }
 
-/** Shared scaffold for pushed settings pages. */
+/** Pushed settings pages. */
 @Composable
 fun SettingsPageScreen(page: Page) {
+    when (page) {
+        Page.Passcode -> PasscodeSettingsScreen()
+        Page.PasscodeSetup -> PasscodeSetupScreen()
+        else -> SettingsScaffold(page.title) {
+            when (page) {
+                Page.Appearance -> appearance()
+                Page.PowerSaving -> powerSaving()
+                Page.Notifications -> notifications()
+                Page.Privacy -> privacy()
+                Page.Data -> dataStorage()
+                Page.Language -> language()
+                Page.Devices -> devices()
+                Page.Folders -> folders()
+                Page.Premium -> premium()
+                Page.EditProfile -> editProfile()
+                Page.BlockedUsers -> blockedUsers()
+                Page.TwoStep -> twoStep()
+                Page.StorageUsage -> storageUsage()
+                Page.NetworkUsage -> networkUsage()
+                Page.AutoDownloadCellular, Page.AutoDownloadWifi, Page.AutoDownloadRoaming -> page.downloadNetwork()?.let { autoDownload(it) }
+                Page.QrCode -> myQrCode()
+                Page.Passcode, Page.PasscodeSetup -> {}
+            }
+        }
+    }
+}
+
+/** Shared scaffold for pushed settings pages: grouped list under a glass top bar. */
+@Composable
+internal fun SettingsScaffold(title: String, content: LazyListScope.() -> Unit) {
     val backdrop = rememberLayerBackdrop()
     val c = TgTheme.colors
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -232,21 +303,9 @@ fun SettingsPageScreen(page: Page) {
             LazyColumn(
                 Modifier.fillMaxSize().layerBackdrop(backdrop),
                 contentPadding = PaddingValues(top = top + 70.dp, bottom = bottom + 30.dp),
-            ) {
-                when (page) {
-                    Page.Appearance -> appearance()
-                    Page.PowerSaving -> powerSaving()
-                    Page.Notifications -> notifications()
-                    Page.Privacy -> privacy()
-                    Page.Data -> dataStorage()
-                    Page.Language -> language()
-                    Page.Devices -> devices()
-                    Page.Folders -> folders()
-                    Page.Premium -> premium()
-                    Page.EditProfile -> editProfile()
-                }
-            }
-            GlassTopBar(page.title, fade = c.groupedBackground)
+                content = content,
+            )
+            GlassTopBar(title, fade = c.groupedBackground)
         }
     }
 }
@@ -406,11 +465,23 @@ private fun LazyListScope.notifications() {
         }
         Spacer(Modifier.height(24.dp))
     }
-    listOf("Private Chats", "Group Chats", "Channels").forEachIndexed { i, header ->
+    com.abtin.tglass.data.NotifyScope.entries.forEach { kind ->
         item {
-            Section(header = "Message Notifications".takeIf { i == 0 }) {
-                ToggleCell("Show Notifications", true, subtitle = header)
-                Cell("Sound", value = listOf("Note", "Tri-tone", "Chime")[i], divider = false, onClick = {})
+            val repo = LocalRepository.current
+            if (kind == com.abtin.tglass.data.NotifyScope.Private) androidx.compose.runtime.LaunchedEffect(Unit) { repo.loadScopeNotifications() }
+            val value = repo.scopeNotifications(kind)
+            Section(
+                header = kind.title,
+                footer = if (value != null && !value.enabled) "Notifications for ${kind.title.lowercase()} are off. Chats with their own settings are not affected." else null,
+            ) {
+                Cell("Show Notifications", chevron = false, trailing = {
+                    if (value != null) IOSSwitch(value.enabled, { repo.setScopeNotifications(kind, value.copy(enabled = it)) })
+                    else com.abtin.tglass.ui.components.ActivityIndicator(18.dp)
+                })
+                Cell("Message Preview", chevron = false, divider = false, trailing = {
+                    if (value != null) IOSSwitch(value.preview, { repo.setScopeNotifications(kind, value.copy(preview = it)) })
+                    else com.abtin.tglass.ui.components.ActivityIndicator(18.dp)
+                })
             }
             Spacer(Modifier.height(24.dp))
         }
@@ -427,11 +498,20 @@ private fun LazyListScope.notifications() {
 
 private fun LazyListScope.privacy() {
     item {
-        val demo = !LocalRepository.current.isLive
+        val repo = LocalRepository.current
+        val nav = LocalNavigator.current
+        val context = androidx.compose.ui.platform.LocalContext.current
+        PasscodeLock.attach(context)
+        androidx.compose.runtime.LaunchedEffect(Unit) {
+            repo.loadBlocked()
+            repo.loadPasswordInfo()
+            repo.loadAccountTtl()
+        }
+        val blocked = repo.blockedCount
         Section {
-            Cell("Passcode Lock", icon = TgIcons.SetPrivacy, iconColor = Orange, value = "Off".takeIf { demo }, onClick = {})
-            Cell("Two-Step Verification", icon = IosIcons.Lock, iconColor = Blue, value = "Off".takeIf { demo }, onClick = {})
-            Cell("Blocked Users", icon = IosIcons.Close, iconColor = Red, value = "3".takeIf { demo }, divider = false, onClick = {})
+            Cell("Passcode Lock", icon = TgIcons.SetPrivacy, iconColor = Orange, value = if (PasscodeLock.enabled) "On" else "Off", onClick = { nav.push(Route.SettingsPage(Page.Passcode)) })
+            Cell("Two-Step Verification", icon = IosIcons.Lock, iconColor = Blue, value = repo.passwordInfo?.let { if (it.hasPassword) "On" else "Off" }, onClick = { nav.push(Route.SettingsPage(Page.TwoStep)) })
+            Cell("Blocked Users", icon = IosIcons.Close, iconColor = Red, value = blocked?.let { if (it == 0) "None" else "$it" }, divider = false, onClick = { nav.push(Route.SettingsPage(Page.BlockedUsers)) })
         }
     }
     gap()
@@ -453,33 +533,43 @@ private fun LazyListScope.privacy() {
     }
     gap()
     item {
-        Section(header = "Automatically delete my account", footer = "If you do not come online at least once within this period, your account will be deleted.") {
-            Cell("If Away For", value = "6 months", divider = false, onClick = {})
+        val repo = LocalRepository.current
+        val sheet = LocalActionSheet.current
+        val days = repo.accountTtlDays
+        Section(header = "Automatically delete my account", footer = "If you do not come online at least once within this period, your account will be deleted along with all messages and contacts.") {
+            Cell("If Away For", value = days?.let { com.abtin.tglass.data.accountTtlLabel(it) } ?: "…", divider = false, onClick = {
+                sheet.show(SheetRequest(
+                    title = "Delete my account if I'm away for",
+                    actions = com.abtin.tglass.data.AccountTtlOptions.map { (d, label) -> SheetAction(label, bold = days == d) { repo.setAccountTtl(d) } },
+                ))
+            })
         }
     }
 }
 
 private fun LazyListScope.dataStorage() {
     item {
+        val repo = LocalRepository.current
+        val nav = LocalNavigator.current
+        androidx.compose.runtime.LaunchedEffect(Unit) {
+            repo.loadStorage()
+            repo.loadDataUsage()
+        }
+        val usage = repo.dataUsage
         Section {
-            Cell("Storage Usage", icon = TgIcons.SetData, iconColor = Blue, value = "1.2 GB", onClick = {})
-            Cell("Data Usage", icon = TgIcons.SetData, iconColor = Green, value = "3.4 GB", divider = false, onClick = {})
+            Cell("Storage Usage", icon = TgIcons.SetData, iconColor = Blue, value = repo.storageInfo?.let { com.abtin.tglass.data.formatBytes(it.total) }, onClick = { nav.push(Route.SettingsPage(Page.StorageUsage)) })
+            Cell("Data Usage", icon = TgIcons.SetData, iconColor = Green, value = usage?.let { com.abtin.tglass.data.formatBytes(it.totalSent + it.totalReceived) }, divider = false, onClick = { nav.push(Route.SettingsPage(Page.NetworkUsage)) })
         }
     }
     gap()
     item {
+        val nav = LocalNavigator.current
+        val context = androidx.compose.ui.platform.LocalContext.current
+        AutoDownloadPrefs.attach(context)
         Section(header = "Automatic Media Download") {
-            Cell("Using Cellular", value = "Enabled", onClick = {})
-            Cell("Using Wi-Fi", value = "Enabled", onClick = {})
-            Cell("Roaming", value = "Disabled", divider = false, onClick = {})
-        }
-    }
-    gap()
-    item {
-        Section(header = "Save to Photos") {
-            ToggleCell("Private Chats", false)
-            ToggleCell("Groups", false)
-            ToggleCell("Channels", false, divider = false)
+            Cell(com.abtin.tglass.data.DownloadNetwork.Cellular.title, value = AutoDownloadPrefs.summary(com.abtin.tglass.data.DownloadNetwork.Cellular), onClick = { nav.push(Route.SettingsPage(Page.AutoDownloadCellular)) })
+            Cell(com.abtin.tglass.data.DownloadNetwork.WiFi.title, value = AutoDownloadPrefs.summary(com.abtin.tglass.data.DownloadNetwork.WiFi), onClick = { nav.push(Route.SettingsPage(Page.AutoDownloadWifi)) })
+            Cell(com.abtin.tglass.data.DownloadNetwork.Roaming.title, value = AutoDownloadPrefs.summary(com.abtin.tglass.data.DownloadNetwork.Roaming), divider = false, onClick = { nav.push(Route.SettingsPage(Page.AutoDownloadRoaming)) })
         }
     }
 }
@@ -579,6 +669,13 @@ private fun LazyListScope.premium() {
                 Triple("Emoji Statuses", "Choose from 1000s of emoji to show next to your name.", Teal),
             ).forEachIndexed { i, (t, d, col) ->
                 Cell(t, subtitle = d, icon = TgIcons.SetPremium, iconColor = col, chevron = false, divider = i != 4)
+            }
+        }
+        if (LocalRepository.current.isLive) {
+            val uri = androidx.compose.ui.platform.LocalUriHandler.current
+            Spacer(Modifier.height(24.dp))
+            Section(footer = "Telegram Premium is purchased in the official Telegram apps.") {
+                Cell("Learn More", titleColor = c.accent, chevron = false, divider = false, onClick = { runCatching { uri.openUri("https://telegram.org/faq_premium") } })
             }
         }
     }

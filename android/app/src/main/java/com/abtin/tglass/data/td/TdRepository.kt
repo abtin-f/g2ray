@@ -1976,6 +1976,382 @@ class TdRepository(context: Context) : TelegramRepository {
         else -> humanize(error)
     }
     // ---- end Polls, contacts, folders ----
+
+    // =====================================================================================
+    // ---- Settings (real) ----
+    // Blocked users, 2-step verification, account TTL, storage, data usage, auto-download,
+    // scope notification settings, support chat and the user's link.
+    // State holders are lazy because this class body runs start() from init before later properties exist.
+    // =====================================================================================
+
+    private val blockedState by lazy { mutableStateOf<List<com.abtin.tglass.data.BlockedPeer>?>(null) }
+    private val blockedTotalState by lazy { mutableStateOf<Int?>(null) }
+    private val passwordState by lazy { mutableStateOf<com.abtin.tglass.data.PasswordInfo?>(null) }
+    private val accountTtlState by lazy { mutableStateOf<Int?>(null) }
+    private val storageState by lazy { mutableStateOf<com.abtin.tglass.data.StorageInfo?>(null) }
+    private val dataUsageState by lazy { mutableStateOf<com.abtin.tglass.data.DataUsage?>(null) }
+    private val scopeStore by lazy { mutableStateMapOf<com.abtin.tglass.data.NotifyScope, com.abtin.tglass.data.ScopeNotifications>() }
+    private val rawScopeSettings by lazy { HashMap<com.abtin.tglass.data.NotifyScope, ScopeNotificationSettings>() }
+
+    override val blockedPeers: List<com.abtin.tglass.data.BlockedPeer>? get() = blockedState.value
+    override val blockedCount: Int? get() = blockedTotalState.value
+
+    override fun loadBlocked() {
+        scope.launch {
+            val r = client.getBlockedMessageSenders(BlockListMain(), 0, 100)
+            if (r !is TdlResult.Success) {
+                r.orReport()
+                return@launch
+            }
+            val peers = ArrayList<com.abtin.tglass.data.BlockedPeer>()
+            for (sender in r.result.senders) {
+                when (sender) {
+                    is MessageSenderUser -> {
+                        var u = userMap[sender.userId]
+                        if (u == null) {
+                            val ur = client.getUser(sender.userId)
+                            if (ur is TdlResult.Success) {
+                                onUser(ur.result)
+                                u = userMap[sender.userId]
+                            }
+                        }
+                        val subtitle = when {
+                            u == null -> ""
+                            u.username != null -> "@${u.username}"
+                            else -> u.phone
+                        }
+                        peers.add(com.abtin.tglass.data.BlockedPeer(sender.userId, true, u?.name?.takeIf { it.isNotBlank() } ?: "Deleted Account", subtitle))
+                    }
+                    is MessageSenderChat -> {
+                        var title = chatMap[sender.chatId]?.title
+                        if (title == null) {
+                            val cr = client.getChat(sender.chatId)
+                            if (cr is TdlResult.Success) title = cr.result.title
+                        }
+                        peers.add(com.abtin.tglass.data.BlockedPeer(sender.chatId, false, title ?: "Chat", ""))
+                    }
+                }
+            }
+            blockedTotalState.value = maxOf(r.result.totalCount, peers.size)
+            blockedState.value = peers
+        }
+    }
+
+    override fun unblock(peer: com.abtin.tglass.data.BlockedPeer, onDone: (String?) -> Unit) {
+        scope.launch {
+            val sender: MessageSender = if (peer.isUser) MessageSenderUser(peer.id) else MessageSenderChat(peer.id)
+            val r = client.setMessageSenderBlockList(sender, null)
+            if (r is TdlResult.Failure) {
+                onDone(humanize(r.message))
+            } else {
+                blockedState.value = blockedState.value?.filter { !(it.id == peer.id && it.isUser == peer.isUser) }
+                blockedTotalState.value = blockedTotalState.value?.let { (it - 1).coerceAtLeast(0) }
+                onDone(null)
+            }
+        }
+    }
+
+    override val passwordInfo: com.abtin.tglass.data.PasswordInfo? get() = passwordState.value
+
+    private fun onPasswordState(p: PasswordState) {
+        val pending = p.recoveryEmailAddressCodeInfo
+        passwordState.value = com.abtin.tglass.data.PasswordInfo(
+            hasPassword = p.hasPassword,
+            hint = p.passwordHint,
+            hasRecoveryEmail = p.hasRecoveryEmailAddress,
+            pendingEmailPattern = pending?.emailAddressPattern,
+            pendingEmailCodeLength = pending?.length ?: 0,
+        )
+    }
+
+    private fun passwordError(error: String): String = when {
+        "PASSWORD_HASH_INVALID" in error -> "Invalid password. Please try again."
+        "EMAIL_INVALID" in error -> "Please enter a valid email address."
+        "CODE_INVALID" in error || "EMAIL_CODE_INVALID" in error -> "Invalid code. Please try again."
+        "CODE_EXPIRED" in error -> "The code has expired. Please request a new one."
+        "SESSION_TOO_FRESH" in error || "PASSWORD_TOO_FRESH" in error ->
+            "For security reasons, this can only be changed 24 hours after logging in on this device."
+        else -> humanize(error)
+    }
+
+    override fun loadPasswordInfo() {
+        scope.launch {
+            val r = client.getPasswordState()
+            if (r is TdlResult.Success) onPasswordState(r.result) else r.orReport()
+        }
+    }
+
+    override fun setPassword(oldPassword: String, newPassword: String, hint: String, recoveryEmail: String?, onDone: (String?) -> Unit) {
+        scope.launch {
+            val r = client.setPassword(oldPassword, newPassword, hint, recoveryEmail != null, recoveryEmail?.trim() ?: "")
+            when (r) {
+                is TdlResult.Success -> {
+                    onPasswordState(r.result)
+                    onDone(null)
+                }
+                is TdlResult.Failure -> onDone(passwordError(r.message))
+            }
+        }
+    }
+
+    override fun setRecoveryEmail(password: String, email: String, onDone: (String?) -> Unit) {
+        scope.launch {
+            val r = client.setRecoveryEmailAddress(password, email.trim())
+            when (r) {
+                is TdlResult.Success -> {
+                    onPasswordState(r.result)
+                    onDone(null)
+                }
+                is TdlResult.Failure -> onDone(passwordError(r.message))
+            }
+        }
+    }
+
+    override fun confirmRecoveryEmail(code: String, onDone: (String?) -> Unit) {
+        scope.launch {
+            val r = client.checkRecoveryEmailAddressCode(code.trim())
+            when (r) {
+                is TdlResult.Success -> {
+                    onPasswordState(r.result)
+                    onDone(null)
+                }
+                is TdlResult.Failure -> onDone(passwordError(r.message))
+            }
+        }
+    }
+
+    override fun resendRecoveryEmailCode(onDone: (String?) -> Unit) {
+        scope.launch {
+            val r = client.resendRecoveryEmailAddressCode()
+            when (r) {
+                is TdlResult.Success -> {
+                    onPasswordState(r.result)
+                    onDone(null)
+                }
+                is TdlResult.Failure -> onDone(passwordError(r.message))
+            }
+        }
+    }
+
+    override val accountTtlDays: Int? get() = accountTtlState.value
+
+    override fun loadAccountTtl() {
+        scope.launch {
+            val r = client.getAccountTtl()
+            if (r is TdlResult.Success) accountTtlState.value = r.result.days
+        }
+    }
+
+    override fun setAccountTtl(days: Int) {
+        val previous = accountTtlState.value
+        accountTtlState.value = days
+        scope.launch {
+            val r = client.setAccountTtl(AccountTtl(days))
+            if (r is TdlResult.Failure) {
+                accountTtlState.value = previous
+                _errors.tryEmit(humanize(r.message))
+            }
+        }
+    }
+
+    override val storageInfo: com.abtin.tglass.data.StorageInfo? get() = storageState.value
+
+    private suspend fun fetchStorage(): com.abtin.tglass.data.StorageInfo? {
+        val r = client.getStorageStatisticsFast()
+        if (r !is TdlResult.Success) return null
+        val s = r.result
+        val info = com.abtin.tglass.data.StorageInfo(s.filesSize, s.fileCount, s.databaseSize, s.languagePackDatabaseSize + s.logSize)
+        storageState.value = info
+        return info
+    }
+
+    override fun loadStorage() {
+        scope.launch { fetchStorage() }
+    }
+
+    override fun clearCache(onDone: (freed: Long?, error: String?) -> Unit) {
+        scope.launch {
+            val before = storageState.value?.filesSize ?: fetchStorage()?.filesSize
+            // size/ttl/count/immunity 0 = delete everything TDLib may delete by default
+            // (thumbnails, profile photos, stickers and wallpapers are kept).
+            val r = client.optimizeStorage(0L, 0, 0, 0, emptyArray<FileType>(), LongArray(0), LongArray(0), false, 0)
+            if (r is TdlResult.Failure) {
+                onDone(null, humanize(r.message))
+                return@launch
+            }
+            // Deleted files must be downloaded again when shown.
+            filePaths.clear()
+            downloading.clear()
+            val after = fetchStorage()?.filesSize
+            onDone(if (before != null && after != null) (before - after).coerceAtLeast(0L) else null, null)
+        }
+    }
+
+    override val dataUsage: com.abtin.tglass.data.DataUsage? get() = dataUsageState.value
+
+    private fun fileTypeTitle(t: FileType?): String = when (t) {
+        null -> "Messages and Other"
+        is FileTypePhoto -> "Photos"
+        is FileTypeVideo, is FileTypeAnimation, is FileTypeVideoNote -> "Videos"
+        is FileTypeAudio -> "Music"
+        is FileTypeVoiceNote -> "Voice Messages"
+        is FileTypeDocument -> "Files"
+        is FileTypeSticker -> "Stickers"
+        else -> "Other Files"
+    }
+
+    private fun mapNetworkStatistics(s: NetworkStatistics): com.abtin.tglass.data.DataUsage {
+        // network -> title -> [sent, received]
+        val sums = HashMap<Int, LinkedHashMap<String, LongArray>>()
+        for (e in s.entries) {
+            val net: NetworkType
+            val title: String
+            val sent: Long
+            val received: Long
+            when (e) {
+                is NetworkStatisticsEntryFile -> {
+                    net = e.networkType; title = fileTypeTitle(e.fileType); sent = e.sentBytes; received = e.receivedBytes
+                }
+                is NetworkStatisticsEntryCall -> {
+                    net = e.networkType; title = "Calls"; sent = e.sentBytes; received = e.receivedBytes
+                }
+            }
+            val bucket = when (net) {
+                is NetworkTypeMobile -> 0
+                is NetworkTypeMobileRoaming -> 2
+                else -> 1
+            }
+            val row = sums.getOrPut(bucket) { LinkedHashMap() }.getOrPut(title) { LongArray(2) }
+            row[0] += sent
+            row[1] += received
+        }
+        fun rows(bucket: Int): List<com.abtin.tglass.data.DataUsageRow> =
+            sums[bucket].orEmpty().map { (title, v) -> com.abtin.tglass.data.DataUsageRow(title, v[0], v[1]) }
+                .filter { it.sent > 0 || it.received > 0 }
+                .sortedByDescending { it.sent + it.received }
+        return com.abtin.tglass.data.DataUsage(s.sinceDate * 1000L, rows(0), rows(1), rows(2))
+    }
+
+    override fun loadDataUsage() {
+        scope.launch {
+            val r = client.getNetworkStatistics(false)
+            if (r is TdlResult.Success) dataUsageState.value = mapNetworkStatistics(r.result) else r.orReport()
+        }
+    }
+
+    override fun resetDataUsage() {
+        scope.launch {
+            client.resetNetworkStatistics().orReport()
+            val r = client.getNetworkStatistics(false)
+            if (r is TdlResult.Success) dataUsageState.value = mapNetworkStatistics(r.result)
+        }
+    }
+
+    override fun applyAutoDownload(network: com.abtin.tglass.data.DownloadNetwork, value: com.abtin.tglass.data.AutoDownload) {
+        scope.launch {
+            val presets = client.getAutoDownloadSettingsPresets()
+            if (presets !is TdlResult.Success) return@launch
+            val base = when (network) {
+                com.abtin.tglass.data.DownloadNetwork.Cellular -> presets.result.medium
+                com.abtin.tglass.data.DownloadNetwork.WiFi -> presets.result.high
+                com.abtin.tglass.data.DownloadNetwork.Roaming -> presets.result.low
+            }
+            val settings = AutoDownloadSettings(
+                value.enabled,
+                if (value.photos) base.maxPhotoFileSize else 0,
+                if (value.videos) base.maxVideoFileSize else 0L,
+                if (value.files) base.maxOtherFileSize else 0L,
+                base.videoUploadBitrate,
+                base.preloadLargeVideos,
+                base.preloadNextAudio,
+                base.preloadStories,
+                base.useLessDataForCalls,
+            )
+            val type: NetworkType = when (network) {
+                com.abtin.tglass.data.DownloadNetwork.Cellular -> NetworkTypeMobile()
+                com.abtin.tglass.data.DownloadNetwork.WiFi -> NetworkTypeWiFi()
+                com.abtin.tglass.data.DownloadNetwork.Roaming -> NetworkTypeMobileRoaming()
+            }
+            client.setAutoDownloadSettings(settings, type).orReport()
+        }
+    }
+
+    private fun tdScope(kind: com.abtin.tglass.data.NotifyScope): NotificationSettingsScope = when (kind) {
+        com.abtin.tglass.data.NotifyScope.Private -> NotificationSettingsScopePrivateChats()
+        com.abtin.tglass.data.NotifyScope.Groups -> NotificationSettingsScopeGroupChats()
+        com.abtin.tglass.data.NotifyScope.Channels -> NotificationSettingsScopeChannelChats()
+    }
+
+    override fun scopeNotifications(kind: com.abtin.tglass.data.NotifyScope): com.abtin.tglass.data.ScopeNotifications? = scopeStore[kind]
+
+    override fun loadScopeNotifications() {
+        scope.launch {
+            for (kind in com.abtin.tglass.data.NotifyScope.entries) {
+                val r = client.getScopeNotificationSettings(tdScope(kind))
+                if (r is TdlResult.Success) {
+                    rawScopeSettings[kind] = r.result
+                    scopeStore[kind] = com.abtin.tglass.data.ScopeNotifications(enabled = r.result.muteFor == 0, preview = r.result.showPreview)
+                }
+            }
+        }
+    }
+
+    override fun setScopeNotifications(kind: com.abtin.tglass.data.NotifyScope, value: com.abtin.tglass.data.ScopeNotifications) {
+        val prev = rawScopeSettings[kind] ?: return
+        val settings = ScopeNotificationSettings(
+            if (value.enabled) 0 else TelegramRepository.MUTE_FOREVER,
+            prev.soundId,
+            value.preview,
+            prev.useDefaultMuteStories,
+            prev.muteStories,
+            prev.storySoundId,
+            prev.showStoryPoster,
+            prev.disablePinnedMessageNotifications,
+            prev.disableMentionNotifications,
+        )
+        val previousUi = scopeStore[kind]
+        rawScopeSettings[kind] = settings
+        scopeStore[kind] = value
+        scope.launch {
+            val r = client.setScopeNotificationSettings(tdScope(kind), settings)
+            if (r is TdlResult.Failure) {
+                rawScopeSettings[kind] = prev
+                if (previousUi != null) scopeStore[kind] = previousUi
+                _errors.tryEmit(humanize(r.message))
+            }
+        }
+    }
+
+    override fun openSupportChat(onResult: (Long?) -> Unit) {
+        scope.launch {
+            val u = client.getSupportUser()
+            if (u !is TdlResult.Success) {
+                u.orReport()
+                onResult(null)
+                return@launch
+            }
+            onUser(u.result)
+            val c = client.createPrivateChat(u.result.id, false)
+            if (c is TdlResult.Success) onResult(c.result.id)
+            else {
+                c.orReport()
+                onResult(null)
+            }
+        }
+    }
+
+    override fun loadMyLink(onResult: (String?) -> Unit) {
+        val username = me.username
+        if (username != null) {
+            onResult("https://t.me/$username")
+            return
+        }
+        scope.launch {
+            val r = client.getUserLink()
+            onResult(if (r is TdlResult.Success) r.result.url else null)
+        }
+    }
+    // ---- end Settings (real) ----
 }
 
 /** Process-wide TDLib instance (TDLib must not be created twice for the same database). */
