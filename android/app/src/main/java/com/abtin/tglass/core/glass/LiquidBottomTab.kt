@@ -21,6 +21,16 @@ import com.kyant.shapes.Capsule
 internal val LocalLiquidBottomTabScale =
     staticCompositionLocalOf { { 1f } }
 
+/**
+ * Which copy of the tabs is being composed: [Base] is the visible row, [Tinted] the accent-tinted copy that
+ * shows through the selection pill, [Overlay] a row drawn above the pill for things that must not be tinted
+ * (unread badges). Tab content reads it to decide what to draw.
+ */
+enum class LiquidBottomTabLayer { Base, Tinted, Overlay }
+
+val LocalLiquidBottomTabLayer =
+    staticCompositionLocalOf { LiquidBottomTabLayer.Base }
+
 @Composable
 fun RowScope.LiquidBottomTab(
     onClick: () -> Unit,
@@ -28,14 +38,20 @@ fun RowScope.LiquidBottomTab(
     content: @Composable ColumnScope.() -> Unit
 ) {
     val scale = LocalLiquidBottomTabScale.current
+    val overlay = LocalLiquidBottomTabLayer.current == LiquidBottomTabLayer.Overlay
     Column(
         modifier
-            .clip(Capsule())
-            .clickable(
-                interactionSource = null,
-                indication = null,
-                role = Role.Tab,
-                onClick = onClick
+            .then(
+                // The overlay copy must not take touches from the pill below it.
+                if (overlay) Modifier
+                else Modifier
+                    .clip(Capsule())
+                    .clickable(
+                        interactionSource = null,
+                        indication = null,
+                        role = Role.Tab,
+                        onClick = onClick
+                    )
             )
             .fillMaxHeight()
             .weight(1f)
@@ -44,7 +60,7 @@ fun RowScope.LiquidBottomTab(
                 scaleX = scale
                 scaleY = scale
             },
-        verticalArrangement = Arrangement.spacedBy(2f.dp, Alignment.CenterVertically),
+        verticalArrangement = Arrangement.spacedBy(1f.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
         content = content
     )

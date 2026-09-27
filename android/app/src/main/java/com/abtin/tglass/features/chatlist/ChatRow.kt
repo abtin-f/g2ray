@@ -131,7 +131,7 @@ fun ChatRow(
                     contentAlignment = Alignment.Center,
                 ) { if (selected) Icon(IosIcons.Checkmark, Color.White, 15.dp) }
             }
-            ChatAvatar(chat, repo, size.avatar.dp)
+            ChatAvatar(chat, repo, size.avatar.dp, showStory = true)
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f).fillMaxHeight().padding(top = if (size == com.abtin.tglass.core.design.ChatListSize.Compact) 6.dp else 8.dp, bottom = 5.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {

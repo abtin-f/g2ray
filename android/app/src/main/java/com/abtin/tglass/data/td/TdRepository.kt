@@ -2863,6 +2863,106 @@ class TdRepository(context: Context) : TelegramRepository {
         }
     }
     // ---- end Composer ----
+
+    // ---- Message menu ----
+    override fun loadAvailableReactions(chatId: Long, messageId: Long, onResult: (com.abtin.tglass.data.AvailableReactionsInfo?) -> Unit) {
+        scope.launch {
+            when (val r = client.getMessageAvailableReactions(chatId, messageId, 8)) {
+                is TdlResult.Failure -> onResult(null)
+                is TdlResult.Success -> {
+                    val res = r.result
+                    val premium = me.premium
+                    // Custom-emoji and paid reactions can't be drawn here; premium-only ones need Premium.
+                    fun emojis(list: Array<AvailableReaction>): List<String> = list.mapNotNull { a ->
+                        if (a.needsPremium && !premium) null else (a.type as? ReactionTypeEmoji)?.emoji
+                    }
+                    val top = emojis(res.topReactions)
+                    val all = (top + emojis(res.recentReactions) + emojis(res.popularReactions)).distinct()
+                    onResult(
+                        com.abtin.tglass.data.AvailableReactionsInfo(
+                            top = top.ifEmpty { all },
+                            all = all,
+                            available = all.isNotEmpty() && res.unavailabilityReason == null,
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    override fun loadMessageCaps(chatId: Long, messageId: Long, onResult: (com.abtin.tglass.data.MessageCaps?) -> Unit) {
+        scope.launch {
+            when (val r = client.getMessageProperties(chatId, messageId)) {
+                is TdlResult.Failure -> onResult(null)
+                is TdlResult.Success -> {
+                    val p = r.result
+                    onResult(
+                        com.abtin.tglass.data.MessageCaps(
+                            canReply = p.canBeReplied,
+                            canEdit = p.canBeEdited,
+                            canForward = p.canBeForwarded,
+                            canPin = p.canBePinned,
+                            canSave = p.canBeSaved,
+                            canGetLink = p.canGetLink,
+                            canReport = p.canReportChat,
+                            canDeleteForSelf = p.canBeDeletedOnlyForSelf,
+                            canDeleteForAll = p.canBeDeletedForAllUsers,
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    override fun loadMessageLink(chatId: Long, messageId: Long, onResult: (String?) -> Unit) {
+        scope.launch {
+            val r = client.getMessageLink(chatId, messageId, 0, 0, "", false, false)
+            onResult(if (r is TdlResult.Success) r.result.link else null)
+        }
+    }
+
+    override fun reportMessages(chatId: Long, messageIds: List<Long>, optionId: ByteArray?, onResult: (com.abtin.tglass.data.ReportStep) -> Unit) {
+        scope.launch {
+            var option = optionId ?: ByteArray(0)
+            repeat(3) {
+                when (val r = client.reportChat(chatId, option, messageIds.toLongArray(), "")) {
+                    is TdlResult.Failure -> {
+                        onResult(com.abtin.tglass.data.ReportStep.Failed(humanize(r.message)))
+                        return@launch
+                    }
+                    is TdlResult.Success -> when (val res = r.result) {
+                        is ReportChatResultOk -> {
+                            onResult(com.abtin.tglass.data.ReportStep.Done)
+                            return@launch
+                        }
+                        is ReportChatResultOptionRequired -> {
+                            onResult(
+                                com.abtin.tglass.data.ReportStep.Options(
+                                    res.title.ifBlank { "Report" },
+                                    res.options.map { com.abtin.tglass.data.ReportChoice(it.id, it.text) },
+                                )
+                            )
+                            return@launch
+                        }
+                        is ReportChatResultTextRequired -> {
+                            if (!res.isOptional) {
+                                onResult(com.abtin.tglass.data.ReportStep.Failed("Telegram needs more details for this report."))
+                                return@launch
+                            }
+                            // Details are optional: send the report without them.
+                            option = res.optionId
+                        }
+                        else -> {
+                            onResult(com.abtin.tglass.data.ReportStep.Failed("These messages can't be reported from here."))
+                            return@launch
+                        }
+                    }
+                }
+            }
+            onResult(com.abtin.tglass.data.ReportStep.Failed("These messages can't be reported from here."))
+        }
+    }
+    // ---- end Message menu ----
 }
 
 /** Process-wide TDLib instance (TDLib must not be created twice for the same database). */
