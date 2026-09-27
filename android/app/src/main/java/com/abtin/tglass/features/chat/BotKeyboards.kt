@@ -17,6 +17,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.unit.sp
+import com.abtin.tglass.core.glass.GlassIconButton
+import com.abtin.tglass.ui.components.TgIcons
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -102,34 +108,40 @@ private fun InlineKeyboardContent(
     onClick: (row: Int, col: Int, button: InlineButton) -> Unit,
 ) {
     val c = TgTheme.colors
+    // Telegram's actionButtonsFillColor: the service tint (day) / black 42 % (night); no glass inside the list.
+    val buttonFill = if (c.isDark) Color.Black.copy(alpha = 0.42f) else c.serviceBubble
     Column(
         Modifier
             .fillMaxWidth()
             // Line up with the bubble body, not its tail column.
-            .padding(start = if (outgoing) 0.dp else TailWidth, end = if (outgoing) TailWidth else 0.dp, top = 3.dp),
-        verticalArrangement = Arrangement.spacedBy(3.dp),
+            .padding(start = if (outgoing) 0.dp else TailWidth, end = if (outgoing) TailWidth else 0.dp, top = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         keyboard.rows.forEachIndexed { r, row ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 row.forEachIndexed { col, b ->
                     val loading = busy(r, col)
                     Box(
                         Modifier
                             .weight(1f)
-                            .height(40.dp)
-                            .clip(RoundedRectangle(12.dp))
-                            .background(c.serviceBubble)
+                            .height(42.dp)
+                            .clip(RoundedRectangle(if (keyboard.rows.lastIndex == r) 14.dp else 10.dp))
+                            .background(buttonFill)
                             .bounceClickable { if (!loading) onClick(r, col, b) }
-                            .padding(horizontal = 8.dp),
+                            .padding(horizontal = 10.dp),
                         contentAlignment = Alignment.Center,
                     ) {
                         if (loading) ActivityIndicator(16.dp, Color.White)
-                        else T(b.text, TgTheme.type.subheadline, Color.White, weight = FontWeight.SemiBold, maxLines = 1, align = TextAlign.Center)
+                        else T(
+                            b.text,
+                            TgTheme.type.subheadline.copy(fontSize = 15.sp, textDirection = TextDirection.Content),
+                            Color.White, weight = FontWeight.SemiBold, maxLines = 1, align = TextAlign.Center,
+                        )
                         if (b.kind == InlineButtonKind.Url) {
-                            // Small ↗ in the corner, like Telegram's link buttons.
+                            // Small arrow in the corner, like Telegram's link buttons.
                             Icon(
                                 IosIcons.ArrowUp, Color.White, 9.dp,
-                                Modifier.align(Alignment.TopEnd).padding(top = 4.dp).graphicsLayer { rotationZ = 45f },
+                                Modifier.align(Alignment.TopEnd).offset(x = 4.dp).padding(top = 5.dp).graphicsLayer { rotationZ = 45f },
                             )
                         }
                     }
@@ -190,14 +202,43 @@ fun ReplyKeyboardPanel(
     }
 }
 
-/** Full-width capsule bar in place of the composer ("Start", "Unblock", …). */
+/**
+ * iOS 26 bar in place of the composer ("Start", "Unblock", "Join Channel"): a centered glass capsule
+ * with the action in accent semibold. Lives in the bottom overlay, outside the message list's backdrop layer.
+ */
 @Composable
 fun ChatBottomBar(title: String, onClick: () -> Unit, color: Color = TgTheme.colors.accent) {
-    GlassBox(
-        onClick = onClick,
-        shape = Capsule(),
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp).height(46.dp),
-    ) { T(title, TgTheme.type.body, color, weight = FontWeight.SemiBold) }
+    Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
+        GlassBox(
+            onClick = onClick,
+            shape = Capsule(),
+            modifier = Modifier.height(50.dp).widthIn(min = 220.dp),
+        ) {
+            T(title, TgTheme.type.body, color, weight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.padding(horizontal = 32.dp))
+        }
+    }
+}
+
+/**
+ * Channel bar for readers (Telegram iOS 26): glass circle for the discussion group on the left,
+ * glass "Mute"/"Unmute" capsule in the middle, glass search circle on the right.
+ */
+@Composable
+fun ChannelBottomBar(muted: Boolean, onDiscuss: (() -> Unit)?, onMute: () -> Unit, onSearch: () -> Unit) {
+    val c = TgTheme.colors
+    Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).height(48.dp)) {
+        if (onDiscuss != null) {
+            GlassIconButton(TgIcons.PiMessage, onDiscuss, Modifier.align(Alignment.CenterStart), size = 48.dp, iconSize = 44.dp, contentDescription = "Discussion")
+        }
+        GlassBox(
+            onClick = onMute,
+            shape = Capsule(),
+            modifier = Modifier.align(Alignment.Center).height(48.dp).widthIn(min = 112.dp),
+        ) {
+            T(if (muted) "Unmute" else "Mute", TgTheme.type.body, c.text, weight = FontWeight.Medium, maxLines = 1, modifier = Modifier.padding(horizontal = 26.dp))
+        }
+        GlassIconButton(TgIcons.PiSearch, onSearch, Modifier.align(Alignment.CenterEnd), size = 48.dp, iconSize = 44.dp, contentDescription = "Search")
+    }
 }
 
 /** Small glass button that brings back a hidden bot keyboard. */

@@ -51,10 +51,13 @@ fun rememberRichText(
     spoilerColor: Color,
     spoilersRevealed: Boolean,
     onRevealSpoiler: () -> Unit,
+    /** Underline links (when they have the same color as the text, like night bubbles). */
+    underlineLinks: Boolean = false,
 ): AnnotatedString {
     val handler = LocalLinkHandler.current
     val all = remember(text, entities) { entities.ifEmpty { detectEntities(text) } }
-    return remember(text, all, link, codeBackground, spoilerColor, spoilersRevealed, handler) {
+    return remember(text, all, link, codeBackground, spoilerColor, spoilersRevealed, handler, underlineLinks) {
+        val linkStyle = SpanStyle(color = link, textDecoration = if (underlineLinks) TextDecoration.Underline else null)
         buildAnnotatedString {
             append(text)
             for (e in all) {
@@ -68,13 +71,13 @@ fun rememberRichText(
                     EntityType.Underline -> addStyle(SpanStyle(textDecoration = TextDecoration.Underline), start, end)
                     EntityType.Strike -> addStyle(SpanStyle(textDecoration = TextDecoration.LineThrough), start, end)
                     EntityType.Code, EntityType.Pre -> addStyle(SpanStyle(fontFamily = FontFamily.Monospace, background = codeBackground), start, end)
-                    EntityType.Quote -> addStyle(SpanStyle(fontStyle = FontStyle.Italic, color = link), start, end)
+                    EntityType.Quote -> addStyle(SpanStyle(fontStyle = FontStyle.Italic), start, end)
                     EntityType.Spoiler -> if (!spoilersRevealed) {
                         addStyle(SpanStyle(color = Color.Transparent, background = spoilerColor), start, end)
                         addLink(LinkAnnotation.Clickable("spoiler") { onRevealSpoiler() }, start, end)
                     }
                     else -> addLink(
-                        LinkAnnotation.Clickable(e.type.name, TextLinkStyles(SpanStyle(color = link))) { handler(e, value) },
+                        LinkAnnotation.Clickable(e.type.name, TextLinkStyles(linkStyle)) { handler(e, value) },
                         start, end,
                     )
                 }

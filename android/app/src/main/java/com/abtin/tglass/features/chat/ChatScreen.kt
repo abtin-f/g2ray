@@ -53,6 +53,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -211,6 +212,10 @@ fun ChatScreen(chatId: Long) {
 
     val messages = repo.messages(chatId)
     val reversed = messages.asReversed()
+    // Media albums become one list item (one bubble with a grid).
+    val items = buildChatItems(messages)
+    val reversedItems = items.asReversed()
+    fun itemIndexOf(id: Long) = reversedItems.indexOfFirst { it.contains(id) }
     val isGroup = chat.type == ChatType.Group
     val isChannel = chat.type == ChatType.Channel
     // Telegram-iOS ChatMessageItemCommon: compactInset 36 (+ avatarInset 38 in groups).
@@ -237,6 +242,9 @@ fun ChatScreen(chatId: Long) {
         repo.openChat(chatId)
         repo.loadChatExtras(chatId)
     }
+    // Channels: the linked discussion group (the round button left of Mute).
+    var discussionId by remember { mutableStateOf<Long?>(null) }
+    LaunchedEffect(isChannel) { if (isChannel) repo.loadDiscussionChat(chatId) { discussionId = it } }
     DisposableEffect(Unit) {
         onDispose {
             repo.setDraft(chatId, text.takeIf { editingId == null })
@@ -249,7 +257,7 @@ fun ChatScreen(chatId: Long) {
     LaunchedEffect(messages.size) {
         if (!initialScrollDone && messages.isNotEmpty()) {
             // Open at the first unread message, with the divider in the upper part of the screen.
-            val idx = firstUnreadId?.let { id -> reversed.indexOfFirst { it.id == id } } ?: -1
+            val idx = firstUnreadId?.let { id -> itemIndexOf(id) } ?: -1
             if (idx > 0) {
                 listState.scrollToItem(idx)
                 listState.scrollBy(-listState.layoutInfo.viewportSize.height * 0.55f)
@@ -263,7 +271,7 @@ fun ChatScreen(chatId: Long) {
     }
 
     fun jumpTo(id: Long) {
-        val idx = reversed.indexOfFirst { it.id == id }
+        val idx = itemIndexOf(id)
         if (idx >= 0) scope.launch {
             listState.animateScrollToItem(idx)
             highlightId = id
@@ -282,6 +290,13 @@ fun ChatScreen(chatId: Long) {
             pendingJump = null
             jumpTo(id)
         }
+    }
+    // Opened from a t.me/…/123 link: scroll to that message.
+    LaunchedEffect(Unit) {
+        val target = ChatJumpRequest.take(chatId) ?: return@LaunchedEffect
+        kotlinx.coroutines.delay(250)
+        initialScrollDone = true
+        jumpToAny(target)
     }
     val currentSearch = androidx.compose.runtime.rememberUpdatedState(searchQuery.trim())
     LaunchedEffect(searchQuery, searchMode) {
@@ -327,18 +342,56 @@ fun ChatScreen(chatId: Long) {
     fun openUsername(name: String) = repo.resolveUsername(name) { id ->
         if (id != null) nav.push(Route.Chat(id)) else toast.show("No one uses @${name.removePrefix("@")}")
     }
+    fun openInBrowser(url: String) {
+        runCatching { uriHandler.openUri(url) }.onFailure { toast.show("Can't open this link") }
+    }
+    fun openResolved(r: com.abtin.tglass.data.ResolvedLink, url: String) {
+        val target = r.chatId
+        val invite = r.invite
+        when {
+            target != null -> {
+                if (target == chatId) r.messageId?.let { jumpToAny(it) }
+                else {
+                    r.messageId?.let { ChatJumpRequest.request(target, it) }
+                    nav.push(Route.Chat(target))
+                }
+            }
+            invite != null -> sheet.show(
+                SheetRequest(
+                    title = invite.title,
+                    message = if (invite.memberCount > 0) "${formatCount(invite.memberCount)} ${if (invite.channel) "subscribers" else "members"}" else null,
+                    actions = listOf(
+                        SheetAction(
+                            when {
+                                invite.requestNeeded -> "Request to Join"
+                                invite.channel -> "Join Channel"
+                                else -> "Join Group"
+                            },
+                            bold = true,
+                        ) {
+                            repo.joinByInviteLink(invite.link) { id, err ->
+                                if (id != null) nav.push(Route.Chat(id)) else if (err != null) toast.show(err)
+                            }
+                        },
+                    ),
+                )
+            )
+            r.error != null -> toast.show(r.error)
+            else -> openInBrowser(url)
+        }
+    }
     fun openUrl(raw: String) {
         val url = if (raw.startsWith("http", ignoreCase = true) || raw.startsWith("tg:", ignoreCase = true)) raw else "https://$raw"
         if (com.abtin.tglass.data.ProxyItem.fromLink(url) != null) {
             nav.push(Route.ProxyLink(url))
             return
         }
-        // t.me/username links open inside the app, like Telegram.
-        Regex("""(?i)^https?://(?:www\.)?(?:t|telegram)\.me/([A-Za-z][A-Za-z0-9_]{3,31})/?$""").find(url)?.let {
-            openUsername(it.groupValues[1])
+        // t.me / telegram.me / tg:// links open inside the app (chats, bots, channels, posts, invites), like Telegram.
+        if (com.abtin.tglass.data.TelegramLinks.isTelegramLink(url)) {
+            repo.resolveLink(url) { r -> openResolved(r, url) }
             return
         }
-        runCatching { uriHandler.openUri(url) }.onFailure { toast.show("Can't open this link") }
+        openInBrowser(url)
     }
     val linkHandler: (com.abtin.tglass.data.Entity, String) -> Unit = { e, value ->
         when (e.type) {
@@ -479,13 +532,15 @@ fun ChatScreen(chatId: Long) {
                         bottom = with(density) { bottomHeight.toDp() } + 4.dp,
                     ),
                 ) {
-                    itemsIndexed(reversed, key = { _, m -> m.id }) { rIdx, m ->
-                        val idx = messages.size - 1 - rIdx
-                        val prev = messages.getOrNull(idx - 1)
-                        val group = groupFor(messages, idx, isGroup)
+                    itemsIndexed(reversedItems, key = { _, it -> it.key }) { rIdx, item ->
+                        val idx = items.size - 1 - rIdx
+                        val prev = items.getOrNull(idx - 1)?.last
+                        val group = groupForItems(items, idx, isGroup)
+                        val m = item.head
+                        val ids = item.messages.map { it.id }
                         Column(Modifier.animateItem()) {
-                            if (prev == null || !sameDay(prev.date, m.date)) ServicePill(formatDay(m.date))
-                            if (m.id == firstUnreadId) UnreadDivider()
+                            if (prev == null || !sameDay(prev.date, item.first.date)) ServicePill(formatDay(item.first.date))
+                            if (firstUnreadId != null && item.contains(firstUnreadId)) UnreadDivider()
                             if (m.content is MessageContent.Service) {
                                 ServicePill((m.content as MessageContent.Service).text)
                             } else {
@@ -503,11 +558,15 @@ fun ChatScreen(chatId: Long) {
                                         }
                                     },
                                     selecting = selecting,
-                                    selected = m.id in selected,
-                                    highlighted = highlightId == m.id,
+                                    selected = ids.any { it in selected },
+                                    highlighted = item.contains(highlightId),
+                                    album = if (item.messages.size > 1) item.messages else emptyList(),
+                                    onAlbumItemClick = { id -> nav.push(Route.Media(chatId, id)) },
+                                    onSenderClick = if (isGroup && repo.user(m.senderId) != null) ({ nav.push(Route.UserProfile(m.senderId)) }) else null,
+                                    onShare = if (isChannel) ({ forward(ids) }) else null,
                                     onTap = {
                                         if (selecting) {
-                                            if (m.id in selected) selected.remove(m.id) else selected.add(m.id)
+                                            if (ids.any { it in selected }) selected.removeAll(ids) else selected.addAll(ids)
                                             if (selected.isEmpty()) selecting = false
                                         }
                                     },
@@ -619,19 +678,19 @@ fun ChatScreen(chatId: Long) {
                         })
                         GlassIconButton(TgIcons.CtxForward, { if (selected.isNotEmpty()) forward(selected.toList()) })
                     }
-                    !chat.joined -> GlassBox(
-                        onClick = { repo.joinChat(chatId) },
-                        shape = Capsule(),
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp).height(46.dp),
-                    ) { T(if (isChannel) "Join Channel" else "Join Group", TgTheme.type.body, c.accent, weight = FontWeight.SemiBold) }
-                    isChannel && !(repo.isLive && chat.canPost) -> GlassBox(
-                        onClick = { repo.toggleMute(chatId) },
-                        shape = Capsule(),
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp).height(46.dp),
-                    ) { T(if (chat.muted) "Unmute" else "Mute", TgTheme.type.body, c.accent, weight = FontWeight.Medium) }
+                    !chat.joined -> ChatBottomBar(if (isChannel) "Join Channel" else "Join Group", { repo.joinChat(chatId) })
+                    isChannel && !(repo.isLive && chat.canPost) -> ChannelBottomBar(
+                        muted = chat.muted,
+                        onDiscuss = if (discussionId != null || !repo.isLive) ({
+                            val d = discussionId
+                            if (d != null) nav.push(Route.Chat(d)) else toast.show("This channel has no discussion group")
+                        }) else null,
+                        onMute = { repo.toggleMute(chatId) },
+                        onSearch = { searchMode = true },
+                    )
                     (chat.type == ChatType.Private || chat.type == ChatType.Bot) && repo.isBlocked(chatId) -> {
                         val bot = chat.type == ChatType.Bot
-                        ChatBottomBar(if (bot) "Restart" else "Unblock", {
+                        ChatBottomBar(if (bot) "Restart Bot" else "Unblock", {
                             repo.setBlocked(chatId, false) { err ->
                                 if (err != null) toast.show(err) else if (bot) repo.startBot(chatId)
                             }
@@ -753,6 +812,65 @@ fun groupFor(messages: List<Message>, idx: Int, isGroup: Boolean): BubbleGroup {
     )
 }
 
+/** One entry of the message list: a message, or all messages of a media album (shown as one bubble). */
+@Immutable
+class ChatItem(val messages: List<Message>) {
+    val first: Message get() = messages.first()
+    val last: Message get() = messages.last()
+    /** The message that speaks for the item (the album's captioned one). */
+    val head: Message get() = if (messages.size == 1) messages[0] else messages.firstOrNull { it.text != null } ?: messages[0]
+    val key: Any get() = if (messages.size > 1) "album-${first.id}" else first.id
+    fun contains(id: Long) = messages.any { it.id == id }
+}
+
+/** Groups consecutive messages with the same TDLib media album id (at most 10, like Telegram). */
+fun buildChatItems(messages: List<Message>): List<ChatItem> {
+    val out = ArrayList<ChatItem>(messages.size)
+    var i = 0
+    while (i < messages.size) {
+        val m = messages[i]
+        var j = i + 1
+        if (m.albumId != 0L) {
+            while (j < messages.size && j - i < 10 && messages[j].albumId == m.albumId && messages[j].content !is MessageContent.Service) j++
+        }
+        out += ChatItem(if (j - i == 1) listOf(m) else messages.subList(i, j).toList())
+        i = j
+    }
+    return out
+}
+
+fun groupForItems(items: List<ChatItem>, idx: Int, isGroup: Boolean): BubbleGroup {
+    val item = items.getOrNull(idx) ?: return BubbleGroup(false, false, false, false)
+    val m = item.head
+    val top = groupable(items.getOrNull(idx - 1)?.last, item.first)
+    val bottom = groupable(item.last, items.getOrNull(idx + 1)?.first)
+    return BubbleGroup(
+        groupedTop = top,
+        groupedBottom = bottom,
+        showName = isGroup && !m.outgoing && !top,
+        showAvatar = isGroup && !m.outgoing && !bottom,
+    )
+}
+
+/** Set before opening a chat from a t.me/…/123 link; the chat screen scrolls to that message. */
+object ChatJumpRequest {
+    private var chatId: Long? = null
+    private var messageId: Long? = null
+
+    fun request(chatId: Long, messageId: Long) {
+        this.chatId = chatId
+        this.messageId = messageId
+    }
+
+    fun take(chatId: Long): Long? {
+        if (this.chatId != chatId) return null
+        val id = messageId
+        this.chatId = null
+        messageId = null
+        return id
+    }
+}
+
 private fun senderNameFor(repo: TelegramRepository, m: Message, group: BubbleGroup, isGroup: Boolean): String? =
     if (isGroup && group.showName) repo.user(m.senderId)?.name else null
 
@@ -780,6 +898,10 @@ private fun MessageRow(
     keyboard: com.abtin.tglass.data.InlineKeyboard? = null,
     busyButton: (Int, Int) -> Boolean = { _, _ -> false },
     onInlineButton: (Int, Int, com.abtin.tglass.data.InlineButton) -> Unit = { _, _, _ -> },
+    album: List<Message> = emptyList(),
+    onAlbumItemClick: (Long) -> Unit = {},
+    onSenderClick: (() -> Unit)? = null,
+    onShare: (() -> Unit)? = null,
 ) {
     val c = TgTheme.colors
     val menu = LocalContextMenu.current
@@ -869,7 +991,11 @@ private fun MessageRow(
                 Box(Modifier.width(38.dp)) { // Telegram-iOS avatarInset = 34 + 4
                     if (group.showAvatar) {
                         val u = repo.user(m.senderId)
-                        com.abtin.tglass.ui.components.Avatar(u?.name ?: "?", m.senderId, 34.dp)
+                        val chatSender = if (u == null) repo.chat(m.senderId) else null
+                        com.abtin.tglass.ui.components.Avatar(
+                            u?.name ?: chatSender?.title ?: "?", m.senderId, 34.dp,
+                            modifier = if (onSenderClick != null) Modifier.fadeClickable(onClick = onSenderClick) else Modifier,
+                        )
                     }
                 }
             }
@@ -888,7 +1014,7 @@ private fun MessageRow(
                 MessageBubble(
                     m = m,
                     group = group,
-                    senderName = if (isGroup && group.showName) repo.user(m.senderId)?.name else null,
+                    senderName = if (isGroup && group.showName) (repo.user(m.senderId)?.name ?: repo.chat(m.senderId)?.title) else null,
                     senderSeed = m.senderId,
                     replyTo = replyTo,
                     replyName = replyTo?.let { repo.senderName(it) },
@@ -898,6 +1024,9 @@ private fun MessageRow(
                     onReact = onReact,
                     onVote = onVote,
                     onMediaClick = onMedia,
+                    album = album,
+                    onAlbumItemClick = onAlbumItemClick,
+                    onSenderClick = onSenderClick,
                 )
             } }
             if (keyboard == null) bubble()
@@ -907,6 +1036,19 @@ private fun MessageRow(
                 bubble = bubble,
                 keyboard = { InlineKeyboardView(keyboard, m.outgoing, busyButton, onInlineButton) },
             )
+            if (onShare != null && !m.outgoing && !selecting) {
+                // Channel posts: round share button next to the bubble (Telegram iOS).
+                Spacer(Modifier.width(6.dp))
+                Box(
+                    Modifier
+                        .padding(bottom = 2.dp)
+                        .size(30.dp)
+                        .clip(CircleShape)
+                        .background(c.serviceBubble)
+                        .fadeClickable(onClick = onShare),
+                    contentAlignment = Alignment.Center,
+                ) { Icon(TgIcons.CtxForward, Color.White, 17.dp) }
+            }
         }
     }
 }
