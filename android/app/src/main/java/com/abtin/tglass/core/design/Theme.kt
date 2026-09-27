@@ -574,19 +574,19 @@ class AppSettings(context: Context) {
     /** Carousel tap. While the night theme is showing (not picked as the main theme) this picks the night theme. */
     fun selectTheme(t: ColorTheme, nightShowing: Boolean) {
         if (nightShowing && !colorTheme.dark) {
-            if (t.dark) setNightTheme(t)
+            if (t.dark) storeNightTheme(t)
             return
         }
         colorTheme = t
         prefs.edit().putInt("colorTheme", t.ordinal).apply()
-        if (t.dark) setNightTheme(t) else {
+        if (t.dark) storeNightTheme(t) else {
             lastDayTheme = t
             prefs.edit().putInt("dayTheme", t.ordinal).apply()
             updateNightForced(false)
         }
     }
 
-    private fun setNightTheme(t: ColorTheme) { nightTheme = t; prefs.edit().putInt("nightTheme", t.ordinal).apply() }
+    private fun storeNightTheme(t: ColorTheme) { nightTheme = t; prefs.edit().putInt("nightTheme", t.ordinal).apply() }
 
     /** "Night Mode" switch. Off also leaves a night theme picked in the carousel. */
     fun updateNightForced(v: Boolean) {
@@ -598,7 +598,7 @@ class AppSettings(context: Context) {
         }
     }
 
-    fun updateNightTheme(t: ColorTheme) { if (t.dark) setNightTheme(t) }
+    fun updateNightTheme(t: ColorTheme) { if (t.dark) storeNightTheme(t) }
     fun updateAutoNight(v: AutoNight) { autoNight = v; prefs.edit().putInt("autoNight", v.ordinal).apply() }
     fun updateNightSchedule(from: Int, to: Int) {
         nightFrom = from.mod(24 * 60); nightTo = to.mod(24 * 60)
