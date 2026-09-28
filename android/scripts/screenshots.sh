@@ -28,7 +28,7 @@ shot() {
     echo "=== ${screen}_${theme}"
     adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity" | head -2
     adb logcat -d -b crash
-    adb logcat -d -s TGlassWatchdog:W | tail -45
+    adb logcat -d -s TGlassWatchdog:W | tail -40
   } >> "$OUT/log.txt" 2>&1 || true
   echo "captured ${screen}_${theme}"
 }

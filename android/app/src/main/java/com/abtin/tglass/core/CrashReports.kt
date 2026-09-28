@@ -64,18 +64,20 @@ object CrashReports {
                     val started = android.os.SystemClock.uptimeMillis()
                     while (!tick.get()) {
                         samples++
-                        main.thread.stackTrace
-                            .filter { it.className.startsWith("com.abtin") }
-                            .map { "${it.className.substringAfterLast('.')}.${it.methodName}:${it.lineNumber}" }
-                            .distinct()
-                            .forEach { counts[it] = (counts[it] ?: 0) + 1 }
+                        val st = main.thread.stackTrace
+                        // Where the thread is right now (top frames) and the innermost app frames under it.
+                        val top = st.take(5).joinToString(" < ") { "${it.className.substringAfterLast('.')}.${it.methodName}:${it.lineNumber}" }
+                        val app = st.filter { it.className.startsWith("com.abtin") }.take(3)
+                            .joinToString(" < ") { "${it.className.substringAfterLast('.')}.${it.methodName}:${it.lineNumber}" }
+                        val key = "$top || $app"
+                        counts[key] = (counts[key] ?: 0) + 1
                         Thread.sleep(100)
                         if (samples % 30 == 0) android.util.Log.w(
                             "TGlassWatchdog",
-                            "still blocked, $samples samples:\n" + counts.entries.sortedByDescending { it.value }.take(25).joinToString("\n") { "  ${it.value}x ${it.key}" },
+                            "still blocked, $samples samples:\n" + counts.entries.sortedByDescending { it.value }.take(12).joinToString("\n") { "  ${it.value}x ${it.key}" },
                         )
                     }
-                    val top = counts.entries.sortedByDescending { it.value }.take(40)
+                    val top = counts.entries.sortedByDescending { it.value }.take(15)
                     android.util.Log.w(
                         "TGlassWatchdog",
                         "main thread blocked ${android.os.SystemClock.uptimeMillis() - started + 1000} ms, $samples samples:\n" +
