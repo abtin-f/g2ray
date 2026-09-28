@@ -134,18 +134,14 @@ internal fun AudioPlayButton(
         Modifier.size(diameter).clip(CircleShape).background(colors.control).bounceClickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        if (loading) {
-            Canvas(Modifier.size(diameter - 8.dp)) {
-                drawArc(
-                    colors.controlGlyph, -90f, 360f * loadProgress.coerceIn(0.05f, 1f), false,
-                    style = Stroke(2.dp.toPx(), cap = StrokeCap.Round),
-                )
-            }
-            Icon(IosIcons.Close, colors.controlGlyph, 14.dp)
-        } else {
-            val glyphScale = diameter.value / 44f
-            Canvas(Modifier.size(diameter)) { drawPlayPause(t, colors.controlGlyph, scale = glyphScale) }
-        }
+        // Play / pause glyph, replaced by Telegram's rotating download ring (X cancels) while the file loads.
+        val glyphAlpha by animateFloatAsState(if (loading) 0f else 1f, label = "playGlyph")
+        val glyphScale = diameter.value / 44f
+        Canvas(Modifier.size(diameter).graphicsLayer { alpha = glyphAlpha }) { drawPlayPause(t, colors.controlGlyph, scale = glyphScale) }
+        DownloadRing(
+            if (loading) DownloadPhase.Loading else DownloadPhase.Done, loadProgress, colors.controlGlyph,
+            Modifier.matchParentSize(), glyphSize = 16.dp, inset = 3.5.dp,
+        )
     }
 }
 
@@ -243,7 +239,7 @@ internal fun VoiceMessageBody(m: Message, v: MessageContent.Voice, colors: Bubbl
             when {
                 media == null -> playAudioMessage(context, repo, m, null, v.seconds)
                 path != null -> playAudioMessage(context, repo, m, path, v.seconds)
-                else -> { pending = !pending; if (pending) repo.requestImage(media) }
+                else -> { pending = !pending; if (pending) repo.requestImage(media) else repo.cancelDownload(media) }
             }
         }
         Spacer(Modifier.width(10.dp))
@@ -280,7 +276,7 @@ internal fun VoiceMessageBody(m: Message, v: MessageContent.Voice, colors: Bubbl
             Spacer(Modifier.height(4.dp))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 val secs = if (current && player.positionMs > 0) (player.positionMs / 1000).toInt() else v.seconds
-                T(formatDuration(secs), TgTheme.type.caption1.copy(fontSize = 12.sp, lineHeight = 14.sp), colors.meta, maxLines = 1)
+                T(formatDuration(secs), bubbleText().meta, colors.meta, maxLines = 1)
                 if (!v.listened && !current) {
                     // Not listened yet: Telegram's small dot next to the duration.
                     Spacer(Modifier.width(4.dp))

@@ -950,7 +950,10 @@ class TdRepository(context: Context) : TelegramRepository {
                 if (u.chatId in openChats) loadPinned(u.chatId)
             }
             is UpdateMessageInteractionInfo -> updateMessage(u.chatId, u.messageId) {
-                it.copy(reactions = mapReactions(u.interactionInfo), views = if (it.views != null) u.interactionInfo?.viewCount else null)
+                it.copy(
+                    reactions = mapReactions(u.interactionInfo), views = if (it.views != null) u.interactionInfo?.viewCount else null,
+                    comments = if (it.views != null) u.interactionInfo?.replyInfo?.replyCount else it.comments,
+                )
             }
             is UpdateDeleteMessages -> if (!u.fromCache) {
                 val ids = u.messageIds.toHashSet()
@@ -1215,7 +1218,7 @@ class TdRepository(context: Context) : TelegramRepository {
     }
 
     private fun imageOf(f: File, mini: Minithumbnail?, width: Int = 0, height: Int = 0) =
-        ImageRef(f.id, localPath(f), mini?.data, width, height)
+        ImageRef(f.id, localPath(f), mini?.data, width, height, if (f.size > 0) f.size else f.expectedSize)
 
     private fun mapMessage(m: Message): UiMessage {
         val st = chatStates[m.chatId]
@@ -1246,6 +1249,14 @@ class TdRepository(context: Context) : TelegramRepository {
             forwardedFrom = m.forwardInfo?.origin?.let { originName(it) },
             pinned = m.isPinned,
             albumId = m.mediaAlbumId,
+            forwardPeerId = when (val o = m.forwardInfo?.origin) {
+                is MessageOriginUser -> o.senderUserId
+                is MessageOriginChat -> o.senderChatId
+                is MessageOriginChannel -> o.chatId
+                else -> 0L
+            },
+            forwardMessageId = (m.forwardInfo?.origin as? MessageOriginChannel)?.messageId ?: 0L,
+            comments = if (m.isChannelPost) m.interactionInfo?.replyInfo?.replyCount else null,
         )
     }
 
@@ -3941,6 +3952,43 @@ class TdRepository(context: Context) : TelegramRepository {
         }
     }
     // ---- end Accounts & Settings v2 ----
+
+    // ---- Bubbles v2 ----
+    /** Chats requested for forward headers (getChat once each; TDLib then sends updateNewChat). */
+    private val originRequested = HashSet<Long>()
+
+    override fun originChat(chatId: Long): com.abtin.tglass.data.OriginChat? {
+        if (chatId == 0L) return null
+        val known = chatMap[chatId]
+        if (known == null) {
+            if (originRequested.add(chatId)) scope.launch { client.getChat(chatId) }
+            return null
+        }
+        return com.abtin.tglass.data.OriginChat(known.title, avatars[chatId])
+    }
+
+    override fun cancelDownload(image: ImageRef) {
+        if (image.fileId <= 0 || filePath(image) != null) return
+        downloading.remove(image.fileId)
+        fileProgressMap.remove(image.fileId)
+        scope.launch { client.cancelDownloadFile(image.fileId, false) }
+    }
+
+    override fun loadCommentsTarget(chatId: Long, messageId: Long, onResult: (com.abtin.tglass.data.CommentsTarget?) -> Unit) {
+        scope.launch {
+            val r = client.getMessageThread(chatId, messageId)
+            if (r is TdlResult.Success) {
+                val info = r.result
+                val starter = info.messages.minByOrNull { it.id }?.id ?: 0L
+                if (chatMap[info.chatId] == null) client.getChat(info.chatId)
+                onResult(com.abtin.tglass.data.CommentsTarget(info.chatId, starter))
+            } else {
+                // Fall back to the channel's discussion group without a position.
+                loadDiscussionChat(chatId) { id -> onResult(id?.let { com.abtin.tglass.data.CommentsTarget(it) }) }
+            }
+        }
+    }
+    // ---- end Bubbles v2 ----
 }
 
 private const val GIFTS_ENABLED = false
