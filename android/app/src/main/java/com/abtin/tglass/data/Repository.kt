@@ -684,6 +684,20 @@ interface TelegramRepository {
 
     fun loadProfileStories(chatId: Long) {}
     // ---- end History gaps & profile posts ----
+
+    // ---- Bubbles v2 ----
+    /**
+     * Title + small photo of the chat a forwarded message comes from (forward header). Live loads an unknown chat on
+     * the first call and returns it once it arrived; the demo only knows its own chats (null otherwise).
+     */
+    fun originChat(chatId: Long): OriginChat? = chat(chatId)?.let { OriginChat(it.title, avatar(chatId)) }
+
+    /** Stops downloading the file behind [image] (the X of the download ring); [fileProgress] goes back to 0. */
+    fun cancelDownload(image: ImageRef) {}
+
+    /** Resolves where the comments of channel post [messageId] live; [onResult] gets null when there are none. */
+    fun loadCommentsTarget(chatId: Long, messageId: Long, onResult: (CommentsTarget?) -> Unit) = onResult(null)
+    // ---- end Bubbles v2 ----
 }
 
 class DemoRepository(private val scope: CoroutineScope) : TelegramRepository {
@@ -821,7 +835,7 @@ class DemoRepository(private val scope: CoroutineScope) : TelegramRepository {
         put(104, listOf(
             msg(104, -1, 60 * 48, MessageContent.Photo(1, 1.6f, "Telegram now fully supports Liquid Glass on iOS — transparent elements and refraction effects throughout the app.", "✨"), listOf(Reaction("❤️", 18_400, false), Reaction("🔥", 9_200, false), Reaction("👍", 5_100, false)), views = 2_400_000),
             msg(104, -1, 60 * 6, text("You can control interface effects in Settings → Power Saving."), listOf(Reaction("👍", 3_900, false)), views = 1_200_000),
-            msg(104, -1, 30, text("New in this update: AI summaries for long posts, comments in video chats and threads for bots."), listOf(Reaction("🎉", 7_700, false), Reaction("❤️", 2_300, false)), views = 860_000),
+            msg(104, -1, 30, text("New in this update: AI summaries for long posts, comments in video chats and threads for bots."), listOf(Reaction("🎉", 7_700, false), Reaction("❤️", 2_300, false)), views = 860_000).copy(comments = 214),
         ))
         put(105, listOf(
             msg(105, 3, 60 * 20, text("Can you send me the files from the meeting?")),

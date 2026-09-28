@@ -30,7 +30,15 @@ data class User(
  * [mini] is Telegram's tiny inline JPEG preview, shown blurred until the real file is ready.
  */
 @Immutable
-class ImageRef(val fileId: Int, val path: String? = null, val mini: ByteArray? = null, val width: Int = 0, val height: Int = 0) {
+class ImageRef(
+    val fileId: Int,
+    val path: String? = null,
+    val mini: ByteArray? = null,
+    val width: Int = 0,
+    val height: Int = 0,
+    /** File size in bytes (0 = unknown); with the download progress it gives Telegram's "2.3 / 14 MB". */
+    val size: Long = 0,
+) {
     override fun equals(other: Any?) = other is ImageRef && other.fileId == fileId && other.path == path
     override fun hashCode() = fileId * 31 + (path?.hashCode() ?: 0)
 }
@@ -142,6 +150,12 @@ data class Message(
     val pinned: Boolean = false,
     /** TDLib media album (Message.mediaAlbumId): photos/videos/files sent together; 0 if none. */
     val albumId: Long = 0,
+    /** Original sender of a forwarded message: user id (> 0) or chat id (< 0, groups / channels); 0 = unknown or hidden. */
+    val forwardPeerId: Long = 0,
+    /** The original channel post of a forwarded message (to jump to it), 0 if none. */
+    val forwardMessageId: Long = 0,
+    /** Posts of a channel with a discussion group: number of comments; null = the post has no comments section. */
+    val comments: Int? = null,
 ) {
     val text: String?
         get() = when (val c = content) {
