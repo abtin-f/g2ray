@@ -231,8 +231,8 @@ fun ChatScreen(chatId: Long) {
     fun itemIndexOf(id: Long) = reversedItems.indexOfFirst { it.contains(id) }
     val isGroup = chat.type == ChatType.Group
     val isChannel = chat.type == ChatType.Channel
-    // Telegram-iOS ChatMessageItemCommon: compactInset 36 (+ avatarInset 38 in groups).
-    val maxBubble: Dp = (LocalConfiguration.current.screenWidthDp - 36 - (if (isGroup) 38 else 0)).dp
+    // Bubbles hug their content up to ~78 % of the chat width (at most ~320 pt + tail), next to the avatar column in groups.
+    val maxBubble: Dp = ((LocalConfiguration.current.screenWidthDp - (if (isGroup) 38 else 0)) * 0.78f).coerceAtMost(326f).dp
     val pinned = repo.pinnedMessage(chatId)
     // "Unread Messages" divider: fixed when the chat opens (before it is marked as read).
     val readAnchor = remember { repo.readAnchor(chatId) }
@@ -693,7 +693,8 @@ fun ChatScreen(chatId: Long) {
                             } else {
                                 MessageRow(
                                     appear = m.date > openedAt,
-                                    m = m,
+                                    // Telegram iOS draws every channel post as an incoming bubble (left, with tail), even the admin's own.
+                                    m = if (isChannel) m.asChannelPost() else m,
                                     group = group,
                                     repo = repo,
                                     isGroup = isGroup,
@@ -707,7 +708,7 @@ fun ChatScreen(chatId: Long) {
                                     selecting = selecting,
                                     selected = ids.any { it in selected },
                                     highlighted = item.contains(highlightId),
-                                    album = if (item.messages.size > 1) item.messages else emptyList(),
+                                    album = if (item.messages.size > 1) (if (isChannel) item.messages.map { it.asChannelPost() } else item.messages) else emptyList(),
                                     onAlbumItemClick = { id -> nav.push(Route.Media(chatId, id)) },
                                     onSenderClick = if (isGroup && repo.user(m.senderId) != null) ({ nav.push(Route.UserProfile(m.senderId)) }) else null,
                                     onShare = if (isChannel) ({ forward(ids) }) else null,
