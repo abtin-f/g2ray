@@ -684,7 +684,43 @@ interface TelegramRepository {
 
     fun loadProfileStories(chatId: Long) {}
     // ---- end History gaps & profile posts ----
+
+    // ---- Custom emoji ----
+
+    /** A custom (premium) emoji once [loadCustomEmoji] brought it (observed state); null while loading / unknown. */
+    fun customEmoji(id: Long): StickerItem? = null
+
+    /** Fetches custom emoji by id (batched into getCustomEmojiStickers calls); [customEmoji] turns non-null. */
+    fun loadCustomEmoji(ids: Collection<Long>) {}
+
+    /** A sticker / custom-emoji set for the Add Stickers sheet; [onResult] gets null when it can't be loaded. */
+    fun loadStickerSet(setId: Long, onResult: (StickerSetInfo?) -> Unit) {
+        // Demo: a made-up pack drawn with Apple emoji.
+        val emoji = listOf("🥳", "😎", "🤩", "😂", "😍", "🙏", "👍", "🔥", "💯", "🎉", "😭", "🤯", "🥰", "😴", "🤔", "👻", "🐱", "🐶", "🦊", "🐼")
+        onResult(
+            StickerSetInfo(
+                id = setId, title = "Party Animals", name = "PartyAnimals", installed = demoInstalledSets.contains(setId), emoji = false,
+                stickers = emoji.map { e -> StickerItem(0, e, null, null, 512, 512, setId = setId) },
+            )
+        )
+    }
+
+    /** Installs or removes a sticker / emoji set (changeStickerSet); [onDone] gets an error or null. */
+    fun setStickerSetInstalled(setId: Long, installed: Boolean, onDone: (String?) -> Unit) {
+        if (installed) demoInstalledSets.add(setId) else demoInstalledSets.remove(setId)
+        onDone(null)
+    }
+
+    /** Adds a GIF (animation file id) to Saved GIFs; [onDone] gets an error or null. */
+    fun saveGif(fileId: Int, onDone: (String?) -> Unit) = onDone(null)
+
+    /** Removes a GIF from Saved GIFs; [onDone] gets an error or null. */
+    fun removeSavedGif(fileId: Int, onDone: (String?) -> Unit) = onDone(null)
+    // ---- end Custom emoji ----
 }
+
+/** Sticker sets "installed" in the demo (the demo has no server). */
+private val demoInstalledSets = HashSet<Long>()
 
 class DemoRepository(private val scope: CoroutineScope) : TelegramRepository {
 

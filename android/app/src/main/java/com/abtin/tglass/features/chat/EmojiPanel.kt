@@ -88,6 +88,8 @@ import com.abtin.tglass.features.main.LocalRepository
 import com.abtin.tglass.ui.components.ActivityIndicator
 import com.abtin.tglass.ui.components.Haptics
 import com.abtin.tglass.ui.components.Icon
+import com.abtin.tglass.ui.components.SheetAction
+import com.abtin.tglass.ui.components.SheetRequest
 import com.abtin.tglass.ui.components.IosIcons
 import com.abtin.tglass.ui.components.T
 import com.abtin.tglass.ui.components.TgImage
@@ -406,6 +408,9 @@ private fun StickersTab(onDemoSticker: (String) -> Unit, onSticker: (StickerItem
 private fun GifsTab(chatId: Long, onDemoGif: (Int) -> Unit, onGif: (GifItem) -> Unit) {
     val c = TgTheme.colors
     val repo = LocalRepository.current
+    val sheet = com.abtin.tglass.ui.components.LocalActionSheet.current
+    val toast = com.abtin.tglass.ui.components.LocalToast.current
+    val view = LocalView.current
     var query by rememberSaveable { mutableStateOf("") }
     var results by remember { mutableStateOf<List<GifItem>?>(null) }
     var searching by remember { mutableStateOf(false) }
@@ -491,7 +496,24 @@ private fun GifsTab(chatId: Long, onDemoGif: (Int) -> Unit, onGif: (GifItem) -> 
                     items(shown.size, key = { i -> "g${shown[i].fileId}:$i" }) { i ->
                         val g = shown[i]
                         val play = rememberPlaybackSlot(slots, i in visible)
-                        Box(Modifier.aspectRatio(1f).clip(RoundedRectangle(10.dp)).background(c.searchField).bounceClickable { onGif(g) }) {
+                        // Saved GIFs: long-press offers Delete (removeSavedAnimation), like Telegram.
+                        val tap = if (results == null && repo.isLive) {
+                            Modifier.fadeClickable(onLongClick = {
+                                Haptics.longPress(view)
+                                sheet.show(
+                                    SheetRequest(
+                                        actions = listOf(
+                                            SheetAction("Delete", destructive = true) {
+                                                repo.removeSavedGif(g.fileId) { err -> if (err != null) toast.error(err) }
+                                            },
+                                        ),
+                                    )
+                                )
+                            }) { onGif(g) }
+                        } else {
+                            Modifier.bounceClickable { onGif(g) }
+                        }
+                        Box(Modifier.aspectRatio(1f).clip(RoundedRectangle(10.dp)).background(c.searchField).then(tap)) {
                             GifCell(g, play, Modifier.fillMaxSize())
                         }
                     }

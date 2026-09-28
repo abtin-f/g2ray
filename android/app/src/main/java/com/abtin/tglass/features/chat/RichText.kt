@@ -1,6 +1,7 @@
 package com.abtin.tglass.features.chat
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
@@ -13,10 +14,12 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import com.abtin.tglass.core.emoji.CustomEmojiSpan
 import com.abtin.tglass.core.emoji.appendWithAppleEmoji
 import com.abtin.tglass.core.emoji.appleEmojiKey
 import com.abtin.tglass.data.Entity
 import com.abtin.tglass.data.EntityType
+import com.abtin.tglass.features.main.LocalRepository
 
 /** What to do when a link, @mention, #hashtag or /command in a message is tapped. */
 val LocalLinkHandler = staticCompositionLocalOf<(Entity, String) -> Unit> { { _, _ -> } }
@@ -59,13 +62,22 @@ fun rememberRichText(
     val handler = LocalLinkHandler.current
     val all = remember(text, entities) { entities.ifEmpty { detectEntities(text) } }
     val emojiKey = appleEmojiKey()
-    return remember(text, all, link, codeBackground, spoilerColor, spoilersRevealed, handler, underlineLinks, emojiKey) {
+    // Premium emoji: drawn inline (Apple fallback until getCustomEmojiStickers answers); tap opens the emoji pack.
+    val custom = remember(all) {
+        all.filter { it.type == EntityType.CustomEmoji && it.customEmojiId != 0L }.map { CustomEmojiSpan(it.start, it.end, it.customEmojiId) }
+    }
+    val repo = LocalRepository.current
+    LaunchedEffect(custom) { if (custom.isNotEmpty()) repo.loadCustomEmoji(custom.map { it.id }.distinct()) }
+    return remember(text, all, custom, link, codeBackground, spoilerColor, spoilersRevealed, handler, underlineLinks, emojiKey) {
         val linkStyle = SpanStyle(color = link, textDecoration = if (underlineLinks) TextDecoration.Underline else null)
         buildAnnotatedString {
             // Apple emoji inline (same offsets); hidden spoilers keep their glyphs so the emoji stay covered.
-            appendWithAppleEmoji(text) { s, e ->
-                !spoilersRevealed && all.any { it.type == EntityType.Spoiler && it.start < e && s < it.end }
-            }
+            appendWithAppleEmoji(
+                text,
+                keepText = { s, e -> !spoilersRevealed && all.any { it.type == EntityType.Spoiler && it.start < e && s < it.end } },
+                custom = custom,
+                tappable = true,
+            )
             for (e in all) {
                 val start = e.start.coerceIn(0, text.length)
                 val end = e.end.coerceIn(start, text.length)
@@ -78,6 +90,7 @@ fun rememberRichText(
                     EntityType.Strike -> addStyle(SpanStyle(textDecoration = TextDecoration.LineThrough), start, end)
                     EntityType.Code, EntityType.Pre -> addStyle(SpanStyle(fontFamily = FontFamily.Monospace, background = codeBackground), start, end)
                     EntityType.Quote -> addStyle(SpanStyle(fontStyle = FontStyle.Italic), start, end)
+                    EntityType.CustomEmoji -> {}
                     EntityType.Spoiler -> if (!spoilersRevealed) {
                         addStyle(SpanStyle(color = Color.Transparent, background = spoilerColor), start, end)
                         addLink(LinkAnnotation.Clickable("spoiler") { onRevealSpoiler() }, start, end)

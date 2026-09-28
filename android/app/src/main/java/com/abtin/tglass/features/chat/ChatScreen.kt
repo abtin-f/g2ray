@@ -634,6 +634,7 @@ fun ChatScreen(chatId: Long) {
                     Icons.Outlined.Download,
                 ) { saveMedia(m) } else null,
                 if (chat.type != ChatType.Saved && k?.canForward != false) MenuAction("Save to Saved Messages", TgIcons.CtxSave) { repo.forward(chatId, listOf(m.id), repo.savedChatId); toast.show("Saved to Saved Messages") } else null,
+                *stickerGifMenuActions(repo, toast, m).toTypedArray(),
                 if (canReport) MenuAction("Report", Icons.Outlined.Report, destructive = true, groupStart = true) { reportMessagesFlow(repo, sheet, toast, chatId, listOf(m.id)) } else null,
             )
         }

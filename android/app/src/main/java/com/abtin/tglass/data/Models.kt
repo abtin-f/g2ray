@@ -37,9 +37,9 @@ class ImageRef(val fileId: Int, val path: String? = null, val mini: ByteArray? =
 
 /** Formatting / link span inside a message text, in UTF-16 offsets (same as TDLib and Kotlin strings). */
 @Immutable
-data class Entity(val start: Int, val end: Int, val type: EntityType, val url: String? = null, val userId: Long = 0)
+data class Entity(val start: Int, val end: Int, val type: EntityType, val url: String? = null, val userId: Long = 0, val customEmojiId: Long = 0)
 
-enum class EntityType { Bold, Italic, Underline, Strike, Code, Pre, Spoiler, Quote, Url, TextUrl, Mention, MentionName, Hashtag, Cashtag, BotCommand, Email, Phone }
+enum class EntityType { Bold, Italic, Underline, Strike, Code, Pre, Spoiler, Quote, Url, TextUrl, Mention, MentionName, Hashtag, Cashtag, BotCommand, Email, Phone, CustomEmoji }
 
 @Immutable
 data class Reaction(val emoji: String, val count: Int, val chosen: Boolean)
@@ -70,7 +70,7 @@ sealed interface MessageContent {
      */
     data class VideoNote(val seconds: Int, val video: ImageRef? = null, val thumb: ImageRef? = null, val viewed: Boolean = false) : MessageContent
     /** [animation] is a Telegram animated sticker (gzipped Lottie, .tgs). */
-    data class Sticker(val emoji: String, val image: ImageRef? = null, val animation: ImageRef? = null) : MessageContent
+    data class Sticker(val emoji: String, val image: ImageRef? = null, val animation: ImageRef? = null, val setId: Long = 0) : MessageContent
     /** A document; [music] files play inline like Telegram's audio player. */
     data class File(
         val name: String,
@@ -272,7 +272,18 @@ data class GlobalResults(val chats: List<Chat>, val messages: List<Message>)
 
 /** A sticker from the user's sticker sets; [image] is a static preview, [animation] the .tgs if animated. */
 @Immutable
-data class StickerItem(val fileId: Int, val emoji: String, val image: ImageRef?, val animation: ImageRef?, val width: Int, val height: Int)
+data class StickerItem(
+    val fileId: Int,
+    val emoji: String,
+    val image: ImageRef?,
+    val animation: ImageRef?,
+    val width: Int,
+    val height: Int,
+    /** The sticker / emoji set it belongs to (0 = none / unknown). */
+    val setId: Long = 0,
+    /** Custom (premium) emoji id when this is a custom emoji; 0 otherwise. */
+    val customEmojiId: Long = 0,
+)
 
 @Immutable
 data class StickerPack(val id: Long, val title: String, val stickers: List<StickerItem>)

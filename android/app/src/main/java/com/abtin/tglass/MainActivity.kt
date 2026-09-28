@@ -228,6 +228,7 @@ class MainActivity : ComponentActivity() {
                         ContextMenuHost(menu) {
                             IOSNavHost(nav) { route -> Screen(route) }
                         }
+                        com.abtin.tglass.features.chat.StickerSetSheetHost()
                         ActionSheetHost(sheet)
                         ToastHost(toast)
                         com.abtin.tglass.notify.InAppBannerHost { chatId ->

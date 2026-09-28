@@ -874,8 +874,10 @@ private fun StickerMessage(m: Message, s: MessageContent.Sticker, modifier: Modi
             if (s.image != null) TgImage(s.image, Modifier.size(160.dp), maxPx = 512, contentScale = ContentScale.Fit)
             else EmojiGlyph(s.emoji, 140.dp)
         }
-        if (anim != null) com.abtin.tglass.ui.components.TgsSticker(animPath, Modifier.size(160.dp), still)
-        else still()
+        Box(Modifier.stickerSetTap(s)) {
+            if (anim != null) com.abtin.tglass.ui.components.TgsSticker(animPath, Modifier.size(160.dp), still)
+            else still()
+        }
         FreeformFooter(m, onReact)
     }
 }
@@ -885,7 +887,7 @@ private fun StickerMessage(m: Message, s: MessageContent.Sticker, modifier: Modi
 private fun BigEmojiMessage(m: Message, text: String, count: Int, modifier: Modifier, onReact: (String) -> Unit) {
     val size = when (count) { 1 -> 64; 2 -> 50; else -> 42 }
     Column(modifier.padding(horizontal = 6.dp), horizontalAlignment = if (m.outgoing) Alignment.End else Alignment.Start) {
-        val emoji = rememberAppleEmojiText(text.trim())
+        val emoji = rememberAppleEmojiText(text.trim(), remember(m.content, text) { com.abtin.tglass.core.emoji.customEmojiSpansTrimmed(m, text) })
         BasicText(
             emoji, style = TextStyle(fontSize = size.sp, lineHeight = (size * 1.2f).sp),
             inlineContent = remember(emoji) { appleEmojiInlineContent(emoji) },
@@ -1095,7 +1097,7 @@ private fun ReactionChip(r: Reaction, colors: BubbleColors, onReact: (String) ->
             .padding(start = 7.dp, end = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        EmojiGlyph(r.emoji, 19.dp)
+        com.abtin.tglass.core.emoji.ReactionGlyph(r.emoji, 19.dp)
         Spacer(Modifier.width(4.dp))
         T(formatCount(r.count), TgTheme.type.footnote.copy(fontSize = 13.sp), if (r.chosen) colors.reactionActiveFg else colors.reactionFg, weight = FontWeight.SemiBold, maxLines = 1)
     }

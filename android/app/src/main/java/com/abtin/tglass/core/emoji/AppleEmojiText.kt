@@ -57,18 +57,58 @@ private const val IdPrefix = "apple-emoji:"
 /** Inline emoji box, relative to the font size of the text (Apple's emoji are a little wider than a letter). */
 private val EmojiPlaceholder = Placeholder(1.2.em, 1.2.em, PlaceholderVerticalAlign.TextCenter)
 
+/** String annotation marking an inline custom (premium) emoji; the item is its inline-content id. */
+const val CustomEmojiTag = "tglass.customEmoji"
+private const val CustomIdPrefix = "custom-emoji:"
+private const val CustomTapIdPrefix = "custom-emoji-tap:"
+
+/** A custom (premium) emoji entity of a text: UTF-16 range [start, end) (its fallback emoji) and the emoji id. */
+@androidx.compose.runtime.Immutable
+data class CustomEmojiSpan(val start: Int, val end: Int, val id: Long)
+
 /**
  * Appends [text] with every emoji whose Apple image is cached replaced by an inline image placeholder. The emoji
  * characters stay in the string (as the placeholder's alternate text), so offsets of entities / links are unchanged.
  * Emoji not downloaded yet start downloading and stay system glyphs for now. [keepText] can exclude ranges (spoilers).
+ * [custom] ranges (premium emoji entities) always become inline custom emoji (Apple fallback while they load);
+ * [tappable] ones open their emoji pack when tapped (message bubbles).
  */
-fun AnnotatedString.Builder.appendWithAppleEmoji(text: String, keepText: (start: Int, end: Int) -> Boolean = { _, _ -> false }) {
-    if (!AppleEmoji.active) {
+fun AnnotatedString.Builder.appendWithAppleEmoji(
+    text: String,
+    keepText: (start: Int, end: Int) -> Boolean = { _, _ -> false },
+    custom: List<CustomEmojiSpan> = emptyList(),
+    tappable: Boolean = false,
+) {
+    val customs = ArrayList<CustomEmojiSpan>()
+    for (c in custom.sortedBy { it.start }) {
+        if (c.id == 0L || c.start < 0 || c.end > text.length || c.start >= c.end) continue
+        if (customs.isNotEmpty() && customs.last().end > c.start) continue
+        if (keepText(c.start, c.end)) continue
+        customs += c
+    }
+    if (!AppleEmoji.active && customs.isEmpty()) {
         append(text)
         return
     }
     var pos = 0
-    for (m in AppleEmoji.find(text)) {
+    var ci = 0
+    // Custom emoji starting before [limit] go in first (Apple emoji they cover are skipped).
+    fun flushCustom(limit: Int) {
+        while (ci < customs.size && customs[ci].start < limit) {
+            val c = customs[ci++]
+            if (c.start < pos) continue
+            if (c.start > pos) append(text, pos, c.start)
+            val id = (if (tappable) CustomTapIdPrefix else CustomIdPrefix) + c.id
+            pushStringAnnotation(CustomEmojiTag, id)
+            appendInlineContent(id, text.substring(c.start, c.end))
+            pop()
+            pos = c.end
+        }
+    }
+    val matches = if (AppleEmoji.active) AppleEmoji.find(text) else emptyList()
+    for (m in matches) {
+        flushCustom(m.end)
+        if (m.start < pos) continue
         if (!AppleEmoji.isOnDisk(m.name)) {
             AppleEmoji.request(m.name)
             continue
@@ -80,6 +120,7 @@ fun AnnotatedString.Builder.appendWithAppleEmoji(text: String, keepText: (start:
         pop()
         pos = m.end
     }
+    flushCustom(Int.MAX_VALUE)
     if (pos < text.length) append(text, pos, text.length)
 }
 
@@ -102,11 +143,11 @@ fun appleEmojiActive(): Boolean {
     return AppleEmoji.active
 }
 
-/** [text] with inline Apple emoji (see [appendWithAppleEmoji]). */
+/** [text] with inline Apple emoji (see [appendWithAppleEmoji]) and the [custom] premium emoji in it. */
 @Composable
-fun rememberAppleEmojiText(text: String): AnnotatedString {
+fun rememberAppleEmojiText(text: String, custom: List<CustomEmojiSpan> = emptyList()): AnnotatedString {
     val key = appleEmojiKey()
-    return remember(text, key) { buildAnnotatedString { appendWithAppleEmoji(text) } }
+    return remember(text, key, custom) { buildAnnotatedString { appendWithAppleEmoji(text, custom = custom) } }
 }
 
 private val inlineCache = HashMap<String, InlineTextContent>() // composition (main) thread only
@@ -114,8 +155,18 @@ private val inlineCache = HashMap<String, InlineTextContent>() // composition (m
 /** The `inlineContent` map for a text built with [appendWithAppleEmoji] (empty when it has no inline emoji). */
 fun appleEmojiInlineContent(text: AnnotatedString): Map<String, InlineTextContent> {
     val anns = text.getStringAnnotations(AppleEmojiTag, 0, text.length)
-    if (anns.isEmpty()) return emptyMap()
+    val customs = text.getStringAnnotations(CustomEmojiTag, 0, text.length)
+    if (anns.isEmpty() && customs.isEmpty()) return emptyMap()
     val map = HashMap<String, InlineTextContent>()
+    for (a in customs) {
+        val id = a.item
+        if (map.containsKey(id)) continue
+        val emojiId = id.substringAfterLast(':').toLongOrNull() ?: continue
+        val tappable = id.startsWith(CustomTapIdPrefix)
+        map[id] = inlineCache.getOrPut(id) {
+            InlineTextContent(EmojiPlaceholder) { alt -> CustomEmojiInline(emojiId, alt, tappable) }
+        }
+    }
     for (a in anns) {
         val id = IdPrefix + a.item
         if (map.containsKey(id)) continue
@@ -128,7 +179,9 @@ fun appleEmojiInlineContent(text: AnnotatedString): Map<String, InlineTextConten
 
 /** Placeholders of the inline emoji, for measuring the text with a `TextMeasurer`. */
 fun appleEmojiPlaceholders(text: AnnotatedString): List<AnnotatedString.Range<Placeholder>> =
-    text.getStringAnnotations(AppleEmojiTag, 0, text.length).map { AnnotatedString.Range(EmojiPlaceholder, it.start, it.end) }
+    (text.getStringAnnotations(AppleEmojiTag, 0, text.length) + text.getStringAnnotations(CustomEmojiTag, 0, text.length))
+        .sortedBy { it.start }
+        .map { AnnotatedString.Range(EmojiPlaceholder, it.start, it.end) }
 
 /** One cached Apple emoji image. [sync] decodes on the spot (a few emoji in a message) instead of in the background (grids). */
 @Composable
@@ -179,8 +232,10 @@ fun EmojiText(
     weight: FontWeight? = null,
     overflow: TextOverflow = TextOverflow.Ellipsis,
     align: TextAlign? = null,
+    /** Premium emoji in [text] (chat previews), drawn inline. */
+    custom: List<CustomEmojiSpan> = emptyList(),
 ) {
-    val annotated = rememberAppleEmojiText(text)
+    val annotated = rememberAppleEmojiText(text, custom)
     val inlineMap = remember(annotated) { appleEmojiInlineContent(annotated) }
     BasicText(
         text = annotated,

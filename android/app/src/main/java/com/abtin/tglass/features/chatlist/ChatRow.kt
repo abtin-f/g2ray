@@ -222,7 +222,10 @@ private fun PreviewLine(m: com.abtin.tglass.data.Message, style: androidx.compos
                 else T(content.emoji, style.copy(fontSize = 11.sp, lineHeight = 12.sp))
             }
             Spacer(Modifier.width(5.dp))
-            com.abtin.tglass.core.emoji.EmojiText(content.caption ?: if (content.video) "Video" else "Photo", style, c.secondaryText, maxLines = 1)
+            com.abtin.tglass.core.emoji.EmojiText(
+                content.caption ?: if (content.video) "Video" else "Photo", style, c.secondaryText, maxLines = 1,
+                custom = if (content.caption != null) com.abtin.tglass.core.emoji.customEmojiSpans(content.captionEntities) else emptyList(),
+            )
         }
         is MessageContent.Voice -> Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(TgIcons.IcVoiceSmall, c.secondaryText, 18.dp)
@@ -238,7 +241,7 @@ private fun PreviewLine(m: com.abtin.tglass.data.Message, style: androidx.compos
             }
             T("Video message", style, c.secondaryText, maxLines = 1)
         }
-        else -> com.abtin.tglass.core.emoji.EmojiText(m.preview, style, c.secondaryText, maxLines = lines)
+        else -> com.abtin.tglass.core.emoji.EmojiText(m.preview, style, c.secondaryText, maxLines = lines, custom = com.abtin.tglass.core.emoji.customEmojiSpans(m))
     }
 }
 

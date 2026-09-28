@@ -362,9 +362,10 @@ class TdRepository(context: Context) : TelegramRepository {
 
     override fun toggleReaction(chatId: Long, messageId: Long, emoji: String) {
         val chosen = messages(chatId).firstOrNull { it.id == messageId }?.reactions?.any { it.emoji == emoji && it.chosen } == true
+        val type: ReactionType = com.abtin.tglass.data.CustomReactions.idOf(emoji)?.let { ReactionTypeCustomEmoji(it) } ?: ReactionTypeEmoji(emoji)
         scope.launch {
-            if (chosen) client.removeMessageReaction(chatId, messageId, ReactionTypeEmoji(emoji)).orReport()
-            else client.addMessageReaction(chatId, messageId, ReactionTypeEmoji(emoji), false, true).orReport()
+            if (chosen) client.removeMessageReaction(chatId, messageId, type).orReport()
+            else client.addMessageReaction(chatId, messageId, type, false, true).orReport()
         }
     }
 
@@ -1248,7 +1249,11 @@ class TdRepository(context: Context) : TelegramRepository {
 
     private fun mapReactions(info: MessageInteractionInfo?): List<UiReaction> =
         info?.reactions?.reactions?.mapNotNull { r ->
-            (r.type as? ReactionTypeEmoji)?.let { UiReaction(it.emoji, r.totalCount, r.isChosen) }
+            when (val t = r.type) {
+                is ReactionTypeEmoji -> UiReaction(t.emoji, r.totalCount, r.isChosen)
+                is ReactionTypeCustomEmoji -> UiReaction(com.abtin.tglass.data.CustomReactions.key(t.customEmojiId), r.totalCount, r.isChosen)
+                else -> null
+            }
         }.orEmpty()
 
     private fun originName(o: MessageOrigin): String = when (o) {
@@ -1336,7 +1341,7 @@ class TdRepository(context: Context) : TelegramRepository {
                 s.thumbnail?.format.let { it is ThumbnailFormatWebp || it is ThumbnailFormatJpeg } -> imageOf(s.thumbnail!!.file, null)
                 else -> null
             }
-            UiContent.Sticker(s.emoji.ifBlank { "🙂" }, image, s.sticker.takeIf { s.format is StickerFormatTgs }?.let { imageOf(it, null) })
+            UiContent.Sticker(s.emoji.ifBlank { "🙂" }, image, s.sticker.takeIf { s.format is StickerFormatTgs }?.let { imageOf(it, null) }, setId = s.setId)
         }
         is MessageAnimatedEmoji -> {
             val s = c.animatedEmoji.sticker
@@ -1393,6 +1398,7 @@ class TdRepository(context: Context) : TelegramRepository {
             is TextEntityTypeBotCommand -> Entity(e.offset, end, EntityType.BotCommand)
             is TextEntityTypeEmailAddress -> Entity(e.offset, end, EntityType.Email)
             is TextEntityTypePhoneNumber -> Entity(e.offset, end, EntityType.Phone)
+            is TextEntityTypeCustomEmoji -> Entity(e.offset, end, EntityType.CustomEmoji, customEmojiId = type.customEmojiId)
             else -> null
         }
     }
@@ -1504,6 +1510,8 @@ class TdRepository(context: Context) : TelegramRepository {
             animation = if (s.format is StickerFormatTgs) imageOf(s.sticker, null) else null,
             width = s.width,
             height = s.height,
+            setId = s.setId,
+            customEmojiId = (s.fullType as? StickerFullTypeCustomEmoji)?.customEmojiId ?: 0L,
         )
     }
 
@@ -3621,6 +3629,123 @@ class TdRepository(context: Context) : TelegramRepository {
         }
     }
     // ---- end History gaps & profile posts ----
+
+    // ---- Custom emoji ----
+    private val customEmojiStore by lazy { mutableStateMapOf<Long, StickerItem>() }
+    /** Ids asked for and not answered yet (never asked twice at the same time). */
+    private val customEmojiPending = HashSet<Long>()
+    private val customEmojiQueue = LinkedHashSet<Long>()
+    private var customEmojiFlush: Job? = null
+
+    override fun customEmoji(id: Long): StickerItem? = customEmojiStore[id]
+
+    override fun loadCustomEmoji(ids: Collection<Long>) {
+        var added = false
+        for (id in ids) {
+            if (id != 0L && !customEmojiStore.containsKey(id) && customEmojiPending.add(id)) {
+                customEmojiQueue.add(id)
+                added = true
+            }
+        }
+        if (!added || customEmojiFlush?.isActive == true) return
+        customEmojiFlush = scope.launch {
+            // Gather the ids of everything composed in this frame into one request (TDLib takes up to 200).
+            delay(24)
+            while (customEmojiQueue.isNotEmpty()) {
+                val batch = customEmojiQueue.take(200)
+                customEmojiQueue.removeAll(batch.toSet())
+                val r = client.getCustomEmojiStickers(batch.toLongArray())
+                if (r is TdlResult.Success) {
+                    for (st in r.result.stickers) {
+                        val id = (st.fullType as? StickerFullTypeCustomEmoji)?.customEmojiId ?: continue
+                        customEmojiStore[id] = stickerItem(st)
+                    }
+                }
+                // Unknown / failed ids may be asked again later (next time they're shown).
+                batch.forEach { customEmojiPending.remove(it) }
+            }
+        }
+    }
+
+    override fun loadStickerSet(setId: Long, onResult: (com.abtin.tglass.data.StickerSetInfo?) -> Unit) {
+        if (setId == 0L) return onResult(null)
+        scope.launch {
+            when (val r = client.getStickerSet(setId)) {
+                is TdlResult.Failure -> onResult(null)
+                is TdlResult.Success -> {
+                    val set = r.result
+                    val items = set.stickers.map { stickerItem(it) }
+                    items.forEach { if (it.customEmojiId != 0L) customEmojiStore[it.customEmojiId] = it }
+                    onResult(
+                        com.abtin.tglass.data.StickerSetInfo(
+                            id = set.id,
+                            title = set.title,
+                            name = set.name,
+                            installed = set.isInstalled && !set.isArchived,
+                            emoji = set.stickerType is StickerTypeCustomEmoji,
+                            stickers = items,
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    override fun setStickerSetInstalled(setId: Long, installed: Boolean, onDone: (String?) -> Unit) {
+        scope.launch {
+            when (val r = client.changeStickerSet(setId, installed, false)) {
+                is TdlResult.Failure -> onDone(humanize(r.message))
+                is TdlResult.Success -> {
+                    // Keep the emoji panel's sticker tabs in step.
+                    if (!installed) {
+                        packs.removeAll { it.id == setId }
+                    } else if (packs.none { it.id == setId }) {
+                        val set = client.getStickerSet(setId)
+                        if (set is TdlResult.Success && set.result.stickerType is StickerTypeRegular) {
+                            packs.add(0, StickerPack(setId, set.result.title, set.result.stickers.map { stickerItem(it) }))
+                        }
+                    }
+                    onDone(null)
+                }
+            }
+        }
+    }
+
+    private suspend fun reloadSavedGifs() {
+        val saved = client.getSavedAnimations()
+        if (saved is TdlResult.Success) {
+            gifs.clear()
+            gifs.addAll(saved.result.animations.map { a ->
+                GifItem(a.animation.id, a.thumbnail?.let { imageOf(it.file, a.minithumbnail, it.width, it.height) }, a.width, a.height, a.duration)
+            })
+        }
+    }
+
+    override fun saveGif(fileId: Int, onDone: (String?) -> Unit) {
+        if (fileId <= 0) return onDone("This GIF can't be saved")
+        scope.launch {
+            when (val r = client.addSavedAnimation(InputFileId(fileId))) {
+                is TdlResult.Failure -> onDone(humanize(r.message))
+                is TdlResult.Success -> {
+                    reloadSavedGifs()
+                    onDone(null)
+                }
+            }
+        }
+    }
+
+    override fun removeSavedGif(fileId: Int, onDone: (String?) -> Unit) {
+        scope.launch {
+            when (val r = client.removeSavedAnimation(InputFileId(fileId))) {
+                is TdlResult.Failure -> onDone(humanize(r.message))
+                is TdlResult.Success -> {
+                    gifs.removeAll { it.fileId == fileId }
+                    onDone(null)
+                }
+            }
+        }
+    }
+    // ---- end Custom emoji ----
 }
 
 private const val GIFTS_ENABLED = false
