@@ -334,13 +334,13 @@ private fun ActionButton(a: SwipeAction, width: androidx.compose.ui.unit.Dp, onC
 
 /** Standard swipe actions for a chat. */
 @Composable
-fun chatSwipeActions(chat: Chat, repo: TelegramRepository, onDelete: () -> Unit): Pair<List<SwipeAction>, List<SwipeAction>> {
+fun chatSwipeActions(chat: Chat, repo: TelegramRepository, onDelete: () -> Unit, folderIndex: Int = 0): Pair<List<SwipeAction>, List<SwipeAction>> {
     val c = TgTheme.colors
     val sheet = com.abtin.tglass.ui.components.LocalActionSheet.current
     val unread = chat.unread > 0 || chat.markedUnread
     val leading = listOf(
         SwipeAction(if (unread) "Read" else "Unread", TgIcons.CtxRead, if (unread) Color(0xFFAAAAAF) else c.accent, if (unread) TgAnimations.Read else TgAnimations.Unread) { repo.toggleRead(chat.id) },
-        SwipeAction(if (chat.pinned) "Unpin" else "Pin", if (chat.pinned) TgIcons.CtxUnpin else TgIcons.CtxPin, c.green, if (chat.pinned) TgAnimations.Unpin else TgAnimations.Pin) { repo.togglePin(chat.id) },
+        SwipeAction(if (chat.pinned) "Unpin" else "Pin", if (chat.pinned) TgIcons.CtxUnpin else TgIcons.CtxPin, c.green, if (chat.pinned) TgAnimations.Unpin else TgAnimations.Pin) { repo.togglePinInFolder(chat.id, folderIndex) },
     )
     val trailing = listOf(
         SwipeAction(if (chat.muted) "Unmute" else "Mute", if (chat.muted) TgIcons.CtxUnmute else TgIcons.CtxMuted, c.orange, if (chat.muted) TgAnimations.Unmute else TgAnimations.Mute) { com.abtin.tglass.features.groups.toggleMuteWithOptions(sheet, repo, chat.id) },

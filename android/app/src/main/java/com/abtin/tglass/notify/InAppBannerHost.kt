@@ -28,7 +28,13 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import com.abtin.tglass.core.design.TgTheme
-import com.abtin.tglass.core.glass.GlassBox
+import com.abtin.tglass.core.glass.glass
+import com.abtin.tglass.ui.components.LocalContextMenu
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.graphics.Color
 import com.abtin.tglass.ui.components.Avatar
 import com.abtin.tglass.ui.components.Haptics
 import com.abtin.tglass.ui.components.T
@@ -65,14 +71,33 @@ fun InAppBannerHost(onOpen: (Long) -> Unit) {
             exit = slideOutVertically { -it * 2 } + fadeOut(),
         ) {
             val b = current ?: return@AnimatedVisibility
-            GlassBox(
-                onClick = { visible = false; onOpen(b.chatId) },
-                shape = RoundedRectangle(26.dp),
-                modifier = Modifier
+            val c = TgTheme.colors
+            val source = remember { MutableInteractionSource() }
+            val pressed by source.collectIsPressedAsState()
+            val press by animateFloatAsState(if (pressed) 1f else 0f, spring(0.6f, 600f), label = "bannerPress")
+            // Heavily frosted so the text stays readable over any content: this host is drawn outside the
+            // context-menu host, whose recorded app content (not containing this banner) is what gets blurred.
+            val surface = if (c.isDark) Color(0xFF1C1C1E).copy(alpha = 0.72f) else Color(0xFFF9F9FB).copy(alpha = 0.74f)
+            Box(
+                Modifier
                     .statusBarsPadding()
                     .padding(horizontal = 10.dp, vertical = 6.dp)
                     .fillMaxWidth()
-                    .pointerInput(Unit) { detectVerticalDragGestures { _, dy -> if (dy < -8f) visible = false } },
+                    .pointerInput(Unit) { detectVerticalDragGestures { _, dy -> if (dy < -8f) visible = false } }
+                    .glass(
+                        shape = RoundedRectangle(26.dp),
+                        backdrop = LocalContextMenu.current.backdrop,
+                        surface = surface,
+                        blurRadius = 28.dp,
+                        lensHeight = 14.dp,
+                        lensAmount = 18.dp,
+                        layerBlock = {
+                            val s = 1f + 0.03f * press
+                            scaleX = s
+                            scaleY = s
+                        },
+                    )
+                    .clickable(source, null) { visible = false; onOpen(b.chatId) },
             ) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Avatar(b.title, b.peerId, 40.dp)

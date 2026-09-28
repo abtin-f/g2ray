@@ -22,8 +22,6 @@ import com.abtin.tglass.ui.components.Cell
 import com.abtin.tglass.ui.components.Icon
 import com.abtin.tglass.ui.components.IosIcons
 import com.abtin.tglass.ui.components.Section
-import com.abtin.tglass.ui.components.SheetAction
-import com.abtin.tglass.ui.components.SheetRequest
 import com.abtin.tglass.ui.components.TgImage
 
 /**
@@ -82,13 +80,10 @@ internal fun AccountsSection() {
     Spacer(Modifier.height(24.dp))
 }
 
-/** Long press on the Settings tab (Telegram iOS): pick another signed-in account or add one. */
+/** Long press on the Settings tab (Telegram iOS): pick another signed-in account or add one ([AccountSwitcherHost]). */
+@Suppress("UNUSED_PARAMETER")
 fun showAccountSwitcher(repo: TelegramRepository, sheet: ActionSheetState) {
     if (!repo.isLive) return
-    val list = repo.accounts
-    val actions = list.map { a ->
-        SheetAction(if (a.active) "✓ ${a.name}" else a.name, bold = a.active) { if (!a.active) repo.switchAccount(a.slot) }
-    } + listOfNotNull(if (repo.canAddAccount) SheetAction("Add Account") { repo.addAccount() } else null)
-    if (actions.isEmpty()) return
-    sheet.show(SheetRequest(title = "Accounts", actions = actions))
+    if (repo.accounts.isEmpty() && !repo.canAddAccount) return
+    AccountSwitcherState.visible = true
 }

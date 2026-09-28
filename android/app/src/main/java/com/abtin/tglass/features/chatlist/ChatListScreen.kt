@@ -258,8 +258,8 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
     val all = repo.chats.filter { !it.archived }
     val folders = repo.folders
     if (folder >= folders.size) folder = 0
-    fun inFolder(chat: Chat, f: Int) = repo.isInFolder(chat, f)
-    val chats = all.filter { inFolder(it, folder) }
+    // Every list (main, archive, each folder) has its own pinned chats and order, like Telegram.
+    val chats = repo.chatsInFolder(folder)
     val archived = repo.chats.filter { it.archived }
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -291,7 +291,7 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
                 searchResults(repo, query, global, onOpen = { focus.clearFocus(); nav.push(Route.Chat(it)) })
             } else {
                 item(key = "folders") {
-                    if (folders.size > 1) FolderTabs(folders, folder, { folder = it }, unreadFor = { f -> all.count { ch -> inFolder(ch, f) && (ch.unread > 0 || ch.markedUnread) && !ch.muted } })
+                    if (folders.size > 1) FolderTabs(folders, folder, { folder = it }, unreadFor = { f -> repo.chatsInFolder(f).count { ch -> (ch.unread > 0 || ch.markedUnread) && !ch.muted } })
                 }
                 if (archived.isNotEmpty() && folder == 0 && !editing) {
                     item(key = "archive") {
@@ -334,6 +334,7 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
                         editing = editing,
                         selected = chat.id in selected,
                         modifier = Modifier.animateItem(),
+                        folderIndex = folder,
                         onDelete = { confirmDelete(chat) },
                         onClick = {
                             if (editing) {
@@ -537,6 +538,8 @@ fun ChatListItem(
     editing: Boolean,
     selected: Boolean,
     modifier: Modifier = Modifier,
+    /** Folder tab the row is shown in (0 = main list / archive): pinning applies to that list. */
+    folderIndex: Int = 0,
     onDelete: () -> Unit,
     onClick: () -> Unit,
 ) {
@@ -545,7 +548,7 @@ fun ChatListItem(
     val sheet = LocalActionSheet.current
     val bounds = remember { arrayOf(Rect.Zero) }
     val key = "chat-${chat.id}"
-    val (leading, trailing) = chatSwipeActions(chat, repo, onDelete)
+    val (leading, trailing) = chatSwipeActions(chat, repo, onDelete, folderIndex)
     val screenWidth = LocalConfiguration.current.screenWidthDp.dp
 
     Box(
@@ -570,7 +573,7 @@ fun ChatListItem(
                             previewSize = (screenWidth - 24.dp) to 420.dp,
                             actions = listOfNotNull(
                                 MenuAction(if (unread) "Mark as Read" else "Mark as Unread", TgIcons.CtxRead) { repo.toggleRead(chat.id) },
-                                if (!chat.archived) MenuAction(if (chat.pinned) "Unpin" else "Pin", if (chat.pinned) TgIcons.CtxUnpin else TgIcons.CtxPin) { repo.togglePin(chat.id) } else null,
+                                MenuAction(if (chat.pinned) "Unpin" else "Pin", if (chat.pinned) TgIcons.CtxUnpin else TgIcons.CtxPin) { repo.togglePinInFolder(chat.id, folderIndex) },
                                 MenuAction(if (chat.muted) "Unmute" else "Mute", if (chat.muted) TgIcons.CtxUnmute else TgIcons.CtxMuted) { com.abtin.tglass.features.groups.toggleMuteWithOptions(sheet, repo, chat.id) },
                                 MenuAction(if (chat.archived) "Unarchive" else "Archive", TgIcons.CtxArchive) { repo.toggleArchive(chat.id) },
                                 MenuAction("Delete", TgIcons.CtxDelete, destructive = true, groupStart = true, onClick = onDelete),

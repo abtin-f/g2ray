@@ -240,10 +240,14 @@ class MainActivity : ComponentActivity() {
                     LocalToast provides toast,
                 ) {
                     Box(Modifier.fillMaxSize()) {
-                        ContextMenuHost(menu) {
-                            IOSNavHost(nav) { route -> Screen(route) }
+                        // Account switch: the whole UI cross-fades to the other account (never a black flash).
+                        com.abtin.tglass.features.settings.AccountSwitchTransition(repo) {
+                            ContextMenuHost(menu) {
+                                IOSNavHost(nav) { route -> Screen(route) }
+                            }
                         }
                         com.abtin.tglass.features.chat.StickerSetSheetHost()
+                        com.abtin.tglass.features.settings.AccountSwitcherHost()
                         ActionSheetHost(sheet)
                         ToastHost(toast)
                         com.abtin.tglass.notify.InAppBannerHost { chatId ->

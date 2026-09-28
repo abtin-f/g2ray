@@ -746,6 +746,27 @@ interface TelegramRepository {
     /** Resolves where the comments of channel post [messageId] live; [onResult] gets null when there are none. */
     fun loadCommentsTarget(chatId: Long, messageId: Long, onResult: (CommentsTarget?) -> Unit) = onResult(null)
     // ---- end Bubbles v2 ----
+
+    // ---- Folder pins ----
+    /**
+     * Chats of the folder tab at [index] of [folders] (0 = All Chats, the main list) in that list's own order. Every
+     * chat list has its own pinned chats (Telegram): [Chat.pinned] of the returned chats tells whether the chat is
+     * pinned in *this* list, pinned chats come first.
+     */
+    fun chatsInFolder(index: Int): List<Chat> = chats.filter { !it.archived && isInFolder(it, index) }
+
+    /**
+     * Pins or unpins [chatId] in the list of the folder tab at [index]. 0 = the main list (the archive for an
+     * archived chat), like [togglePin].
+     */
+    fun togglePinInFolder(chatId: Long, index: Int) = togglePin(chatId)
+
+    /**
+     * The account being switched to while TDLib restarts on its database (the UI cross-fades to it meanwhile);
+     * null when no switch is running. Goes back to null when the switch finished or failed.
+     */
+    val switchingAccount: AccountInfo? get() = null
+    // ---- end Folder pins ----
 }
 
 /** Sticker sets "installed" in the demo (the demo has no server). */
@@ -1174,6 +1195,28 @@ class DemoRepository(private val scope: CoroutineScope) : TelegramRepository {
         onDone(null)
     }
     // ---- end Chat polls, audio & search (demo) ----
+
+    // ---- Folder pins (demo) ----
+    /** Pinned chat ids per folder tab index (> 0), in pin order; the main list keeps using [Chat.pinned]. */
+    private val folderPins = mutableStateMapOf<Int, List<Long>>()
+
+    override fun chatsInFolder(index: Int): List<Chat> {
+        val base = chats.filter { !it.archived && isInFolder(it, index) }
+        if (index == 0) return base
+        val pins = folderPins[index].orEmpty()
+        val pinned = pins.mapNotNull { id -> base.firstOrNull { it.id == id } }.map { if (it.pinned) it else it.copy(pinned = true) }
+        val rest = base.filter { it.id !in pins }
+            .map { if (it.pinned) it.copy(pinned = false) else it }
+            .sortedByDescending { lastMessage(it.id)?.date ?: 0L }
+        return pinned + rest
+    }
+
+    override fun togglePinInFolder(chatId: Long, index: Int) {
+        if (index == 0) return togglePin(chatId)
+        val pins = folderPins[index].orEmpty()
+        folderPins[index] = if (chatId in pins) pins - chatId else listOf(chatId) + pins
+    }
+    // ---- end Folder pins (demo) ----
 }
 
 /** Sender label for a message in group chats. */

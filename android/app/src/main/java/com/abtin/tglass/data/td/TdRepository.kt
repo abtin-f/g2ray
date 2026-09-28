@@ -716,6 +716,7 @@ class TdRepository(context: Context) : TelegramRepository {
             client.getMe().let { if (it is TdlResult.Success) { myId = it.result.id; onUser(it.result) } }
             client.loadChats(ChatListMain(), 100)
             client.loadChats(ChatListArchive(), 50)
+            loadFolderLists(folderInfos.map { it.id })
             loadContacts()
             loadSessions()
             loadCalls()
@@ -731,6 +732,7 @@ class TdRepository(context: Context) : TelegramRepository {
         chatMap.clear(); userMap.clear(); lastMessages.clear(); messageStore.clear(); avatars.clear(); filePaths.clear()
         contactIds.clear(); callList.clear(); sessionList.clear(); folderInfos = emptyList()
         chatInfos.clear(); sharedMediaStore.clear(); messageCache.clear(); requestedMessages.clear(); pinnedStore.clear()
+        folderPositions.clear()
         packs.clear(); recents.clear(); gifs.clear(); stickersLoaded = false
         myId = 0
         resetStories()
@@ -924,7 +926,7 @@ class TdRepository(context: Context) : TelegramRepository {
             is UpdateChatAction -> onChatAction(u)
             is UpdateChatFolders -> {
                 folderInfos = u.chatFolders.toList()
-                scope.launch { u.chatFolders.forEach { client.loadChats(ChatListFolder(it.id), 100) } }
+                loadFolderLists(u.chatFolders.map { it.id })
             }
             is UpdateNewMessage -> {
                 addMessage(u.message)
@@ -1166,6 +1168,7 @@ class TdRepository(context: Context) : TelegramRepository {
             canPost = canPost,
             rights = rights,
         )
+        publishFolderPositions(st)
     }
 
     private fun publishLast(st: ChatState) {
@@ -3830,10 +3833,23 @@ class TdRepository(context: Context) : TelegramRepository {
             TdAccounts.attach(app)
             if (slot == TdAccounts.active || slot !in TdAccounts.slots || accountSwitchTo >= 0) return
             accountSwitchTo = slot
-            closeForAccountChange()
+            beginAccountSwitch(slot)
+            // Let the UI fade out first, so the old account's state being cleared is never seen.
+            scope.launch {
+                delay(ACCOUNT_FADE_OUT_MS)
+                try {
+                    closeForAccountChange()
+                } catch (e: Exception) {
+                    android.util.Log.e("TGlass", "Switch account failed", e)
+                    accountSwitchTo = -1
+                    endAccountSwitch()
+                    _errors.tryEmit("Couldn't switch accounts")
+                }
+            }
         } catch (e: Exception) {
             android.util.Log.e("TGlass", "Switch account failed", e)
             accountSwitchTo = -1
+            endAccountSwitch()
             _errors.tryEmit("Couldn't switch accounts")
         }
     }
@@ -3870,6 +3886,7 @@ class TdRepository(context: Context) : TelegramRepository {
                 if (target >= 0 && TdAccounts.adding && accountDropSlot < 0) TdAccounts.abortAdding(target)
                 accountSwitchTo = -1
                 accountDropSlot = -1
+                endAccountSwitch()
                 val s = client.getAuthorizationState()
                 if (s is TdlResult.Success) onAuth(s.result)
             }
@@ -3989,9 +4006,108 @@ class TdRepository(context: Context) : TelegramRepository {
         }
     }
     // ---- end Bubbles v2 ----
+
+    // ---- Folder pins ----
+    /** Order + pinned state of a chat inside one folder's chat list (ChatListFolder). */
+    private data class FolderSlot(val order: Long, val pinned: Boolean)
+
+    /** Chat id → folder id → its position in that folder (only lists the chat is in). Lazy: see activeStories. */
+    private val folderPositions by lazy { mutableStateMapOf<Long, Map<Int, FolderSlot>>() }
+
+    /** One cached, sorted chat list per folder id (recomputed only when positions or chats change). */
+    private val folderChatLists by lazy { HashMap<Int, androidx.compose.runtime.State<List<UiChat>>>() }
+
+    private fun publishFolderPositions(st: ChatState) {
+        val m = HashMap<Int, FolderSlot>()
+        st.positions.values.forEach { p ->
+            val list = p.list
+            if (list is ChatListFolder && p.order != 0L) m[list.chatFolderId] = FolderSlot(p.order, p.isPinned)
+        }
+        if (m.isEmpty()) {
+            if (folderPositions.containsKey(st.id)) folderPositions.remove(st.id)
+        } else if (folderPositions[st.id] != m) {
+            folderPositions[st.id] = m
+        }
+    }
+
+    /**
+     * Loads every folder's chat list so TDLib sends the chats' positions (order + isPinned) in it. TDLib may load
+     * fewer chats than asked per call, so keep asking (bounded) until it answers 404 (the list is complete).
+     */
+    private fun loadFolderLists(ids: List<Int>) {
+        ids.forEach { id ->
+            scope.launch {
+                repeat(4) { if (client.loadChats(ChatListFolder(id), 100) is TdlResult.Failure) return@launch }
+            }
+        }
+    }
+
+    private fun folderIdAt(index: Int): Int? = if (index <= 0) null else folderInfos.getOrNull(index - 1)?.id
+
+    override fun chatsInFolder(index: Int): List<UiChat> {
+        val id = folderIdAt(index) ?: return sortedChats.filter { !it.archived }
+        return folderChatLists.getOrPut(id) {
+            derivedStateOf {
+                folderPositions.mapNotNull { (chatId, slots) ->
+                    val slot = slots[id] ?: return@mapNotNull null
+                    val c = chatMap[chatId] ?: return@mapNotNull null
+                    if (c.pinned == slot.pinned && c.order == slot.order) c else c.copy(pinned = slot.pinned, order = slot.order)
+                }.sortedWith(compareByDescending<UiChat> { it.order }.thenByDescending { it.id })
+            }
+        }.value
+    }
+
+    override fun togglePinInFolder(chatId: Long, index: Int) {
+        val id = folderIdAt(index) ?: return togglePin(chatId)
+        val pinned = folderPositions[chatId]?.get(id)?.pinned == true
+        scope.launch { client.toggleChatIsPinned(ChatListFolder(id), chatId, !pinned).orReport() }
+    }
+
+    // Account switch transition (see TelegramRepository.switchingAccount).
+    private val switchTargetState by lazy { mutableStateOf<com.abtin.tglass.data.AccountInfo?>(null) }
+    private var switchWatch: Job? = null
+
+    override val switchingAccount: com.abtin.tglass.data.AccountInfo? get() = switchTargetState.value
+
+    /** Shows the switch to [slot] until its TDLib is up and its chats arrived (or it failed / timed out). */
+    private fun beginAccountSwitch(slot: Int) {
+        val info = accounts.firstOrNull { it.slot == slot }
+            ?: com.abtin.tglass.data.AccountInfo(slot, TdAccounts.userId(slot), TdAccounts.name(slot).ifBlank { "Account" }, TdAccounts.phone(slot), TdAccounts.photo(slot), active = false)
+        switchTargetState.value = info
+        switchWatch?.cancel()
+        switchWatch = scope.launch {
+            // All of this state lives on the main thread (scope = Main.immediate): a light poll is enough.
+            val arrived = kotlinx.coroutines.withTimeoutOrNull(25_000L) {
+                while (true) {
+                    val started = auth != AuthStep.Starting
+                    if (TdAccounts.active == slot && started) break
+                    // The switch was abandoned (it failed after TDLib closed): the old account is back up.
+                    if (accountSwitchTo < 0 && TdAccounts.active != slot && started) break
+                    delay(40)
+                }
+                TdAccounts.active == slot
+            }
+            if (arrived == true && auth == AuthStep.Ready) {
+                kotlinx.coroutines.withTimeoutOrNull(2_500L) { while (sortedChats.isEmpty()) delay(40) }
+                delay(120)
+            }
+            switchTargetState.value = null
+            switchWatch = null
+        }
+    }
+
+    private fun endAccountSwitch() {
+        switchWatch?.cancel()
+        switchWatch = null
+        switchTargetState.value = null
+    }
+    // ---- end Folder pins ----
 }
 
 private const val GIFTS_ENABLED = false
+
+/** How long the UI fades out before TDLib closes for an account switch (AccountSwitchTransition's fade-out). */
+private const val ACCOUNT_FADE_OUT_MS = 240L
 
 /** Process-wide TDLib instance (TDLib must not be created twice for the same database). */
 object Td {
