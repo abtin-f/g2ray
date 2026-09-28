@@ -385,7 +385,7 @@ private fun SharedContactRow(u: User, onClick: () -> Unit) {
             Avatar(u.name, u.id, 42.dp)
             Spacer(Modifier.width(12.dp))
             Column {
-                T(u.name, TgTheme.type.headline, c.text, maxLines = 1)
+                com.abtin.tglass.core.emoji.EmojiText(u.name, TgTheme.type.headline, c.text, maxLines = 1)
                 T(u.phone.ifBlank { u.status }, TgTheme.type.subheadline, c.secondaryText, maxLines = 1)
             }
         }

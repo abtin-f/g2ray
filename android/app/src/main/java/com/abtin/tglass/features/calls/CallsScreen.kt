@@ -158,7 +158,7 @@ fun CallsScreen(backdrop: LayerBackdrop, isTab: Boolean) {
                         Avatar(u.name, u.id, 42.dp)
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
-                            T(u.name, TgTheme.type.headline, if (call.missed) c.destructive else c.text, maxLines = 1)
+                            com.abtin.tglass.core.emoji.EmojiText(u.name, TgTheme.type.headline, if (call.missed) c.destructive else c.text, maxLines = 1)
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(if (call.video) TgIcons.ClOutgoingVideo else TgIcons.ClOutgoing, c.secondaryText, 16.dp, Modifier.graphicsLayer { if (!call.outgoing) rotationZ = 180f })
                                 Spacer(Modifier.width(4.dp))

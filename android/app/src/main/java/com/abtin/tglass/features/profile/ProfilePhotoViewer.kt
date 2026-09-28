@@ -127,7 +127,7 @@ internal fun ProfilePhotoViewer(
                     contentAlignment = Alignment.Center,
                 ) { Icon(IosIcons.Close, Color.White, 22.dp) }
                 Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
-                    T(name, TgTheme.type.headline, Color.White, maxLines = 1)
+                    com.abtin.tglass.core.emoji.EmojiText(name, TgTheme.type.headline, Color.White, maxLines = 1)
                     if (count > 1) T("${pager.currentPage + 1} of $count", TgTheme.type.footnote, Color.White.copy(alpha = 0.7f))
                 }
             }

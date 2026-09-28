@@ -649,6 +649,41 @@ interface TelegramRepository {
             }
         }
     // ---- end Chat polls, audio & search ----
+
+    // ---- History gaps & profile posts ----
+
+    /**
+     * Ids of loaded messages right after which newer history is not loaded yet (left by jumping to an old message,
+     * e.g. a search result). The chat loads it with [loadNewerMessages] while the user scrolls down.
+     */
+    fun historyGaps(chatId: Long): Set<Long> = emptySet()
+
+    /** Loads the history right after [afterMessageId] (an entry of [historyGaps]); the gap closes or moves up. */
+    fun loadNewerMessages(chatId: Long, afterMessageId: Long) {}
+
+    /** Makes sure the chat's newest messages are loaded (scroll-to-bottom after a jump), then calls [onLoaded]. */
+    fun loadLatestMessages(chatId: Long, onLoaded: () -> Unit) = onLoaded()
+
+    /** Stories of the profile's Posts tab: pinned ones first, then the others newest first. Empty hides the tab. */
+    fun profileStories(chatId: Long): List<Story> {
+        val chat = chat(chatId) ?: return emptyList()
+        if (chat.type != ChatType.Private && chat.type != ChatType.Channel) return emptyList()
+        val owner = chat.peerUserId ?: chatId
+        val own = stories.filter { it.userId == owner }
+        if (own.isEmpty() && owner % 2L != 0L) return emptyList()
+        val looks = listOf(
+            "🏖" to listOf(0xFF4FACFE, 0xFF00F2FE), "🎸" to listOf(0xFFFA709A, 0xFFFEE140), "🍕" to listOf(0xFFF6D365, 0xFFFDA085),
+            "🚲" to listOf(0xFF43E97B, 0xFF38F9D7), "🌃" to listOf(0xFF30CFD0, 0xFF330867), "🐕" to listOf(0xFFA18CD1, 0xFFFBC2EB),
+            "📚" to listOf(0xFFFF9A9E, 0xFFFECFEF),
+        )
+        val posts = looks.mapIndexed { i, (e, colors) ->
+            Story(owner, e, colors, "Post ${i + 1}", chatId = owner, id = 0, pinned = i < 2)
+        }
+        return posts.take(2) + own + posts.drop(2)
+    }
+
+    fun loadProfileStories(chatId: Long) {}
+    // ---- end History gaps & profile posts ----
 }
 
 class DemoRepository(private val scope: CoroutineScope) : TelegramRepository {

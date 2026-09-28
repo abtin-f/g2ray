@@ -159,7 +159,7 @@ fun ContactRow(u: User, onLongClick: (() -> Unit)? = null, onClick: () -> Unit) 
             Avatar(u.name, u.id, 42.dp)
             Spacer(Modifier.width(12.dp))
             Column {
-                T(u.name, TgTheme.type.headline, c.text, maxLines = 1)
+                com.abtin.tglass.core.emoji.EmojiText(u.name, TgTheme.type.headline, c.text, maxLines = 1)
                 T(u.status, TgTheme.type.subheadline, if (u.online) c.accent else c.secondaryText, maxLines = 1)
             }
         }

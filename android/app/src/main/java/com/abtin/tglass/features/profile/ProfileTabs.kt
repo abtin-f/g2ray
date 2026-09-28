@@ -38,6 +38,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -52,6 +53,7 @@ import com.abtin.tglass.data.EntityType
 import com.abtin.tglass.data.Message
 import com.abtin.tglass.data.MessageContent
 import com.abtin.tglass.data.ProfileGift
+import com.abtin.tglass.data.Story
 import com.abtin.tglass.data.senderName
 import com.abtin.tglass.features.main.LocalRepository
 import com.abtin.tglass.ui.components.ActivityIndicator
@@ -76,7 +78,7 @@ import kotlin.math.sin
 
 /** Tabs of the profile page, in Telegram's order. */
 internal enum class ProfileTab(val title: String) {
-    Members("Members"), Gifts("Gifts"), Media("Media"), Files("Files"), Links("Links"),
+    Posts("Posts"), Members("Members"), Gifts("Gifts"), Media("Media"), Files("Files"), Links("Links"),
     Music("Music"), Voice("Voice"), Gifs("GIFs"), Groups("Groups"),
 }
 
@@ -210,6 +212,45 @@ internal fun LazyListScope.mediaGrid(
                 }
                 repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
             }
+        }
+    }
+}
+
+/** Posts tab: 3-column grid of story covers (pinned ones first, with a pin), like Telegram's profile stories. */
+internal fun LazyListScope.postsGrid(posts: List<Story>, itemModifier: Modifier, onOpen: (Int) -> Unit) {
+    posts.chunked(3).forEachIndexed { r, row ->
+        item(key = "posts-row$r") {
+            Row(itemModifier.fillMaxWidth().padding(bottom = 1.5.dp), horizontalArrangement = Arrangement.spacedBy(1.5.dp)) {
+                row.forEachIndexed { i, s -> PostTile(s, Modifier.weight(1f)) { onOpen(r * 3 + i) } }
+                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PostTile(s: Story, modifier: Modifier, onClick: () -> Unit) {
+    val colors = s.colors.map { Color(it) }
+    val background = Brush.linearGradient(if (colors.size >= 2) colors else listOf(Color(0xFF48484A), Color(0xFF1C1C1E)))
+    val image = s.image
+    Box(modifier.aspectRatio(0.75f).background(background).bounceClickable(onClick), contentAlignment = Alignment.Center) {
+        when {
+            image != null -> TgImage(image, Modifier.matchParentSize(), maxPx = 480, contentScale = ContentScale.Crop)
+            s.emoji.isNotEmpty() -> T(s.emoji, TgTheme.type.body.copy(fontSize = 38.sp, lineHeight = 44.sp))
+            !s.loaded -> ActivityIndicator(18.dp, Color.White)
+        }
+        if (s.pinned) {
+            Box(
+                Modifier.align(Alignment.TopStart).padding(5.dp).size(20.dp).clip(Capsule()).background(Color.Black.copy(alpha = 0.3f)),
+                contentAlignment = Alignment.Center,
+            ) { Icon(TgIcons.MsgPinned, Color.White, 13.dp) }
+        }
+        if (s.video != null && s.durationSec > 0) {
+            T(
+                formatDuration(s.durationSec.toInt()), TgTheme.type.caption2, Color.White, weight = FontWeight.SemiBold,
+                modifier = Modifier.align(Alignment.BottomEnd).padding(5.dp)
+                    .clip(Capsule()).background(Color.Black.copy(alpha = 0.35f)).padding(horizontal = 5.dp, vertical = 1.dp),
+            )
         }
     }
 }
@@ -350,7 +391,7 @@ internal fun ChatRowCell(title: String, subtitle: String?, chatId: Long, palette
             Avatar(title, chatId, 40.dp)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                T(title, TgTheme.type.body.copy(textDirection = TextDirection.Content), palette.cardText, maxLines = 1)
+                com.abtin.tglass.core.emoji.EmojiText(title, TgTheme.type.body.copy(textDirection = TextDirection.Content), palette.cardText, maxLines = 1)
                 if (subtitle != null) T(subtitle, TgTheme.type.subheadline, palette.cardLabel, maxLines = 1)
             }
         }

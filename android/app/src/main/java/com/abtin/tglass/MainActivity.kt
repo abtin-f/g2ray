@@ -276,7 +276,7 @@ private fun Screen(route: Route) {
         is Route.UserProfile -> UserProfileScreen(route.userId)
         Route.Archive -> ArchiveScreen()
         Route.NewMessage -> NewMessageScreen()
-        is Route.Stories -> StoryViewer(route.startUserId)
+        is Route.Stories -> StoryViewer(route.startUserId, route.postsOf, route.startIndex)
         is Route.ActiveCall -> ActiveCallScreen(route.userId, route.video)
         is Route.Media -> MediaViewer(route.chatId, route.messageId)
         is Route.SettingsPage -> SettingsPageScreen(route.page)

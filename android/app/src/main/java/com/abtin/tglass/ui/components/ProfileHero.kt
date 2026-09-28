@@ -148,7 +148,7 @@ fun CollapsedTitle(name: String, seed: Long, collapse: Float, saved: Boolean = f
     Row(Modifier.graphicsLayer { alpha = a; translationY = (1f - a) * 12.dp.toPx() }, verticalAlignment = Alignment.CenterVertically) {
         Avatar(name, seed, 26.dp, saved = saved, photoPeer = photoPeer)
         Spacer(Modifier.width(8.dp))
-        T(name, TgTheme.type.headline, TgTheme.colors.text, maxLines = 1)
+        com.abtin.tglass.core.emoji.EmojiText(name, TgTheme.type.headline, TgTheme.colors.text, maxLines = 1)
     }
 }
 

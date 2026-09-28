@@ -292,7 +292,7 @@ internal fun ProfileHeaderItem(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                T(
+                com.abtin.tglass.core.emoji.EmojiText(
                     name, TgTheme.type.title2.copy(fontSize = 26.sp, lineHeight = 31.sp), palette.title,
                     weight = FontWeight.SemiBold, maxLines = 1, align = TextAlign.Center,
                     modifier = Modifier.weight(1f, fill = false),

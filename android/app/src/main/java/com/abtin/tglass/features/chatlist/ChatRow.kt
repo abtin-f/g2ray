@@ -135,7 +135,7 @@ fun ChatRow(
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f).fillMaxHeight().padding(top = if (size == com.abtin.tglass.core.design.ChatListSize.Compact) 6.dp else 8.dp, bottom = 5.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    T(chat.title, TgTheme.type.headline.copy(fontSize = size.titleSp.sp, lineHeight = (size.titleSp + 4f).sp), c.text, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                    com.abtin.tglass.core.emoji.EmojiText(chat.title, TgTheme.type.headline.copy(fontSize = size.titleSp.sp, lineHeight = (size.titleSp + 4f).sp), c.text, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
                     if (chat.verified) {
                         Spacer(Modifier.width(3.dp))
                         VerifiedBadge(16.dp)

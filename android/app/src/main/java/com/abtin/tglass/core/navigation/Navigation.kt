@@ -51,7 +51,8 @@ sealed interface Route {
     data class UserProfile(val userId: Long) : Route
     data object Archive : Route
     data object NewMessage : Route
-    data class Stories(val startUserId: Long) : Route
+    /** Story viewer; with [postsOf] it shows that chat's profile Posts (see profileStories) from [startIndex]. */
+    data class Stories(val startUserId: Long, val postsOf: Long = 0L, val startIndex: Int = 0) : Route
     data class ActiveCall(val userId: Long, val video: Boolean) : Route
     data class Media(val chatId: Long, val messageId: Long) : Route
     data class SettingsPage(val page: com.abtin.tglass.features.settings.Page) : Route

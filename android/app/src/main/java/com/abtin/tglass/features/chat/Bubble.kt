@@ -425,7 +425,7 @@ fun MessageBubble(
     ) {
         val inner = Modifier.padding(horizontal = 11.dp)
         if (senderName != null) {
-            T(
+            com.abtin.tglass.core.emoji.EmojiText(
                 senderName,
                 TgTheme.type.subheadline.copy(fontSize = 14.sp, lineHeight = 18.sp, textDirection = TextDirection.Content),
                 if (isChannel) colors.accent else nameColor(senderSeed),
@@ -436,7 +436,7 @@ fun MessageBubble(
         if (m.forwardedFrom != null) {
             Column(inner.padding(top = if (senderName != null) 1.dp else 6.dp)) {
                 T("Forwarded from", TgTheme.type.footnote.copy(fontSize = 14.sp, lineHeight = 17.sp), colors.accent, maxLines = 1)
-                T(m.forwardedFrom, TgTheme.type.footnote.copy(fontSize = 14.sp, lineHeight = 17.sp, textDirection = TextDirection.Content), colors.accent, weight = FontWeight.SemiBold, maxLines = 1)
+                com.abtin.tglass.core.emoji.EmojiText(m.forwardedFrom, TgTheme.type.footnote.copy(fontSize = 14.sp, lineHeight = 17.sp, textDirection = TextDirection.Content), colors.accent, weight = FontWeight.SemiBold, maxLines = 1)
             }
         }
         if (replyTo != null) {
@@ -545,7 +545,7 @@ private fun ReplyHeader(name: String, replyTo: Message, color: Color, colors: Bu
         }
         Column(Modifier.padding(start = 7.dp, end = 8.dp, top = 4.dp, bottom = 4.dp)) {
             val style = TgTheme.type.footnote.copy(fontSize = 14.sp, lineHeight = 17.sp, textDirection = TextDirection.Content)
-            T(name, style, color, weight = FontWeight.SemiBold, maxLines = 1)
+            com.abtin.tglass.core.emoji.EmojiText(name, style, color, weight = FontWeight.SemiBold, maxLines = 1)
             T(replyTo.preview.replace('\n', ' '), style, colors.text, maxLines = 1)
         }
     }

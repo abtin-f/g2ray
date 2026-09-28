@@ -713,7 +713,7 @@ private fun StoriesRow(repo: TelegramRepository, fraction: Float, modifier: Modi
             Column(Modifier.width(68.dp).fadeClickable { onOpen(u.id) }, horizontalAlignment = Alignment.CenterHorizontally) {
                 Avatar(u.name, u.id, 68.dp, storyRing = if (u.storySeen) StoryRing.Seen else StoryRing.Unseen)
                 Spacer(Modifier.height(3.dp))
-                T(u.firstName, TgTheme.type.caption1, if (u.storySeen) c.secondaryText else c.text, maxLines = 1, align = TextAlign.Center)
+                com.abtin.tglass.core.emoji.EmojiText(u.firstName, TgTheme.type.caption1, if (u.storySeen) c.secondaryText else c.text, maxLines = 1, align = TextAlign.Center)
             }
         }
     }
@@ -735,7 +735,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.searchResults(repo: T
                     Column(Modifier.width(72.dp).fadeClickable { onOpen(chat.id) }, horizontalAlignment = Alignment.CenterHorizontally) {
                         ChatAvatar(chat, repo, 58.dp)
                         Spacer(Modifier.height(4.dp))
-                        T(chat.title.substringBefore(' '), TgTheme.type.caption1, c.text, maxLines = 1)
+                        com.abtin.tglass.core.emoji.EmojiText(chat.title.substringBefore(' '), TgTheme.type.caption1, c.text, maxLines = 1)
                     }
                 }
             }
@@ -774,7 +774,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.searchResults(repo: T
                 ChatAvatar(chat, repo, 48.dp)
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
-                    T(chat.title, TgTheme.type.headline, c.text, maxLines = 1)
+                    com.abtin.tglass.core.emoji.EmojiText(chat.title, TgTheme.type.headline, c.text, maxLines = 1)
                     val sub = listOfNotNull(
                         chat.username?.let { "@$it" },
                         chat.members.takeIf { it > 0 }?.let { "$it ${if (chat.type == ChatType.Channel) "subscribers" else "members"}" },
@@ -796,7 +796,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.searchResults(repo: T
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Row {
-                        T(chat.title, TgTheme.type.headline, c.text, maxLines = 1, modifier = Modifier.weight(1f))
+                        com.abtin.tglass.core.emoji.EmojiText(chat.title, TgTheme.type.headline, c.text, maxLines = 1, modifier = Modifier.weight(1f))
                         T(formatListDate(m.date), TgTheme.type.footnote, c.secondaryText)
                     }
                     T(m.preview, TgTheme.type.subheadline, c.secondaryText, maxLines = 2)

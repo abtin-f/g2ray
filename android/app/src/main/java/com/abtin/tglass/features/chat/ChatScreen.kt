@@ -71,6 +71,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -273,6 +274,32 @@ fun ChatScreen(chatId: Long) {
     // Reverse layout: the oldest loaded message is the last item, so near-the-end means "load older".
     val nearTop by remember { derivedStateOf { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index?.let { it >= listState.layoutInfo.totalItemsCount - 6 } == true } }
     LaunchedEffect(nearTop, messages.size) { if (nearTop && messages.isNotEmpty()) repo.loadOlderMessages(chatId) }
+    // After a jump to an old message (search result, reply, link) the history between it and the newest messages
+    // is missing: load it page by page (newer messages) when that spot comes near the screen while scrolling down.
+    val gaps = repo.historyGaps(chatId)
+    val gapsState = rememberUpdatedState(gaps)
+    val itemsState = rememberUpdatedState(reversedItems)
+    val gapInView by remember {
+        derivedStateOf<Long?> {
+            val g = gapsState.value
+            val list = itemsState.value
+            val visible = listState.layoutInfo.visibleItemsInfo
+            if (g.isEmpty() || visible.isEmpty() || list.isEmpty()) return@derivedStateOf null
+            val from = (visible.first().index - 12).coerceIn(0, list.lastIndex)
+            val to = (visible.last().index + 12).coerceIn(0, list.lastIndex)
+            var lo = Long.MAX_VALUE
+            var hi = Long.MIN_VALUE
+            for (i in from..to) for (m in list[i].messages) {
+                if (m.id < lo) lo = m.id
+                if (m.id > hi) hi = m.id
+            }
+            g.filter { it in lo..hi }.minOrNull()
+        }
+    }
+    LaunchedEffect(gapInView) { gapInView?.let { repo.loadNewerMessages(chatId, it) } }
+    // The newest messages themselves aren't loaded (the chat was opened straight at an old message).
+    val newestMissing = gaps.isNotEmpty() && messages.lastOrNull()?.id?.let { last -> gaps.any { it >= last } } == true
+    val newestSeen = remember { longArrayOf(messages.lastOrNull()?.id ?: 0L) }
     LaunchedEffect(messages.size) {
         if (!initialScrollDone && messages.isNotEmpty()) {
             // Open at the first unread message, with the divider in the upper part of the screen.
@@ -286,7 +313,10 @@ fun ChatScreen(chatId: Long) {
         }
         val last = messages.lastOrNull()
         if (last != null && last.outgoing && last.date > openedAt) wallpaperPhase++
-        if (listState.firstVisibleItemIndex <= 2) listState.animateScrollToItem(0)
+        // Follow new messages at the bottom; history filled in above or below the viewport doesn't move the list.
+        val newestChanged = (last?.id ?: 0L) != newestSeen[0]
+        newestSeen[0] = last?.id ?: 0L
+        if (newestChanged && listState.firstVisibleItemIndex <= 2) listState.animateScrollToItem(0)
     }
 
     fun jumpTo(id: Long) {
@@ -306,6 +336,14 @@ fun ChatScreen(chatId: Long) {
     fun jumpToAny(id: Long) {
         if (messages.any { it.id == id }) jumpTo(id)
         else repo.loadAroundMessage(chatId, id) { found -> if (found) pendingJump = id else toast.error("Message not found") }
+    }
+    /** Scroll-to-bottom button: back to the newest messages (loading them first after a jump far back). */
+    fun scrollToBottom() {
+        repo.loadLatestMessages(chatId) {
+            scope.launch {
+                if (listState.firstVisibleItemIndex > 30) listState.scrollToItem(0) else listState.animateScrollToItem(0)
+            }
+        }
     }
     LaunchedEffect(pendingJump, messages.size) {
         val id = pendingJump ?: return@LaunchedEffect
@@ -729,7 +767,7 @@ fun ChatScreen(chatId: Long) {
                             val (subtitle, active) = chatSubtitle(chat, repo)
                             GlassBox(onClick = { nav.push(Route.Profile(chatId)) }, modifier = Modifier.height(48.dp)) {
                                 Column(Modifier.padding(horizontal = 18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                    T(chat.title, TgTheme.type.headline.copy(fontSize = TgTheme.type.headline.fontSize * 0.95f), c.text, maxLines = 1)
+                                    com.abtin.tglass.core.emoji.EmojiText(chat.title, TgTheme.type.headline.copy(fontSize = TgTheme.type.headline.fontSize * 0.95f), c.text, maxLines = 1)
                                     if (chat.typing != null) TypingText(chat.typing, TgTheme.type.caption1.copy(fontSize = TgTheme.type.caption1.fontSize * 1.05f), c.accent)
                                     else if (subtitle != null) T(subtitle, TgTheme.type.caption1.copy(fontSize = TgTheme.type.caption1.fontSize * 1.05f), if (active) c.accent else c.secondaryText, maxLines = 1)
                                 }
@@ -774,8 +812,8 @@ fun ChatScreen(chatId: Long) {
             ) {
                 // Scroll-to-bottom
                 val showDown by remember { derivedStateOf { listState.firstVisibleItemIndex > 2 } }
-                AnimatedVisibility(showDown, enter = scaleIn() + fadeIn(), exit = scaleOut() + fadeOut(), modifier = Modifier.align(Alignment.End).padding(end = 12.dp)) {
-                    GlassIconButton(IosIcons.ChevronDown, { scope.launch { listState.animateScrollToItem(0) } }, size = 44.dp, iconSize = 24.dp)
+                AnimatedVisibility(showDown || newestMissing, enter = scaleIn() + fadeIn(), exit = scaleOut() + fadeOut(), modifier = Modifier.align(Alignment.End).padding(end = 12.dp)) {
+                    GlassIconButton(IosIcons.ChevronDown, { scrollToBottom() }, size = 44.dp, iconSize = 24.dp)
                 }
                 when {
                     searchMode -> SearchResultsBar(
@@ -1247,7 +1285,7 @@ fun ChatPeek(chatId: Long, onOpen: () -> Unit) {
             ChatAvatar(chat, repo, 38.dp, showOnline = false)
             Spacer(Modifier.width(10.dp))
             Column {
-                T(chat.title, TgTheme.type.headline, c.text, maxLines = 1)
+                com.abtin.tglass.core.emoji.EmojiText(chat.title, TgTheme.type.headline, c.text, maxLines = 1)
                 val (sub, active) = chatSubtitle(chat, repo)
                 if (sub != null) T(sub, TgTheme.type.footnote, if (active) c.accent else c.secondaryText, maxLines = 1)
             }

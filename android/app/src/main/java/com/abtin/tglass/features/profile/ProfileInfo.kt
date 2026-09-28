@@ -159,7 +159,7 @@ internal fun ChannelCard(title: String, subtitle: String, chatId: Long, palette:
             Avatar(title, chatId, 40.dp)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                T(title, TgTheme.type.headline.copy(textDirection = TextDirection.Content), palette.cardText, maxLines = 1)
+                com.abtin.tglass.core.emoji.EmojiText(title, TgTheme.type.headline.copy(textDirection = TextDirection.Content), palette.cardText, maxLines = 1)
                 T(subtitle, TgTheme.type.subheadline.copy(textDirection = TextDirection.Content), palette.cardLabel, maxLines = 1)
             }
             Icon(IosIcons.ChevronRight, palette.cardLabel, 14.dp)

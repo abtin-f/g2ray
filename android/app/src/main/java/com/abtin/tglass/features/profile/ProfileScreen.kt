@@ -134,12 +134,14 @@ fun ProfileScreen(chatId: Long) {
         repo.loadProfilePhotos(chatId)
         repo.loadSharedCounts(chatId)
         repo.loadProfileGifts(chatId)
+        repo.loadProfileStories(chatId)
         if (isPrivate && userId != null) repo.loadCommonGroups(userId)
     }
     val info = repo.chatInfo(chatId)
     val details = repo.profileDetails(chatId)
     val photos = if (isSaved) emptyList() else repo.profilePhotos(chatId)
     val gifts = repo.profileGifts(chatId)
+    val posts = if (isSaved) emptyList() else repo.profileStories(chatId)
     val commonGroups = if (isPrivate && userId != null) repo.commonGroups(userId) else emptyList()
     val smallAvatar = if (isSaved) null else repo.avatar(photoPeer)
     val hasPhoto = !isSaved && (smallAvatar != null || photos.any { it.image != null })
@@ -328,7 +330,9 @@ fun ProfileScreen(chatId: Long) {
     // ---- Tabs ----
     fun has(kind: SharedKind) = (repo.sharedCount(chatId, kind) ?: 0) > 0
     val tabs = buildList {
+        if (posts.isNotEmpty() && !isGroup) add(ProfileTab.Posts)
         if (isGroup) add(ProfileTab.Members)
+        if (posts.isNotEmpty() && isGroup) add(ProfileTab.Posts)
         if (gifts.isNotEmpty()) add(ProfileTab.Gifts)
         if (has(SharedKind.Media) || !repo.isLive) add(ProfileTab.Media)
         if (has(SharedKind.Files)) add(ProfileTab.Files)
@@ -493,11 +497,13 @@ fun ProfileScreen(chatId: Long) {
                         repo = repo,
                         info = info,
                         gifts = gifts,
+                        posts = posts,
                         commonGroups = commonGroups,
                         palette = palette,
                         itemModifier = itemModifier,
                         onOpenMedia = { m -> nav.push(Route.Media(chat.id, m.id)) },
                         onGift = { g -> showGift(sheet, g) },
+                        onOpenPost = { i -> posts.getOrNull(i)?.let { nav.push(Route.Stories(it.userId, postsOf = chat.id, startIndex = i)) } },
                         onOpenChat = { id -> nav.push(Route.Chat(id)) },
                         onOpenUser = { id -> nav.push(Route.UserProfile(id)) },
                         onAddMembers = { if (canInvite) nav.push(Route.AddMembers(chat.id)) else sheet.alert("Admin Rights Required", "Only admins can add members to this group.") },
@@ -708,11 +714,13 @@ private fun androidx.compose.foundation.lazy.LazyListScope.profileTabContent(
     repo: TelegramRepository,
     info: ChatInfo?,
     gifts: List<ProfileGift>,
+    posts: List<com.abtin.tglass.data.Story>,
     commonGroups: List<Long>,
     palette: ProfilePalette,
     itemModifier: Modifier,
     onOpenMedia: (Message) -> Unit,
     onGift: (ProfileGift) -> Unit,
+    onOpenPost: (Int) -> Unit,
     onOpenChat: (Long) -> Unit,
     onOpenUser: (Long) -> Unit,
     onAddMembers: () -> Unit,
@@ -740,6 +748,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.profileTabContent(
                 }
             }
         }
+        ProfileTab.Posts -> postsGrid(posts, itemModifier, onOpenPost)
         ProfileTab.Gifts -> giftGrid(gifts, itemModifier, onGift)
         ProfileTab.Media, ProfileTab.Gifs -> {
             val kind = if (tab == ProfileTab.Media) MediaKind.Media else MediaKind.Gifs

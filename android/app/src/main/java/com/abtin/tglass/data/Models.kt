@@ -252,6 +252,8 @@ data class Story(
     /** Whether the user has already viewed this story. */
     val seen: Boolean = false,
     val loaded: Boolean = true,
+    /** Pinned to the top of the profile's Posts tab. */
+    val pinned: Boolean = false,
 )
 
 @Immutable

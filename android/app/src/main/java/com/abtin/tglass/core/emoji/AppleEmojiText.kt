@@ -37,6 +37,7 @@ import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.ResolvedTextDirection
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -177,6 +178,7 @@ fun EmojiText(
     maxLines: Int = Int.MAX_VALUE,
     weight: FontWeight? = null,
     overflow: TextOverflow = TextOverflow.Ellipsis,
+    align: TextAlign? = null,
 ) {
     val annotated = rememberAppleEmojiText(text)
     val inlineMap = remember(annotated) { appleEmojiInlineContent(annotated) }
@@ -186,6 +188,7 @@ fun EmojiText(
         style = style.copy(
             color = if (color.isSpecified) color else style.color,
             fontWeight = weight ?: style.fontWeight,
+            textAlign = align ?: style.textAlign,
             textDirection = if (style.textDirection == TextDirection.Unspecified) TextDirection.Content else style.textDirection,
         ),
         overflow = overflow,

@@ -75,18 +75,27 @@ private const val PHOTO_STORY_MS = 5000
  * Demo stories are drawn as emoji on a gradient; live ones show the real photo or play the video.
  */
 @Composable
-fun StoryViewer(startUserId: Long) {
+fun StoryViewer(startUserId: Long, postsOf: Long = 0L, startIndex: Int = 0) {
     val repo = LocalRepository.current
     val nav = LocalNavigator.current
+    // Profile Posts mode: only that chat's posts, starting at the tapped one.
+    val postsMode = postsOf != 0L
+    fun storiesFor(id: Long): List<Story> = if (postsMode) repo.profileStories(id) else repo.storiesOf(id)
 
     // The order of people is fixed when the viewer opens, so it doesn't reshuffle while stories become seen.
     val order = remember {
         val ids = repo.storyUsers.map { it.id }
-        if (startUserId in ids || repo.storiesOf(startUserId).isEmpty()) ids else listOf(startUserId) + ids
+        when {
+            postsMode -> listOf(postsOf)
+            startUserId in ids || repo.storiesOf(startUserId).isEmpty() -> ids
+            else -> listOf(startUserId) + ids
+        }
     }
-    val startPos = remember { order.indexOf(startUserId).coerceAtLeast(0) }
+    val startPos = remember { order.indexOf(if (postsMode) postsOf else startUserId).coerceAtLeast(0) }
     var userPos by remember { mutableIntStateOf(startPos) }
-    var storyPos by remember { mutableIntStateOf(order.getOrNull(startPos)?.let { firstUnseen(repo.storiesOf(it)) } ?: 0) }
+    var storyPos by remember {
+        mutableIntStateOf(if (postsMode) startIndex else order.getOrNull(startPos)?.let { firstUnseen(repo.storiesOf(it)) } ?: 0)
+    }
     var restarts by remember { mutableIntStateOf(0) }
     var closing by remember { mutableStateOf(false) }
     var paused by remember { mutableStateOf(false) }
@@ -102,13 +111,13 @@ fun StoryViewer(startUserId: Long) {
 
     fun enterUser(pos: Int, fromEnd: Boolean) {
         val id = order.getOrNull(pos) ?: return close()
-        val list = repo.storiesOf(id)
+        val list = storiesFor(id)
         userPos = pos
         storyPos = if (fromEnd) (list.size - 1).coerceAtLeast(0) else firstUnseen(list)
     }
 
     fun next() {
-        val count = order.getOrNull(userPos)?.let { repo.storiesOf(it).size } ?: 0
+        val count = order.getOrNull(userPos)?.let { storiesFor(it).size } ?: 0
         if (storyPos < count - 1) storyPos++ else enterUser(userPos + 1, fromEnd = false)
     }
 
@@ -121,9 +130,10 @@ fun StoryViewer(startUserId: Long) {
     }
 
     val userId = order.getOrNull(userPos)
-    val stories = if (userId != null) repo.storiesOf(userId) else emptyList()
+    val stories = if (userId != null) storiesFor(userId) else emptyList()
 
     LaunchedEffect(userId) {
+        if (postsMode) return@LaunchedEffect
         if (userId != null) repo.loadStories(userId)
         order.getOrNull(userPos + 1)?.let { repo.loadStories(it) }
     }
@@ -141,6 +151,8 @@ fun StoryViewer(startUserId: Long) {
         return
     }
     val user = repo.user(story.userId)
+    // Channels post stories too: fall back to the chat's title.
+    val posterName = user?.name ?: repo.chat(story.chatId)?.title ?: ""
 
     // Tells the repository which story is on screen (marks it viewed).
     DisposableEffect(userPos, storyPos, story.id) {
@@ -240,10 +252,10 @@ fun StoryViewer(startUserId: Long) {
                 }
                 Spacer(Modifier.height(10.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Avatar(user?.name ?: "", story.userId, 36.dp)
+                    Avatar(posterName, story.userId, 36.dp)
                     Spacer(Modifier.width(8.dp))
                     Column(Modifier.weight(1f)) {
-                        T(user?.name ?: "", TgTheme.type.subheadline, Color.White, weight = FontWeight.SemiBold, maxLines = 1)
+                        com.abtin.tglass.core.emoji.EmojiText(posterName, TgTheme.type.subheadline, Color.White, weight = FontWeight.SemiBold, maxLines = 1)
                         if (story.date > 0) T(formatListDate(story.date), TgTheme.type.caption1, Color.White.copy(0.7f))
                     }
                     Box(Modifier.size(40.dp).fadeClickable { close() }, contentAlignment = Alignment.Center) {

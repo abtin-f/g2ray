@@ -3014,7 +3014,9 @@ class TdRepository(context: Context) : TelegramRepository {
         }
     }
 
-    override fun profileGifts(chatId: Long): List<com.abtin.tglass.data.ProfileGift> = profileGiftStore[chatId] ?: emptyList()
+    // No Gifts tab while live gift loading is off (see GIFTS_ENABLED).
+    override fun profileGifts(chatId: Long): List<com.abtin.tglass.data.ProfileGift> =
+        if (GIFTS_ENABLED) profileGiftStore[chatId] ?: emptyList() else emptyList()
 
     override fun loadProfileGifts(chatId: Long) {
         // Disabled: tdl-coroutines 13.0.0 treats Gift.background as required, but the server sends gifts without it.
@@ -3495,16 +3497,130 @@ class TdRepository(context: Context) : TelegramRepository {
         scope.launch {
             messageStore.getOrPut(chatId) { mutableStateListOf() }
             val r = client.getChatHistory(chatId, messageId, -25, 50, false)
-            if (r is TdlResult.Success) r.result.messages.filterNotNull().forEach { addMessage(it) }
+            // Remembers where this piece doesn't touch the loaded history (see historyGaps).
+            if (r is TdlResult.Success) addHistoryPiece(chatId, r.result.messages.filterNotNull())
             if (messages(chatId).none { it.id == messageId }) {
                 // The history call may answer with only what it has cached: fetch the message itself.
                 val one = client.getMessage(chatId, messageId)
-                if (one is TdlResult.Success) addMessage(one.result)
+                if (one is TdlResult.Success) addHistoryPiece(chatId, listOf(one.result))
             }
             onLoaded(messages(chatId).any { it.id == messageId })
         }
     }
     // ---- end Chat polls, audio & search ----
+
+    // ---- History gaps & profile posts ----
+
+    /** Per chat: loaded messages right after which newer history is missing (see [historyGaps]). */
+    private val historyGapMap by lazy { mutableStateMapOf<Long, Set<Long>>() }
+    private val gapLoading by lazy { HashSet<Long>() }
+
+    override fun historyGaps(chatId: Long): Set<Long> = historyGapMap[chatId] ?: emptySet()
+
+    /**
+     * Adds a contiguous piece of history (continuing the loaded message [from], if given) and updates the gap
+     * markers: gaps inside the piece close, and a gap opens on each side where it doesn't touch loaded messages.
+     */
+    private fun addHistoryPiece(chatId: Long, piece: List<Message>, from: Long? = null) {
+        val bounds = piece.map { it.id } + listOfNotNull(from)
+        if (bounds.isEmpty()) return
+        val list = messageStore.getOrPut(chatId) { mutableStateListOf() }
+        val loaded = list.mapTo(HashSet()) { it.id }
+        val lo = bounds.min()
+        val hi = bounds.max()
+        piece.forEach { addMessage(it) }
+        val gaps = historyGaps(chatId).filterTo(HashSet()) { it < lo || it >= hi }
+        if (lo !in loaded) list.lastOrNull { it.id < lo }?.let { gaps += it.id }
+        if (hi !in loaded) {
+            val next = list.firstOrNull { it.id > hi }
+            val newest = chatStates[chatId]?.lastMessage?.id
+            if (next != null || (newest != null && newest > hi)) gaps += hi
+        }
+        historyGapMap[chatId] = gaps
+    }
+
+    override fun loadNewerMessages(chatId: Long, afterMessageId: Long) {
+        if (afterMessageId !in historyGaps(chatId) || !gapLoading.add(chatId)) return
+        scope.launch {
+            try {
+                var piece = emptyList<Message>()
+                var ok = false
+                // TDLib may first answer with only what it has cached (just the message itself): ask again.
+                for (attempt in 0 until 3) {
+                    val r = client.getChatHistory(chatId, afterMessageId, -49, 50, false)
+                    if (r !is TdlResult.Success) break
+                    ok = true
+                    piece = r.result.messages.filterNotNull()
+                    if (piece.any { it.id > afterMessageId }) break
+                }
+                onNewerPiece(chatId, afterMessageId, piece, ok)
+            } finally {
+                gapLoading -= chatId
+            }
+        }
+    }
+
+    private fun onNewerPiece(chatId: Long, afterMessageId: Long, piece: List<Message>, ok: Boolean) {
+        val newest = chatStates[chatId]?.lastMessage?.id
+        if (piece.any { it.id > afterMessageId }) {
+            addHistoryPiece(chatId, piece, from = afterMessageId)
+        } else if (ok && (newest == null || newest <= afterMessageId)) {
+            // Nothing newer exists: the gap was only apparent.
+            historyGapMap[chatId] = historyGaps(chatId) - afterMessageId
+        }
+    }
+
+    override fun loadLatestMessages(chatId: Long, onLoaded: () -> Unit) {
+        val newest = chatStates[chatId]?.lastMessage?.id
+        if (newest == null || messages(chatId).any { it.id == newest }) return onLoaded()
+        scope.launch {
+            val r = client.getChatHistory(chatId, 0, 0, 50, false)
+            if (r is TdlResult.Success) addHistoryPiece(chatId, r.result.messages.filterNotNull())
+            onLoaded()
+        }
+    }
+
+    /** Posts tab: stories posted to the chat's page (pinned first) plus its active stories. */
+    private val profileStoryStore by lazy { mutableStateMapOf<Long, List<UiStory>>() }
+
+    override fun profileStories(chatId: Long): List<UiStory> = profileStoryStore[chatId] ?: emptyList()
+
+    override fun loadProfileStories(chatId: Long) {
+        val chat = chat(chatId) ?: return
+        if (chat.type == UiChatType.Saved) return
+        scope.launch {
+            val found = LinkedHashMap<Int, UiStory>()
+            val pinnedOrder = ArrayList<Int>()
+            var from = 0
+            for (page in 0 until 4) {
+                val r = client.getChatPostedToChatPageStories(chatId, from, 50)
+                if (r !is TdlResult.Success) break
+                r.result.pinnedStoryIds.forEach { if (it !in pinnedOrder) pinnedOrder += it }
+                val fresh = r.result.stories.filter { it.id !in found }
+                fresh.forEach { found[it.id] = mapStory(it) }
+                if (fresh.isEmpty() || found.size >= r.result.totalCount) break
+                from = r.result.stories.minOf { it.id }
+            }
+            // Active stories that are not on the page (yet).
+            val active = client.getChatActiveStories(chatId)
+            if (active is TdlResult.Success) {
+                for (info in active.result.stories) {
+                    if (info.storyId in found) continue
+                    val cached = storyCache[storyKey(chatId, info.storyId)]?.takeIf { it.loaded }
+                    if (cached != null) {
+                        found[info.storyId] = cached
+                        continue
+                    }
+                    val s = client.getStory(chatId, info.storyId, false)
+                    if (s is TdlResult.Success) found[info.storyId] = mapStory(s.result)
+                }
+            }
+            val all = found.values.map { it.copy(pinned = it.id in pinnedOrder) }
+            profileStoryStore[chatId] = all.filter { it.pinned }.sortedBy { pinnedOrder.indexOf(it.id) } +
+                all.filter { !it.pinned }.sortedByDescending { it.id }
+        }
+    }
+    // ---- end History gaps & profile posts ----
 }
 
 private const val GIFTS_ENABLED = false

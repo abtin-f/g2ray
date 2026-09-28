@@ -196,7 +196,7 @@ fun ChatPickerSheet(
                                 ChatAvatar(chat, repo, 44.dp, showOnline = false)
                                 Spacer(Modifier.width(12.dp))
                                 Column(Modifier.weight(1f)) {
-                                    T(
+                                    com.abtin.tglass.core.emoji.EmojiText(
                                         if (chat.type == ChatType.Saved) "Saved Messages" else chat.title,
                                         TgTheme.type.body.copy(textDirection = TextDirection.Content), c.text,
                                         weight = FontWeight.Medium, maxLines = 1,

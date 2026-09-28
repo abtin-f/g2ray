@@ -243,7 +243,7 @@ private fun SelectableUserRow(user: User, checked: Boolean, enabled: Boolean, su
             Avatar(user.name, user.id, 42.dp)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                T(user.name, TgTheme.type.headline, if (enabled) c.text else c.secondaryText, maxLines = 1)
+                com.abtin.tglass.core.emoji.EmojiText(user.name, TgTheme.type.headline, if (enabled) c.text else c.secondaryText, maxLines = 1)
                 T(subtitle ?: user.status, TgTheme.type.subheadline, if (subtitle == null && user.online) c.accent else c.secondaryText, maxLines = 1)
             }
         }
@@ -497,7 +497,7 @@ fun MemberCell(user: User, role: String?, divider: Boolean, onClick: () -> Unit,
             Avatar(user.name, user.id, 40.dp)
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
-                T(user.name, TgTheme.type.body, c.text, maxLines = 1)
+                com.abtin.tglass.core.emoji.EmojiText(user.name, TgTheme.type.body, c.text, maxLines = 1)
                 T(user.status, TgTheme.type.subheadline, if (user.online) c.accent else c.secondaryText, maxLines = 1)
             }
             if (role != null) T(role, TgTheme.type.subheadline, c.secondaryText, maxLines = 1, modifier = Modifier.padding(start = 8.dp))
