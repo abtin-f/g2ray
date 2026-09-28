@@ -43,11 +43,13 @@ fun InAppBannerHost(onOpen: (Long) -> Unit) {
     var visible by remember { mutableStateOf(false) }
     var shown by remember { mutableStateOf(0) }
     LaunchedEffect(Unit) {
+        InAppAlerts.attach(view.context)
         InAppBanners.flow.collect { b ->
             current = b
             visible = true
             shown++
-            Haptics.tick(view)
+            if (InAppAlerts.vibrate) Haptics.tick(view)
+            InAppAlerts.playSound(view.context)
         }
     }
     LaunchedEffect(shown) {

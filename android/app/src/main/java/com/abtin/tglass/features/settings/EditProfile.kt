@@ -299,12 +299,19 @@ fun EditProfileScreen() {
                     Spacer(Modifier.height(24.dp))
                     Section {
                         Box(Modifier.fillMaxWidth().height(50.dp).fadeClickable {
-                            sheet.show(SheetRequest(title = "Log out?", message = "You will return to the welcome screen.", alert = true, actions = listOf(SheetAction("Log Out", destructive = true) {
+                            // With other accounts signed in, logging out removes this one and switches to the next.
+                            val other = repo.accounts.firstOrNull { !it.active }
+                            val message = if (other != null) "This account will be removed from TGlass and you will switch to ${other.name}." else "You will return to the welcome screen."
+                            sheet.show(SheetRequest(title = "Log out?", message = message, alert = true, actions = listOf(SheetAction("Log Out", destructive = true) {
                                 repo.logOut()
-                                PasscodeLock.disable()
-                                settings.updateLoggedIn(false)
-                                settings.updateDemoMode(false)
-                                nav.resetTo(com.abtin.tglass.core.navigation.Route.Welcome)
+                                if (other != null) {
+                                    nav.resetTo(com.abtin.tglass.core.navigation.Route.Main)
+                                } else {
+                                    PasscodeLock.disable()
+                                    settings.updateLoggedIn(false)
+                                    settings.updateDemoMode(false)
+                                    nav.resetTo(com.abtin.tglass.core.navigation.Route.Welcome)
+                                }
                             })))
                         }, contentAlignment = Alignment.Center) {
                             T("Log Out", TgTheme.type.body, c.destructive)

@@ -90,6 +90,7 @@ fun MainScreen() {
     val backdrop = rememberLayerBackdrop()
     val holder = rememberSaveableStateHolder()
     val tabBar = remember { TabBarController() }
+    val sheet = com.abtin.tglass.ui.components.LocalActionSheet.current
     val c = TgTheme.colors
 
     Box(Modifier.fillMaxSize().background(c.background)) {
@@ -139,7 +140,10 @@ fun MainScreen() {
                         TabItem(TgAnimations.TabContacts, "Contacts", selected = tab == 0) { tab = 0 }
                         TabItem(TgAnimations.TabCalls, "Calls", selected = tab == 1) { tab = 1 }
                         TabItem(TgAnimations.TabChats, "Chats", selected = tab == 2, badge = unread) { tab = 2 }
-                        TabItem(TgAnimations.TabSettings, "Settings", selected = tab == 3) { tab = 3 }
+                        TabItem(
+                            TgAnimations.TabSettings, "Settings", selected = tab == 3,
+                            onLongClick = if (repo.isLive) ({ com.abtin.tglass.features.settings.showAccountSwitcher(repo, sheet) }) else null,
+                        ) { tab = 3 }
                     }
                     Spacer(Modifier.width(8.dp))
                     GlassIconButton(
@@ -156,11 +160,18 @@ fun MainScreen() {
 }
 
 @Composable
-private fun androidx.compose.foundation.layout.RowScope.TabItem(animation: Int, label: String, selected: Boolean, badge: Int = 0, onClick: () -> Unit) {
+private fun androidx.compose.foundation.layout.RowScope.TabItem(
+    animation: Int,
+    label: String,
+    selected: Boolean,
+    badge: Int = 0,
+    onLongClick: (() -> Unit)? = null,
+    onClick: () -> Unit,
+) {
     val c = TgTheme.colors
     val layer = LocalLiquidBottomTabLayer.current
     val overlay = layer == LiquidBottomTabLayer.Overlay
-    LiquidBottomTab(onClick = onClick) {
+    LiquidBottomTab(onClick = onClick, onLongClick = onLongClick) {
         // The icon slot is shorter than the Lottie canvas: Telegram's tab animations leave ~25% empty margin
         // around the glyph, so a 44dp canvas gives the ~24pt glyph of the iOS 26 tab bar.
         Box(Modifier.size(width = 44.dp, height = 28.dp), contentAlignment = Alignment.Center) {

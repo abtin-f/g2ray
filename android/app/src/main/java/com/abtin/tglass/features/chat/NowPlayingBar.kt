@@ -55,10 +55,11 @@ private data class NowPlaying(
     val video: Boolean,
 )
 
-private fun nowPlaying(repo: TelegramRepository): NowPlaying? {
+private fun nowPlaying(repo: TelegramRepository, includeVideo: Boolean = true): NowPlaying? {
     VoicePlayer.track?.let { t ->
         return NowPlaying(t.key, t.chatId, t.messageId, t.title.ifBlank { "Audio" }, t.subtitle, video = false)
     }
+    if (!includeVideo) return null
     val key = VideoNotePlayback.activeKey ?: return null
     val parts = key.split(':')
     val chatId = parts.getOrNull(0)?.toLongOrNull() ?: return null
@@ -78,8 +79,13 @@ private fun nowPlaying(repo: TelegramRepository): NowPlaying? {
  * It follows the global player, so it stays while the user switches chats. Tapping it opens the message.
  */
 @Composable
-fun NowPlayingBar(repo: TelegramRepository, onOpen: (chatId: Long, messageId: Long) -> Unit, modifier: Modifier = Modifier) {
-    val current = nowPlaying(repo)
+fun NowPlayingBar(
+    repo: TelegramRepository,
+    onOpen: (chatId: Long, messageId: Long) -> Unit,
+    modifier: Modifier = Modifier,
+    includeVideo: Boolean = true,
+) {
+    val current = nowPlaying(repo, includeVideo)
     val last = remember { arrayOfNulls<NowPlaying>(1) }
     if (current != null) last[0] = current
     AnimatedVisibility(
@@ -92,6 +98,9 @@ fun NowPlayingBar(repo: TelegramRepository, onOpen: (chatId: Long, messageId: Lo
         NowPlayingContent(np, onOpen)
     }
 }
+
+/** Whether [NowPlayingBar] has something to show (for screens that make room for it). */
+fun hasNowPlaying(repo: TelegramRepository, includeVideo: Boolean = true): Boolean = nowPlaying(repo, includeVideo) != null
 
 @Composable
 private fun NowPlayingContent(np: NowPlaying, onOpen: (Long, Long) -> Unit) {
