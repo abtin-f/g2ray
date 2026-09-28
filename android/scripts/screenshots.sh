@@ -18,6 +18,7 @@ sleep 20
 
 shot() {
   local screen=$1 theme=$2 wait=${3:-7}
+  adb logcat -c -b main || true
   adb shell am force-stop com.abtin.tglass
   adb shell input keyevent KEYCODE_WAKEUP || true
   adb shell am start -W -n com.abtin.tglass/.MainActivity --es screen "$screen" --es theme "$theme" >/dev/null
@@ -27,7 +28,7 @@ shot() {
     echo "=== ${screen}_${theme}"
     adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity" | head -2
     adb logcat -d -b crash
-    adb logcat -d -s TGlassWatchdog:W | head -70
+    adb logcat -d -s TGlassWatchdog:W | tail -45
   } >> "$OUT/log.txt" 2>&1 || true
   echo "captured ${screen}_${theme}"
 }

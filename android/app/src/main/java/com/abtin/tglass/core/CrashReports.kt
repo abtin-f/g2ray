@@ -56,10 +56,31 @@ object CrashReports {
             while (true) {
                 val tick = java.util.concurrent.atomic.AtomicBoolean(false)
                 handler.post { tick.set(true) }
-                Thread.sleep(2000)
+                Thread.sleep(1000)
                 if (!tick.get()) {
-                    android.util.Log.w("TGlassWatchdog", "main thread blocked:\n" + main.thread.stackTrace.take(60).joinToString("\n") { "  at $it" })
-                    while (!tick.get()) Thread.sleep(200)
+                    // Sample the blocked main thread every 100 ms; log the hottest app frames once it is free again.
+                    val counts = HashMap<String, Int>()
+                    var samples = 0
+                    val started = android.os.SystemClock.uptimeMillis()
+                    while (!tick.get()) {
+                        samples++
+                        main.thread.stackTrace
+                            .filter { it.className.startsWith("com.abtin") }
+                            .map { "${it.className.substringAfterLast('.')}.${it.methodName}:${it.lineNumber}" }
+                            .distinct()
+                            .forEach { counts[it] = (counts[it] ?: 0) + 1 }
+                        Thread.sleep(100)
+                        if (samples % 30 == 0) android.util.Log.w(
+                            "TGlassWatchdog",
+                            "still blocked, $samples samples:\n" + counts.entries.sortedByDescending { it.value }.take(25).joinToString("\n") { "  ${it.value}x ${it.key}" },
+                        )
+                    }
+                    val top = counts.entries.sortedByDescending { it.value }.take(40)
+                    android.util.Log.w(
+                        "TGlassWatchdog",
+                        "main thread blocked ${android.os.SystemClock.uptimeMillis() - started + 1000} ms, $samples samples:\n" +
+                            top.joinToString("\n") { "  ${it.value}x ${it.key}" },
+                    )
                 }
             }
         }, "tglass-watchdog").apply { isDaemon = true }.start()
