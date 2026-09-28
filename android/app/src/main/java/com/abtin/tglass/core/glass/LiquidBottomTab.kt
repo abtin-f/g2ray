@@ -3,6 +3,7 @@
 package com.abtin.tglass.core.glass
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -31,10 +32,13 @@ enum class LiquidBottomTabLayer { Base, Tinted, Overlay }
 val LocalLiquidBottomTabLayer =
     staticCompositionLocalOf { LiquidBottomTabLayer.Base }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun RowScope.LiquidBottomTab(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Long press (Telegram iOS: on the Settings tab it opens the account switcher). */
+    onLongClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     val scale = LocalLiquidBottomTabScale.current
@@ -44,6 +48,15 @@ fun RowScope.LiquidBottomTab(
             .then(
                 // The overlay copy must not take touches from the pill below it.
                 if (overlay) Modifier
+                else if (onLongClick != null) Modifier
+                    .clip(Capsule())
+                    .combinedClickable(
+                        interactionSource = null,
+                        indication = null,
+                        role = Role.Tab,
+                        onLongClick = onLongClick,
+                        onClick = onClick
+                    )
                 else Modifier
                     .clip(Capsule())
                     .clickable(

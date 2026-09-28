@@ -120,6 +120,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         DebugLaunch.parse(intent)
+        com.abtin.tglass.data.td.TdAccounts.attach(this)
         readChatRequest(intent)
         val settings = AppSettings(this)
         DebugLaunch.theme?.let { settings.updateTheme(if (it == "dark") ThemeMode.Dark else ThemeMode.Light) }
@@ -167,13 +168,26 @@ class MainActivity : ComponentActivity() {
                         settings.updateLoggedIn(true)
                         nav.resetTo(Route.Main)
                     }
-                    AuthStep.WaitPhone, AuthStep.NeedCredentials -> if (settings.loggedIn) {
+                    AuthStep.WaitPhone, AuthStep.NeedCredentials -> if (live.addingAccount) {
+                        // Adding another account: its sign-in (with "Cancel" back to the current one).
+                        val t = nav.top
+                        if (t != Route.Phone && t != Route.ApiSetup && t != Route.Proxy && t !is Route.ProxyEdit) nav.resetTo(Route.Phone)
+                    } else if (settings.loggedIn) {
                         // Session ended (logged out here or terminated from another device).
                         settings.updateLoggedIn(false)
                         nav.resetTo(Route.Welcome)
                     }
                     is AuthStep.Unsupported -> sheet.alert("Not Supported", auth.what)
                     else -> {}
+                }
+            }
+            // Switched to another signed-in account: start over from its chat list.
+            val activeSlot = com.abtin.tglass.data.td.TdAccounts.active
+            val shownSlot = remember { intArrayOf(activeSlot) }
+            LaunchedEffect(activeSlot) {
+                if (activeSlot != shownSlot[0]) {
+                    shownSlot[0] = activeSlot
+                    if (settings.loggedIn && !live.addingAccount && nav.top != Route.Main) nav.resetTo(Route.Main)
                 }
             }
             // The central place TDLib errors reach the user: a friendly iOS alert (Premium required, flood wait, …).

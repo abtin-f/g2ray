@@ -119,6 +119,8 @@ private fun AuthPage(
         GlassTopBar(
             title = null,
             fade = Color.Transparent,
+            // Signing in an additional account: "Cancel" returns to the account that was active.
+            left = if (live?.addingAccount == true) ({ com.abtin.tglass.ui.components.GlassTextButton("Cancel", { live?.cancelAddAccount() }) }) else null,
             // Telegram iOS shows proxy settings on the login screens: often the only way to connect.
             right = if (live != null) ({ com.abtin.tglass.ui.components.GlassTextButton("Proxy", { nav.push(Route.Proxy) }) }) else null,
         )

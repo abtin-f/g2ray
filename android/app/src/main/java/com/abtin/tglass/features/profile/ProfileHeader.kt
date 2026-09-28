@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
@@ -160,9 +161,12 @@ internal class HeaderGeometry(
     val height: Dp,
 )
 
-/** Telegram iOS 26 profile buttons: 56pt glass circles, 12pt apart, centered under the name. */
-internal val ButtonSize = 56.dp
-internal val ButtonGap = 12.dp
+/**
+ * Telegram iOS profile buttons: equal-width rounded-rect glass tiles, 60pt tall (24pt glyph over a 12pt
+ * label), 8pt apart, filling the width between 16pt margins.
+ */
+internal val ButtonSize = 60.dp
+internal val ButtonGap = 8.dp
 
 internal fun headerGeometry(width: Dp, statusTop: Dp, p: Float, pull: Dp, hasMusic: Boolean): HeaderGeometry {
     val size0 = 100.dp + (pull * 0.35f).coerceAtMost(44.dp)
@@ -317,12 +321,12 @@ internal fun NameBadges(details: ProfileDetails?, verified: Boolean, premium: Bo
     val glyph = details?.emojiStatusEmoji
     if (verified) {
         Spacer(Modifier.width(6.dp))
-        VerifiedBadge(22.dp, color = if (tinted) Color.White.copy(alpha = 0.9f) else TgTheme.colors.accent)
+        VerifiedBadge(20.dp, color = if (tinted) Color.White.copy(alpha = 0.9f) else TgTheme.colors.accent)
     }
     when {
         status != null -> {
             Spacer(Modifier.width(6.dp))
-            StickerGlyph(status, glyph ?: "⭐", 26.dp)
+            StickerGlyph(status, glyph ?: "⭐", 24.dp)
         }
         glyph != null -> {
             Spacer(Modifier.width(6.dp))
@@ -360,17 +364,17 @@ internal fun GiftGlyph(g: ProfileGift, size: Dp) {
     }
 }
 
-/** One round glass button under the name. [label] is its accessibility name (iOS 26 shows no caption). */
+/** One glass tile under the name: [icon] with its lowercase [label] caption (Telegram iOS "call", "mute"…). */
 internal class ProfileAction(val icon: Int, val label: String, val onClick: () -> Unit)
 
 /**
- * Size to draw a profile-button drawable at so every glyph comes out ~22dp like Telegram iOS 26: most
- * `tg_pi_*` icons are a 20-unit glyph in a 40-unit viewport, the video camera fills most of its 30-unit one.
+ * Size to draw a profile-button drawable at so every glyph comes out ~24dp like Telegram iOS: the
+ * `tg_pi_*` icons are a ~20-unit glyph in a 40-unit viewport, the video camera fills ~24 of its 30 units.
  */
-private fun profileIconSize(icon: Int): Dp = if (icon == com.abtin.tglass.ui.components.TgIcons.PiVideo) 27.dp else 44.dp
+private fun profileIconSize(icon: Int): Dp = if (icon == com.abtin.tglass.ui.components.TgIcons.PiVideo) 29.dp else 46.dp
 
 /**
- * The row of glass circle buttons (call, video, mute, search, more). Drawn above the list — outside the
+ * The row of glass buttons (call, video, mute, search, more). Drawn above the list — outside the
  * list's backdrop layer, so the glass may refract it — at [y] px from the top, fading by [alpha].
  */
 @Composable
@@ -379,18 +383,33 @@ internal fun ProfileActionsOverlay(actions: List<ProfileAction>, palette: Profil
         Modifier
             .fillMaxWidth()
             .offset { IntOffset(0, y()) }
-            .graphicsLayer { this.alpha = alpha() },
+            .graphicsLayer { this.alpha = alpha() }
+            .padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(ButtonGap, Alignment.CenterHorizontally),
     ) {
         actions.forEach { a ->
-            Box(
+            Column(
                 Modifier
-                    .size(ButtonSize)
+                    .weight(1f)
+                    .height(ButtonSize)
                     .then(if (enabled) Modifier.bounceClickable(a.onClick) else Modifier)
-                    .profileGlass(Capsule(), palette.button, palette.buttonSolid),
-                contentAlignment = Alignment.Center,
+                    .profileGlass(com.kyant.shapes.RoundedRectangle(14.dp), palette.button, palette.buttonSolid),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
             ) {
-                Icon(a.icon, palette.buttonIcon, profileIconSize(a.icon), contentDescription = a.label)
+                // The drawables carry their own padding: lay them out in a 24dp box so the caption sits close.
+                Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
+                    Icon(
+                        a.icon, palette.buttonIcon, profileIconSize(a.icon),
+                        modifier = Modifier.wrapContentSize(unbounded = true),
+                        contentDescription = a.label,
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+                T(
+                    a.label.lowercase(), TgTheme.type.caption1, palette.buttonIcon,
+                    maxLines = 1, align = TextAlign.Center,
+                )
             }
         }
     }

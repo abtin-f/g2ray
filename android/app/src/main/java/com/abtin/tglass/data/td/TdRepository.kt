@@ -657,11 +657,13 @@ class TdRepository(context: Context) : TelegramRepository {
             return
         }
         scope.launch {
-            val dir = app.filesDir
+            // Each signed-in account has its own database (Accounts & Settings v2): slot 0 = "td", N = "td_N".
+            TdAccounts.attach(app)
+            val slot = TdAccounts.active
             val r = client.setTdlibParameters(
                 useTestDc = false,
-                databaseDirectory = java.io.File(dir, "td").absolutePath,
-                filesDirectory = java.io.File(dir, "td_files").absolutePath,
+                databaseDirectory = TdAccounts.databaseDir(app, slot).absolutePath,
+                filesDirectory = TdAccounts.filesDir(app, slot).absolutePath,
                 databaseEncryptionKey = ByteArray(0),
                 useFileDatabase = true,
                 useChatInfoDatabase = true,
@@ -704,7 +706,7 @@ class TdRepository(context: Context) : TelegramRepository {
             is AuthorizationStateReady -> { onReady(); AuthStep.Ready }
             is AuthorizationStateLoggingOut -> AuthStep.LoggingOut
             is AuthorizationStateClosing -> return
-            is AuthorizationStateClosed -> { reset(); start(); AuthStep.Starting }
+            is AuthorizationStateClosed -> { onAccountClosed(auth == AuthStep.LoggingOut); reset(); start(); AuthStep.Starting }
             else -> AuthStep.Unsupported("This login method is not supported yet.")
         }
     }
@@ -3746,6 +3748,199 @@ class TdRepository(context: Context) : TelegramRepository {
         }
     }
     // ---- end Custom emoji ----
+
+    // ---- Accounts & Settings v2 ----
+    // Several accounts: one TDLib database per slot (see TdAccounts). Only the active slot runs; switching
+    // closes the client, and when TDLib reports Closed, [onAccountClosed] picks the next slot before the usual
+    // reset() + start(), so this same repository instance (and every screen bound to it) serves the new account.
+    private var accountSwitchTo = -1
+    private var accountDropSlot = -1
+
+    /** Keeps the active slot's cached name / phone / photo fresh, for the account list of other sessions. */
+    @Suppress("unused")
+    private val accountCacheJob = scope.launch {
+        try {
+            TdAccounts.attach(app)
+            androidx.compose.runtime.snapshotFlow {
+                if (auth != AuthStep.Ready || myId == 0L) null
+                else userMap[myId]?.let { u -> Triple(u, avatars[u.id]?.let { filePath(it) }, TdAccounts.active) }
+            }.collect { v ->
+                if (v != null) {
+                    TdAccounts.cache(v.third, v.first.id, v.first.name, v.first.phone, v.second)
+                    TdAccounts.signedIn()
+                }
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.e("TGlass", "Account cache failed", e)
+        }
+    }
+
+    override val accounts: List<com.abtin.tglass.data.AccountInfo>
+        get() {
+            TdAccounts.attach(app)
+            // Read so the list recomposes when the cached info changes.
+            if (TdAccounts.version < 0) return emptyList()
+            val active = TdAccounts.active
+            val adding = TdAccounts.adding
+            return TdAccounts.signedInSlots().filter { !(adding && it == active) }.map { slot ->
+                if (slot == active) {
+                    val m = me
+                    com.abtin.tglass.data.AccountInfo(slot, m.id, m.name.ifBlank { TdAccounts.name(slot) }, m.phone.ifBlank { TdAccounts.phone(slot) }, null, active = true)
+                } else {
+                    com.abtin.tglass.data.AccountInfo(slot, TdAccounts.userId(slot), TdAccounts.name(slot).ifBlank { "Account" }, TdAccounts.phone(slot), TdAccounts.photo(slot), active = false)
+                }
+            }
+        }
+
+    // Telegram allows 3 accounts per app (4 with Premium); keep to 3.
+    override val canAddAccount: Boolean
+        get() = !TdAccounts.adding && accountSwitchTo < 0 && TdAccounts.signedInSlots().size < 3
+
+    override val addingAccount: Boolean get() = TdAccounts.adding
+
+    override fun addAccount() {
+        try {
+            TdAccounts.attach(app)
+            if (TdAccounts.adding || accountSwitchTo >= 0) return
+            accountSwitchTo = TdAccounts.newSlot()
+            closeForAccountChange()
+        } catch (e: Exception) {
+            android.util.Log.e("TGlass", "Add account failed", e)
+            if (accountSwitchTo >= 0) runCatching { TdAccounts.abortAdding(accountSwitchTo) }
+            accountSwitchTo = -1
+            _errors.tryEmit("Couldn't add an account")
+        }
+    }
+
+    override fun switchAccount(slot: Int) {
+        try {
+            TdAccounts.attach(app)
+            if (slot == TdAccounts.active || slot !in TdAccounts.slots || accountSwitchTo >= 0) return
+            accountSwitchTo = slot
+            closeForAccountChange()
+        } catch (e: Exception) {
+            android.util.Log.e("TGlass", "Switch account failed", e)
+            accountSwitchTo = -1
+            _errors.tryEmit("Couldn't switch accounts")
+        }
+    }
+
+    override fun cancelAddAccount() {
+        try {
+            val back = TdAccounts.returnTo
+            if (back < 0 || accountSwitchTo >= 0) return
+            accountDropSlot = TdAccounts.active
+            accountSwitchTo = back
+            closeForAccountChange()
+        } catch (e: Exception) {
+            android.util.Log.e("TGlass", "Cancel add account failed", e)
+            accountSwitchTo = -1
+            accountDropSlot = -1
+        }
+    }
+
+    private fun closeForAccountChange() {
+        runCatching { com.abtin.tglass.core.media.VoicePlayer.stop() }
+        auth = AuthStep.Starting
+        scope.launch {
+            val r = try {
+                client.close()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.e("TGlass", "close() threw", e)
+                null
+            }
+            if (r !is TdlResult.Success) {
+                // TDLib did not close: stay on the current account.
+                val target = accountSwitchTo
+                if (target >= 0 && TdAccounts.adding && accountDropSlot < 0) TdAccounts.abortAdding(target)
+                accountSwitchTo = -1
+                accountDropSlot = -1
+                val s = client.getAuthorizationState()
+                if (s is TdlResult.Success) onAuth(s.result)
+            }
+        }
+    }
+
+    /** TDLib closed: decide which slot starts next (a switch, a cancelled sign-in, or a log out). */
+    private fun onAccountClosed(loggedOut: Boolean) {
+        try {
+            TdAccounts.attach(app)
+            val closed = TdAccounts.active
+            val target = accountSwitchTo
+            val drop = accountDropSlot
+            accountSwitchTo = -1
+            accountDropSlot = -1
+            if (target >= 0 || loggedOut) resetAccountExtras()
+            when {
+                target >= 0 -> {
+                    TdAccounts.activate(target)
+                    if (drop >= 0 && drop != target) {
+                        TdAccounts.remove(drop)
+                        deleteAccountFiles(drop)
+                    }
+                }
+                loggedOut -> {
+                    // Logged out (here or from another device): forget this account and continue with another.
+                    val others = TdAccounts.signedInSlots().filter { it != closed && TdAccounts.userId(it) != 0L }
+                    if (others.isNotEmpty()) {
+                        TdAccounts.remove(closed)
+                        deleteAccountFiles(closed)
+                        TdAccounts.activate(others.first())
+                    } else {
+                        TdAccounts.forget(closed)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("TGlass", "Account change failed", e)
+        }
+    }
+
+    /**
+     * Per-account state kept by other areas that reset() does not clear (it only ever had one account):
+     * privacy, security, storage, notification scopes, profile caches… so the next account never shows them.
+     */
+    private fun resetAccountExtras() {
+        runCatching {
+            privacyValues.clear()
+            folderCache.clear()
+            blockedState.value = null
+            blockedTotalState.value = null
+            passwordState.value = null
+            accountTtlState.value = null
+            storageState.value = null
+            dataUsageState.value = null
+            scopeStore.clear()
+            rawScopeSettings.clear()
+            profileDetailsStore.clear()
+            profilePhotoStore.clear()
+            profileGiftStore.clear()
+            sharedCountStore.clear()
+            sharedMusicStore.clear()
+            commonGroupStore.clear()
+            gifBotId = 0L
+            profileBirthdate = null
+            profileChannel = null
+            profileNameColor = -1
+            historyGapMap.clear()
+            gapLoading.clear()
+            profileStoryStore.clear()
+        }.onFailure { android.util.Log.e("TGlass", "Account state reset failed", it) }
+    }
+
+    /** Removes a dropped slot's database (never slot 0's, which TDLib itself empties on log out). */
+    private fun deleteAccountFiles(slot: Int) {
+        if (slot == 0) return
+        runCatching {
+            TdAccounts.databaseDir(app, slot).deleteRecursively()
+            TdAccounts.filesDir(app, slot).deleteRecursively()
+        }
+    }
+    // ---- end Accounts & Settings v2 ----
 }
 
 private const val GIFTS_ENABLED = false

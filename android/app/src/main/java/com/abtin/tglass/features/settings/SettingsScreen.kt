@@ -87,6 +87,7 @@ import com.abtin.tglass.ui.components.LocalToast
 import com.abtin.tglass.ui.components.Section
 import com.abtin.tglass.ui.components.SheetAction
 import com.abtin.tglass.ui.components.SheetRequest
+import com.abtin.tglass.ui.components.alert
 import com.abtin.tglass.ui.components.SegmentedControl
 import com.abtin.tglass.ui.components.T
 import com.abtin.tglass.ui.components.CollapsedTitle
@@ -195,6 +196,8 @@ fun SettingsScreen(backdrop: LayerBackdrop) {
                 }
                 Spacer(Modifier.height(24.dp))
             }
+            // Telegram iOS: the other signed-in accounts and "Add Account", right under the profile.
+            item(key = "accounts") { AccountsSection() }
             item {
                 Section {
                     Cell("My Profile", icon = TgIcons.SetProfile, iconColor = Red, divider = live, onClick = { open(Page.EditProfile) })
@@ -353,12 +356,6 @@ private fun LazyListScope.powerSaving() {
     }
 }
 
-@Composable
-private fun ToggleCell(title: String, initial: Boolean, divider: Boolean = true, subtitle: String? = null) {
-    var on by rememberSaveable(title) { mutableStateOf(initial) }
-    Cell(title, subtitle = subtitle, chevron = false, divider = divider, trailing = { IOSSwitch(on, { on = it }) })
-}
-
 private fun LazyListScope.notifications() {
     item {
         val s = LocalAppSettings.current
@@ -429,8 +426,11 @@ private fun LazyListScope.notifications() {
     }
     item {
         Section(header = "In-App Notifications") {
-            ToggleCell("In-App Sounds", true)
-            ToggleCell("In-App Vibrate", true)
+            val context = androidx.compose.ui.platform.LocalContext.current
+            com.abtin.tglass.notify.InAppAlerts.attach(context)
+            val alerts = com.abtin.tglass.notify.InAppAlerts
+            Cell("In-App Sounds", chevron = false, trailing = { IOSSwitch(alerts.sounds, { alerts.updateSounds(it) }) })
+            Cell("In-App Vibrate", chevron = false, trailing = { IOSSwitch(alerts.vibrate, { alerts.updateVibrate(it) }) })
             val s = LocalAppSettings.current
             Cell("In-App Preview", chevron = false, divider = false, trailing = { IOSSwitch(s.inAppPreview, { s.updateInAppPreview(it) }) })
         }
@@ -519,10 +519,13 @@ private val Languages = listOf("English" to "English", "Persian" to "فارسی"
 
 private fun LazyListScope.language() {
     item {
-        var sel by rememberSaveable { mutableIntStateOf(0) }
-        Section(header = "Interface Language") {
+        val sheet = LocalActionSheet.current
+        // The interface is English-only for now; messages in any language (and RTL) are shown as sent.
+        Section(header = "Interface Language", footer = "TGlass is available in English for now. Messages in every language, including right-to-left ones, are shown as they were written.") {
             Languages.forEachIndexed { i, (en, native) ->
-                Cell(native, subtitle = en, checked = sel == i, chevron = false, divider = i != Languages.lastIndex, onClick = { sel = i })
+                Cell(native, subtitle = en, checked = i == 0, chevron = false, divider = i != Languages.lastIndex, onClick = {
+                    if (i != 0) sheet.alert(en, "This language isn't available in TGlass yet.")
+                })
             }
         }
     }
@@ -566,8 +569,8 @@ private fun LazyListScope.devices() {
 
 @Composable
 private fun SessionIcon() {
-    Box(Modifier.size(30.dp).clip(RoundedRectangle(8.dp)).background(Blue), contentAlignment = Alignment.Center) {
-        Icon(TgIcons.SetDevices, Color.White, 30.dp)
+    Box(Modifier.size(29.dp).clip(RoundedRectangle(7.dp)).background(Blue), contentAlignment = Alignment.Center) {
+        Icon(TgIcons.SetDevices, Color.White, 29.dp)
     }
 }
 
@@ -581,9 +584,10 @@ private fun LazyListScope.folders() {
         }
         if (repo.isLive) LiveFolderList()
         else Section(header = "Chat Folders") {
-            Cell("Create New Folder", icon = TgIcons.SetFolders, iconColor = c.accent, titleColor = c.accent, chevron = false, onClick = {})
+            val toast = LocalToast.current
+            Cell("Create New Folder", icon = TgIcons.SetFolders, iconColor = c.accent, titleColor = c.accent, chevron = false, onClick = { toast.show("Folders can be created with a real account") })
             repo.folders.drop(1).forEachIndexed { i, f ->
-                Cell(f, subtitle = when (f) { "Personal" -> "Private chats"; "Work" -> "2 chats"; else -> "Unread chats" }, divider = i != repo.folders.size - 2, onClick = {})
+                Cell(f, subtitle = when (f) { "Personal" -> "Private chats"; "Work" -> "2 chats"; else -> "Unread chats" }, divider = i != repo.folders.size - 2)
             }
         }
     }

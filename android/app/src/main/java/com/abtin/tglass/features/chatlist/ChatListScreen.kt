@@ -265,6 +265,9 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val headerHeight = 56.dp
     val storiesHeight = with(density) { storiesPx.toDp() }
+    // Music / voice playing (global player): Telegram's top player bar under the header.
+    val playerShown = !searching && com.abtin.tglass.features.chat.hasNowPlaying(repo, includeVideo = false)
+    val playerHeight = if (playerShown) 50.dp else 0.dp
 
     fun confirmDelete(chat: Chat) {
         val what = when (chat.type) {
@@ -282,7 +285,7 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
                 .fillMaxSize()
                 .nestedScroll(storiesConnection)
                 .layerBackdrop(backdrop),
-            contentPadding = PaddingValues(top = top + headerHeight + 4.dp + if (searching) 0.dp else storiesHeight, bottom = bottom + 112.dp),
+            contentPadding = PaddingValues(top = top + headerHeight + 4.dp + playerHeight + if (searching) 0.dp else storiesHeight, bottom = bottom + 112.dp),
         ) {
             if (searching) {
                 searchResults(repo, query, global, onOpen = { focus.clearFocus(); nav.push(Route.Chat(it)) })
@@ -361,7 +364,7 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
             }
         } else {
             Box(Modifier.fillMaxWidth()) {
-                ScrollEdgeBlur(top + headerHeight + 24.dp + storiesHeight)
+                ScrollEdgeBlur(top + headerHeight + 24.dp + storiesHeight + playerHeight)
                 Column(Modifier.fillMaxWidth().statusBarsPadding()) {
                     Box(Modifier.fillMaxWidth().height(headerHeight).padding(horizontal = 12.dp)) {
                         GlassTextButton(if (editing) "Done" else "Edit", {
@@ -389,6 +392,16 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
                     if (storiesFraction > 0.01f) {
                         StoriesRow(repo, storiesFraction, Modifier.height(storiesHeight)) { nav.push(Route.Stories(it)) }
                     }
+                    // Outside the list's backdrop layer, so the bar's glass is safe here.
+                    com.abtin.tglass.features.chat.NowPlayingBar(
+                        repo,
+                        onOpen = { cid, mid ->
+                            if (mid != 0L) com.abtin.tglass.features.chat.ChatJumpRequest.request(cid, mid)
+                            nav.push(Route.Chat(cid))
+                        },
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                        includeVideo = false,
+                    )
                 }
             }
         }

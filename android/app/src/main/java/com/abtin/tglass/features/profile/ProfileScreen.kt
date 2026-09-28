@@ -695,7 +695,9 @@ private fun ProfileInfoBlock(
                         "location" -> InfoRow(r.label, r.value, palette, divider, userText = true, trailing = { MiniMap() }, onClick = {
                             copyText(context, "address", r.value); toast.show("Address copied")
                         })
-                        "birthday" -> InfoRow(r.label, r.value, palette, divider, leading = { androidx.compose.foundation.text.BasicText("🎂") })
+                        "birthday" -> InfoRow(r.label, r.value, palette, divider, onLongClick = {
+                            copyText(context, r.label, r.value); toast.show("Copied")
+                        })
                         else -> InfoRow(r.label, r.value, palette, divider, userText = r.userText, onLongClick = {
                             copyText(context, r.label, r.value); toast.show("Copied")
                         })

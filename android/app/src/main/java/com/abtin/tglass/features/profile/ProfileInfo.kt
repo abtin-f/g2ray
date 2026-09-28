@@ -89,8 +89,8 @@ internal fun InfoRow(
             Modifier
                 .fillMaxWidth()
                 .then(if (onClick != null || onLongClick != null) Modifier.iosClickable(onLongClick = onLongClick, onClick = onClick ?: {}) else Modifier)
-                .heightIn(min = 60.dp)
-                .padding(horizontal = 16.dp, vertical = 9.dp),
+                .heightIn(min = 58.dp)
+                .padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
@@ -119,19 +119,19 @@ internal fun InfoRow(
 @Composable
 internal fun QrButton(palette: ProfilePalette, onClick: () -> Unit) {
     Box(
-        Modifier.size(36.dp).clip(Capsule()).clickable(remember { MutableInteractionSource() }, null, onClick = onClick),
+        Modifier.size(34.dp).clip(Capsule()).clickable(remember { MutableInteractionSource() }, null, onClick = onClick),
         contentAlignment = Alignment.Center,
-    ) { Icon(IosIcons.QrCode, palette.cardAccent, 26.dp) }
+    ) { Icon(IosIcons.QrCode, palette.cardAccent, 22.dp) }
 }
 
 /** The little map tile with a red pin shown next to a location (a stylized map; no map SDK in the app). */
 @Composable
 internal fun MiniMap() {
-    Canvas(Modifier.size(58.dp).clip(RoundedRectangle(12.dp))) {
+    Canvas(Modifier.size(44.dp).clip(RoundedRectangle(10.dp))) {
         drawRect(Color(0xFFE9F0DA))
         val road = Color.White
-        drawLine(road, Offset(0f, size.height * 0.62f), Offset(size.width, size.height * 0.38f), strokeWidth = 5f)
-        drawLine(road, Offset(size.width * 0.3f, 0f), Offset(size.width * 0.52f, size.height), strokeWidth = 4f)
+        drawLine(road, Offset(0f, size.height * 0.62f), Offset(size.width, size.height * 0.38f), strokeWidth = 4f)
+        drawLine(road, Offset(size.width * 0.3f, 0f), Offset(size.width * 0.52f, size.height), strokeWidth = 3f)
         drawRect(Color(0xFFCFE3B6), Offset(size.width * 0.62f, size.height * 0.62f), Size(size.width * 0.3f, size.height * 0.28f))
         val cx = size.width / 2f
         val cy = size.height * 0.42f

@@ -257,13 +257,13 @@ fun Section(
     }
 }
 
-/** Colored rounded-square settings icon. */
+/** Colored rounded-square settings icon (iOS: 29pt tile, ~7pt corners). */
 @Composable
-fun SettingsIcon(icon: Any, color: Color, size: Dp = 30.dp) {
+fun SettingsIcon(icon: Any, color: Color, size: Dp = 29.dp) {
     Box(
         Modifier
             .size(size)
-            .clip(RoundedRectangle(8.dp))
+            .clip(RoundedRectangle(size * 0.24f))
             .background(Brush.verticalGradient(listOf(color.lighten(0.08f), color))),
         contentAlignment = Alignment.Center,
     ) {
@@ -306,7 +306,7 @@ fun Cell(
             modifier
                 .fillMaxWidth()
                 .then(if (onClick != null) Modifier.iosClickable(onClick = onClick) else Modifier)
-                .heightIn(min = if (subtitle != null) 58.dp else 50.dp)
+                .heightIn(min = if (subtitle != null) 58.dp else 44.dp)
                 .padding(start = 16.dp, end = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

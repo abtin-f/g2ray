@@ -717,6 +717,21 @@ interface TelegramRepository {
     /** Removes a GIF from Saved GIFs; [onDone] gets an error or null. */
     fun removeSavedGif(fileId: Int, onDone: (String?) -> Unit) = onDone(null)
     // ---- end Custom emoji ----
+
+    // ---- Accounts & Settings v2 ----
+    /** Accounts signed in on this device, in the order they were added (demo: just [me]). */
+    val accounts: List<AccountInfo> get() = listOf(AccountInfo(0, me.id, me.name, me.phone, null, active = true))
+    /** Whether "Add Account" is available (live TDLib only). */
+    val canAddAccount: Boolean get() = false
+    /** True while a new account is signing in (the login screens then offer "Cancel"). */
+    val addingAccount: Boolean get() = false
+    /** Starts a fresh TDLib database for a new account; the login flow follows its auth state. */
+    fun addAccount() {}
+    /** Makes the account in [slot] the active one (restarts TDLib on its database). */
+    fun switchAccount(slot: Int) {}
+    /** Abandons signing in a new account and returns to the previous one. */
+    fun cancelAddAccount() {}
+    // ---- end Accounts & Settings v2 ----
 }
 
 /** Sticker sets "installed" in the demo (the demo has no server). */
