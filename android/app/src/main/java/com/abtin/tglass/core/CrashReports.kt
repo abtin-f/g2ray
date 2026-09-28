@@ -19,6 +19,7 @@ import java.util.Locale
 object CrashReports {
     private const val FILE = "last_crash.txt"
     @Volatile private var installed = false
+    @Volatile private var watching = false
 
     fun install(context: Context) {
         if (installed) return
@@ -40,6 +41,28 @@ object CrashReports {
             }
             previous?.uncaughtException(thread, error)
         }
+    }
+
+    /**
+     * Debug builds only: logs the main thread's stack (tag TGlassWatchdog) whenever it is blocked for over 2 s,
+     * so the CI emulator run shows where a freeze / ANR happens.
+     */
+    fun startWatchdog() {
+        if (!BuildConfig.DEBUG || watching) return
+        watching = true
+        val main = android.os.Looper.getMainLooper()
+        val handler = android.os.Handler(main)
+        Thread({
+            while (true) {
+                val tick = java.util.concurrent.atomic.AtomicBoolean(false)
+                handler.post { tick.set(true) }
+                Thread.sleep(2000)
+                if (!tick.get()) {
+                    android.util.Log.w("TGlassWatchdog", "main thread blocked:\n" + main.thread.stackTrace.take(60).joinToString("\n") { "  at $it" })
+                    while (!tick.get()) Thread.sleep(200)
+                }
+            }
+        }, "tglass-watchdog").apply { isDaemon = true }.start()
     }
 
     /** The saved report of the last crash, or null; reading it removes it. */

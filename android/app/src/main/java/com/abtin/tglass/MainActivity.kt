@@ -117,6 +117,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         com.abtin.tglass.core.CrashReports.install(this)
+        com.abtin.tglass.core.CrashReports.startWatchdog()
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         DebugLaunch.parse(intent)
