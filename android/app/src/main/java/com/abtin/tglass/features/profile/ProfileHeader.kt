@@ -162,10 +162,11 @@ internal class HeaderGeometry(
 )
 
 /**
- * Telegram iOS profile buttons: equal-width rounded-rect glass tiles, 60pt tall (24pt glyph over a 12pt
- * label), 8pt apart, filling the width between 16pt margins.
+ * Profile buttons: round 48pt glass buttons (22pt glyph) with an 11pt label under each, spread evenly
+ * across the width. [ButtonSize] is the height of the whole row (circle + gap + label).
  */
-internal val ButtonSize = 60.dp
+internal val ButtonCircle = 48.dp
+internal val ButtonSize = 66.dp
 internal val ButtonGap = 8.dp
 
 internal fun headerGeometry(width: Dp, statusTop: Dp, p: Float, pull: Dp, hasMusic: Boolean): HeaderGeometry {
@@ -371,7 +372,7 @@ internal class ProfileAction(val icon: Int, val label: String, val onClick: () -
  * Size to draw a profile-button drawable at so every glyph comes out ~24dp like Telegram iOS: the
  * `tg_pi_*` icons are a ~20-unit glyph in a 40-unit viewport, the video camera fills ~24 of its 30 units.
  */
-private fun profileIconSize(icon: Int): Dp = if (icon == com.abtin.tglass.ui.components.TgIcons.PiVideo) 29.dp else 46.dp
+private fun profileIconSize(icon: Int): Dp = if (icon == com.abtin.tglass.ui.components.TgIcons.PiVideo) 26.dp else 42.dp
 
 /**
  * The row of glass buttons (call, video, mute, search, more). Drawn above the list — outside the
@@ -392,13 +393,16 @@ internal fun ProfileActionsOverlay(actions: List<ProfileAction>, palette: Profil
                 Modifier
                     .weight(1f)
                     .height(ButtonSize)
-                    .then(if (enabled) Modifier.bounceClickable(a.onClick) else Modifier)
-                    .profileGlass(com.kyant.shapes.RoundedRectangle(14.dp), palette.button, palette.buttonSolid),
+                    .then(if (enabled) Modifier.bounceClickable(a.onClick) else Modifier),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
             ) {
-                // The drawables carry their own padding: lay them out in a 24dp box so the caption sits close.
-                Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier
+                        .size(ButtonCircle)
+                        .profileGlass(com.kyant.shapes.Capsule(), palette.button, palette.buttonSolid),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    // The drawables carry their own padding: draw them unbounded so the glyph comes out ~22dp.
                     Icon(
                         a.icon, palette.buttonIcon, profileIconSize(a.icon),
                         modifier = Modifier.wrapContentSize(unbounded = true),
@@ -407,7 +411,7 @@ internal fun ProfileActionsOverlay(actions: List<ProfileAction>, palette: Profil
                 }
                 Spacer(Modifier.height(4.dp))
                 T(
-                    a.label.lowercase(), TgTheme.type.caption1, palette.buttonIcon,
+                    a.label.lowercase(), TgTheme.type.caption2.copy(fontSize = 11.sp, lineHeight = 13.sp), palette.buttonIcon,
                     maxLines = 1, align = TextAlign.Center,
                 )
             }

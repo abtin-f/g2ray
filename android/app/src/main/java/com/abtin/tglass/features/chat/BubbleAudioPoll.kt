@@ -145,6 +145,37 @@ internal fun AudioPlayButton(
     }
 }
 
+/**
+ * Song name and artist for the player: the file's title / performer, otherwise the tags inside the downloaded
+ * file, then the file name (without extension), the caption's first line, and finally the chat's name.
+ */
+internal fun musicTitle(repo: com.abtin.tglass.data.TelegramRepository, m: Message, c: MessageContent.File): Pair<String, String> {
+    var title = c.name.takeUnless { it.isBlank() || it == "Audio" }
+    var artist = c.performer?.takeIf { it.isNotBlank() }
+    if (title == null || artist == null) {
+        val path = c.file?.let { repo.filePath(it) }
+        if (path != null) runCatching {
+            val r = android.media.MediaMetadataRetriever()
+            try {
+                r.setDataSource(path)
+                if (title == null) title = r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_TITLE)?.takeIf { it.isNotBlank() }
+                if (artist == null) artist = r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ARTIST)?.takeIf { it.isNotBlank() }
+            } finally {
+                r.release()
+            }
+        }
+    }
+    if (title == null) title = path2name(c.file?.path)
+    if (title == null) title = c.caption?.lineSequence()?.firstOrNull { it.isNotBlank() }?.trim()?.take(60)
+    val chatTitle = repo.chat(m.chatId)?.title
+    return (title ?: chatTitle ?: "Audio") to (artist ?: chatTitle ?: "Unknown Artist")
+}
+
+private val audioExt = Regex("\\.(mp3|m4a|aac|ogg|oga|opus|flac|wav|wma|alac|aiff?)$", RegexOption.IGNORE_CASE)
+
+private fun path2name(path: String?): String? =
+    path?.substringAfterLast('/')?.replace(audioExt, "")?.replace('_', ' ')?.trim()?.takeIf { it.isNotBlank() && !it.all { ch -> ch.isDigit() || ch == ' ' } }
+
 /** The chat's player entry for a voice or music message (for the now-playing bar and auto-advance). */
 internal fun audioTrackOf(repo: com.abtin.tglass.data.TelegramRepository, m: Message): com.abtin.tglass.core.media.VoiceTrack? {
     val key = "${m.chatId}:${m.id}"
@@ -154,10 +185,13 @@ internal fun audioTrackOf(repo: com.abtin.tglass.data.TelegramRepository, m: Mes
             title = if (m.outgoing) "You" else repo.senderName(m).ifBlank { repo.chat(m.chatId)?.title ?: "Voice Message" },
             subtitle = "Voice Message", music = false, seconds = c.seconds,
         )
-        is MessageContent.File -> if (!c.music) null else com.abtin.tglass.core.media.VoiceTrack(
-            key, m.chatId, m.id,
-            title = c.name, subtitle = c.performer ?: "Unknown Artist", music = true, seconds = c.duration,
-        )
+        is MessageContent.File -> if (!c.music) null else {
+            val (title, artist) = musicTitle(repo, m, c)
+            com.abtin.tglass.core.media.VoiceTrack(
+                key, m.chatId, m.id,
+                title = title, subtitle = artist, music = true, seconds = c.duration,
+            )
+        }
         else -> null
     }
 }
