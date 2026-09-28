@@ -49,7 +49,6 @@ import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawOutline
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.IntrinsicMeasurable
@@ -388,17 +387,15 @@ fun MessageBubble(
     val screenW = LocalConfiguration.current.screenWidthDp.dp
     val contentMax = maxWidth - TailWidth
     val textMax = contentMax - 22.dp
-    // Telegram-iOS media: at most ~70 % of the screen / 280 pt wide, never wider than the bubble allows.
-    val mediaMax = minOf(contentMax - 4.dp, screenW * 0.7f, 280.dp)
+    val mediaMax = minOf(contentMax - 4.dp, screenW * 0.68f)
     val reactions = m.reactions
     val photos = album.filter { it.content is MessageContent.Photo }
     val isAlbumGrid = album.size > 1 && photos.size == album.size
     val albumCaption = if (isAlbumGrid) album.firstNotNullOfOrNull { (it.content as MessageContent.Photo).caption?.let { c -> it to c } } else null
     val hasHeader = senderName != null || replyTo != null || m.forwardedFrom != null
-    val text = bubbleText()
 
     // A photo/video without caption or header: the picture itself takes the bubble shape (tail included).
-    if (content is MessageContent.Photo && album.size <= 1 && content.caption == null && !hasHeader && reactions.isEmpty() && m.comments == null) {
+    if (content is MessageContent.Photo && album.size <= 1 && content.caption == null && !hasHeader && reactions.isEmpty()) {
         val size = mediaSize(content.aspect, mediaMax)
         Box(
             modifier
@@ -418,17 +415,6 @@ fun MessageBubble(
     }
 
     val showMeta = reactions.isEmpty()
-    // Widest the content itself gets: headers / reactions wrap or truncate inside it instead of widening the bubble.
-    val albumW = mediaMax
-    val contentW: Dp = when {
-        isAlbumGrid -> albumW + 4.dp
-        album.size > 1 -> minOf(contentMax, 300.dp)
-        content is MessageContent.Photo -> mediaSize(content.aspect, mediaMax).first + 4.dp
-        content is MessageContent.Location -> minOf(mediaMax, 260.dp) + 4.dp
-        else -> contentMax
-    }
-    // Headers alone never make a short message's bubble wider than this.
-    val headerCap = if (contentW < contentMax) contentW else minOf(contentMax, 250.dp)
     Column(
         modifier
             .widthIn(max = maxWidth)
@@ -439,34 +425,31 @@ fun MessageBubble(
     ) {
         val inner = Modifier.padding(horizontal = 11.dp)
         if (senderName != null) {
-            CapWidth(headerCap) {
-                com.abtin.tglass.core.emoji.EmojiText(
-                    senderName,
-                    text.header,
-                    if (isChannel) colors.accent else nameColor(senderSeed),
-                    weight = FontWeight.SemiBold, maxLines = 1,
-                    modifier = inner.padding(top = 6.dp).then(if (onSenderClick != null) Modifier.fadeClickable(onClick = onSenderClick) else Modifier),
-                )
-            }
+            com.abtin.tglass.core.emoji.EmojiText(
+                senderName,
+                TgTheme.type.subheadline.copy(fontSize = 14.sp, lineHeight = 18.sp, textDirection = TextDirection.Content),
+                if (isChannel) colors.accent else nameColor(senderSeed),
+                weight = FontWeight.SemiBold, maxLines = 1,
+                modifier = inner.padding(top = 6.dp).then(if (onSenderClick != null) Modifier.fadeClickable(onClick = onSenderClick) else Modifier),
+            )
         }
         if (m.forwardedFrom != null) {
-            CapWidth(headerCap) {
-                ForwardHeader(m, colors, inner.padding(top = if (senderName != null) 2.dp else 6.dp))
+            Column(inner.padding(top = if (senderName != null) 1.dp else 6.dp)) {
+                T("Forwarded from", TgTheme.type.footnote.copy(fontSize = 14.sp, lineHeight = 17.sp), colors.accent, maxLines = 1)
+                com.abtin.tglass.core.emoji.EmojiText(m.forwardedFrom, TgTheme.type.footnote.copy(fontSize = 14.sp, lineHeight = 17.sp, textDirection = TextDirection.Content), colors.accent, weight = FontWeight.SemiBold, maxLines = 1)
             }
         }
         if (replyTo != null) {
             val replyColor = if (m.outgoing) colors.accent else if (replyTo.outgoing) colors.accent else nameColor(replyTo.senderId)
-            CapWidth(headerCap) {
-                ReplyHeader(
-                    replyName ?: "", replyTo, replyColor, colors,
-                    Modifier.padding(start = 8.dp, end = 8.dp, top = if (senderName != null || m.forwardedFrom != null) 4.dp else 7.dp).fadeClickable(onClick = onReplyClick),
-                )
-            }
+            ReplyHeader(
+                replyName ?: "", replyTo, replyColor, colors,
+                Modifier.padding(start = 8.dp, end = 8.dp, top = if (senderName != null || m.forwardedFrom != null) 4.dp else 7.dp).fadeClickable(onClick = onReplyClick),
+            )
         }
         val textTop = if (hasHeader) 3.dp else 6.dp
         when {
             isAlbumGrid -> {
-                val w = albumW
+                val w = minOf(contentMax - 4.dp, screenW * 0.76f)
                 AlbumGrid(
                     photos, w, radius, small, topFlat = hasHeader, bottomFlat = albumCaption != null || !showMeta,
                     onClick = onAlbumItemClick,
@@ -474,10 +457,10 @@ fun MessageBubble(
                     modifier = Modifier.padding(start = 2.dp, end = 2.dp, top = if (hasHeader) 4.dp else 2.dp, bottom = if (albumCaption == null && showMeta) 2.dp else 0.dp),
                 )
                 if (albumCaption != null) {
-                    val (cm, captionText) = albumCaption
+                    val (cm, text) = albumCaption
                     val cc = cm.content as MessageContent.Photo
                     TextWithMeta(
-                        richFor(m, captionText, cc.captionEntities, colors), bodyStyle(colors),
+                        richFor(m, text, cc.captionEntities, colors), bodyStyle(colors),
                         meta = { if (showMeta) MetaRow(m, colors.meta) },
                         modifier = Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, top = 5.dp, bottom = 6.dp),
                         maxTextWidth = w - 20.dp,
@@ -514,16 +497,13 @@ fun MessageBubble(
             else -> {}
         }
         if (reactions.isNotEmpty()) {
-            // Reactions wrap into rows inside the content's width (Telegram iOS) — they never stretch the bubble.
             ReactionsWithMeta(
                 reactions, colors,
                 meta = { MetaRow(m, colors.meta) },
                 onReact = onReact,
-                limit = contentW - 20.dp,
-                modifier = Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, top = 4.dp, bottom = 7.dp),
+                modifier = Modifier.fillMaxWidth().padding(start = 9.dp, end = 9.dp, top = 5.dp, bottom = 6.dp),
             )
         }
-        if (m.comments != null) CommentsBar(m, colors)
     }
 }
 
@@ -561,10 +541,10 @@ private fun ReplyHeader(name: String, replyTo: Message, color: Color, colors: Bu
     ) {
         if (thumb != null) {
             Spacer(Modifier.width(6.dp))
-            TgImage(thumb, Modifier.size(30.dp).clip(RoundedRectangle(4.dp)), maxPx = 120)
+            TgImage(thumb, Modifier.size(32.dp).clip(RoundedRectangle(4.dp)), maxPx = 120)
         }
         Column(Modifier.padding(start = 7.dp, end = 8.dp, top = 4.dp, bottom = 4.dp)) {
-            val style = bubbleText().header
+            val style = TgTheme.type.footnote.copy(fontSize = 14.sp, lineHeight = 17.sp, textDirection = TextDirection.Content)
             com.abtin.tglass.core.emoji.EmojiText(name, style, color, weight = FontWeight.SemiBold, maxLines = 1)
             T(replyTo.preview.replace('\n', ' '), style, colors.text, maxLines = 1)
         }
@@ -575,18 +555,15 @@ private fun ReplyHeader(name: String, replyTo: Message, color: Color, colors: Bu
 @Composable
 fun MetaRow(m: Message, color: Color, overlay: Boolean = false, overlayColor: Color = Color.Black.copy(alpha = 0.32f)) {
     val c = TgTheme.colors
-    val style = bubbleText().meta
-    val scale = LocalAppSettings.current.textScale
-    // Telegram-iOS ChatMessageDateAndStatusNode: 11 pt date, status glyphs ~13 pt, all scaled with the text size.
-    fun sz(v: Float) = (v * scale).dp
+    val style = TgTheme.type.caption2.copy(fontSize = 11.sp, lineHeight = 13.sp)
     val row = @Composable {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (m.pinned) {
-                Icon(TgIcons.MsgPinned, color, sz(10f))
+                Icon(TgIcons.MsgPinned, color, 11.dp)
                 Spacer(Modifier.width(3.dp))
             }
             if (m.views != null) {
-                Icon(IosIcons.Eye, color, sz(12f))
+                Icon(IosIcons.Eye, color, 13.dp)
                 Spacer(Modifier.width(2.dp))
                 T(formatCount(m.views), style, color, maxLines = 1)
                 Spacer(Modifier.width(5.dp))
@@ -596,10 +573,10 @@ fun MetaRow(m: Message, color: Color, overlay: Boolean = false, overlayColor: Co
             if (m.outgoing) {
                 Spacer(Modifier.width(2.dp))
                 when (m.status) {
-                    MessageStatus.Sending -> Icon(IosIcons.Clock, color, sz(11f))
-                    MessageStatus.Sent -> Icon(IosIcons.CheckSingle, color, sz(13f))
-                    MessageStatus.Read -> Icon(IosIcons.CheckDouble, color, sz(13f))
-                    MessageStatus.Failed -> Icon(Icons.Rounded.ErrorOutline, c.destructive, sz(14f))
+                    MessageStatus.Sending -> Icon(IosIcons.Clock, color, 12.dp)
+                    MessageStatus.Sent -> Icon(IosIcons.CheckSingle, color, 14.dp)
+                    MessageStatus.Read -> Icon(IosIcons.CheckDouble, color, 14.dp)
+                    MessageStatus.Failed -> Icon(Icons.Rounded.ErrorOutline, c.destructive, 15.dp)
                 }
             }
         }
@@ -737,43 +714,16 @@ private fun MediaTile(p: MessageContent.Photo, modifier: Modifier, onClick: () -
         if (p.image != null) TgImage(p.image, Modifier.matchParentSize(), maxPx = 900)
         else T(p.emoji, TgTheme.type.body.copy(fontSize = 56.sp, lineHeight = 64.sp))
         if (p.video) {
-            val repo = LocalRepository.current
-            val vf = p.videoFile
-            val vPath = vf?.let { repo.filePath(it) }
-            val vProgress = vf?.let { repo.fileProgress(it) } ?: 0f
-            // The video file is being fetched (viewer opened / saving): ring + X over the play button, bytes in the pill.
-            val vLoading = !p.loop && vf != null && vPath == null && vProgress > 0f
             if (!p.loop) {
-                val ringShown by androidx.compose.animation.core.animateFloatAsState(if (vLoading) 1f else 0f, label = "videoRing")
-                Box(
-                    Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(Color.Black.copy(0.45f))
-                        .then(if (vLoading && vf != null) Modifier.fadeClickable { repo.cancelDownload(vf) } else Modifier),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(IosIcons.Play, Color.White, 22.dp, Modifier.offset(x = 1.dp).graphicsLayer { alpha = 1f - ringShown })
-                    DownloadRing(
-                        if (vLoading) DownloadPhase.Loading else DownloadPhase.Done, vProgress, Color.White,
-                        Modifier.matchParentSize(), glyphSize = 17.dp, inset = 4.dp,
-                    )
+                Box(Modifier.size(44.dp).clip(CircleShape).background(Color.Black.copy(0.45f)), contentAlignment = Alignment.Center) {
+                    Icon(IosIcons.Play, Color.White, 24.dp, Modifier.offset(x = 1.dp))
                 }
             }
-            val pill = when {
-                vLoading && vf != null && vf.size > 0 -> progressBytes((vf.size * vProgress).toLong(), vf.size)
-                p.loop -> "GIF"
-                p.duration > 0 -> formatDuration(p.duration)
-                else -> null
-            }
-            if (pill != null) {
-                Box(Modifier.align(Alignment.TopStart).padding(6.dp).clip(Capsule()).background(Color.Black.copy(0.4f)).padding(horizontal = 6.dp, vertical = 2.dp)) {
-                    T(pill, bubbleText().meta, Color.White, weight = FontWeight.Medium, maxLines = 1)
+            if (p.duration > 0 || p.loop) {
+                Box(Modifier.align(Alignment.TopStart).padding(7.dp).clip(Capsule()).background(Color.Black.copy(0.4f)).padding(horizontal = 6.dp, vertical = 2.dp)) {
+                    T(if (p.loop) "GIF" else formatDuration(p.duration), TgTheme.type.caption2.copy(fontSize = 11.sp), Color.White, weight = FontWeight.Medium)
                 }
             }
-        } else {
-            // Photos: blurred minithumbnail (TgImage) under Telegram's dark download ring until the picture is here.
-            ImageDownloadOverlay(p.image)
         }
     }
 }
@@ -983,59 +933,53 @@ private fun FileBody(m: Message, f: MessageContent.File, colors: BubbleColors, s
             act(path)
         }
     }
-    val progress = ref?.let { repo.fileProgress(it) } ?: 0f
-    // Loading: tapped here, or TDLib is already fetching it (progress reported) — Telegram's ring + X either way.
-    val downloading = ref != null && path == null && (pending || progress > 0f)
+    val downloading = pending && path == null
     val playing = f.music && player.currentKey == key && player.playing
-    val text = bubbleText()
     Column {
-        Row(Modifier.padding(start = 9.dp, end = 11.dp, top = 8.dp, bottom = if (f.caption != null) 2.dp else 7.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(start = 8.dp, end = 11.dp, top = 8.dp, bottom = if (f.caption != null) 2.dp else 7.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier
-                    .size(40.dp)
+                    .size(46.dp)
                     .clip(CircleShape)
                     .background(colors.control)
                     .bounceClickable {
                         when {
                             ref == null -> {}
                             path != null -> act(path)
-                            downloading -> { pending = false; repo.cancelDownload(ref) }
-                            else -> { pending = true; repo.requestImage(ref) }
+                            else -> { pending = !pending; if (pending) repo.requestImage(ref) }
                         }
                     },
                 contentAlignment = Alignment.Center,
             ) {
-                val phase = when {
-                    downloading -> DownloadPhase.Loading
-                    ref != null && path == null && !f.music -> DownloadPhase.Remote
-                    else -> DownloadPhase.Done
-                }
-                // The file / play glyph fades back in as the ring leaves.
-                val glyphAlpha by androidx.compose.animation.core.animateFloatAsState(if (phase == DownloadPhase.Done) 1f else 0f, label = "fileGlyph")
-                Box(Modifier.matchParentSize().graphicsLayer { alpha = glyphAlpha }, contentAlignment = Alignment.Center) {
-                    if (f.music) {
-                        val t by androidx.compose.animation.core.animateFloatAsState(if (playing) 1f else 0f, label = "musicPlay")
-                        Canvas(Modifier.size(40.dp)) { drawPlayPause(t, colors.controlGlyph, scale = 40f / 44f) }
-                    } else {
-                        Icon(TgIcons.AttFile, colors.controlGlyph, 21.dp)
+                when {
+                    downloading -> {
+                        val progress = ref?.let { repo.fileProgress(it) } ?: 0f
+                        Canvas(Modifier.size(38.dp)) {
+                            drawArc(colors.controlGlyph, -90f, 360f * progress.coerceAtLeast(0.05f), false, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round))
+                        }
+                        Icon(IosIcons.Close, colors.controlGlyph, 14.dp)
                     }
+                    f.music -> {
+                        val t by androidx.compose.animation.core.animateFloatAsState(if (playing) 1f else 0f, label = "musicPlay")
+                        Canvas(Modifier.size(46.dp)) { drawPlayPause(t, colors.controlGlyph, scale = 46f / 44f) }
+                    }
+                    ref != null && path == null -> Icon(IosIcons.ArrowDown, colors.controlGlyph, 22.dp)
+                    else -> Icon(TgIcons.AttFile, colors.controlGlyph, 24.dp)
                 }
-                DownloadRing(phase, progress, colors.controlGlyph, Modifier.matchParentSize(), glyphSize = 15.dp, inset = 3.dp)
             }
             Spacer(Modifier.width(10.dp))
             Column(Modifier.widthIn(max = 200.dp)) {
-                T(f.name, text.fileTitle, colors.fileTitle, weight = FontWeight.Medium, maxLines = 2)
-                if (f.music && f.performer != null) T(f.performer, text.fileInfo, colors.meta, maxLines = 1)
+                T(f.name, TgTheme.type.body.copy(fontSize = 16.sp, lineHeight = 20.sp, textDirection = TextDirection.Content), colors.fileTitle, weight = FontWeight.SemiBold, maxLines = 2)
+                if (f.music && f.performer != null) T(f.performer, TgTheme.type.footnote, colors.meta, maxLines = 1)
                 Spacer(Modifier.height(2.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     val info = when {
-                        downloading && ref != null && ref.size > 0 -> progressBytes((ref.size * progress).toLong(), ref.size)
-                        downloading -> "${(progress * 100).toInt()}% of ${f.size}"
+                        downloading -> "${((ref?.let { repo.fileProgress(it) } ?: 0f) * 100).toInt()}% of ${f.size}"
                         playing -> "${formatDuration((player.positionMs / 1000).toInt())} / ${formatDuration(f.duration)}"
                         f.music && f.duration > 0 -> "${formatDuration(f.duration)} · ${f.size}"
                         else -> f.size
                     }
-                    T(info, text.fileInfo, colors.meta, maxLines = 1)
+                    T(info, TgTheme.type.footnote, colors.meta, maxLines = 1)
                     if (f.caption == null && showMeta) {
                         Spacer(Modifier.weight(1f).widthIn(min = 14.dp))
                         MetaRow(m, colors.meta)
@@ -1077,12 +1021,9 @@ private fun LocationBody(m: Message, l: MessageContent.Location, colors: BubbleC
         }
         Icon(TgIcons.AttLocation, TgTheme.colors.destructive, 40.dp)
     }
-    // Title / address wrap under the map instead of widening the bubble past it.
-    CapWidth(minOf(maxMedia, 260.dp) + 4.dp) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp)) {
-            T(l.title, TgTheme.type.subheadline.copy(textDirection = TextDirection.Content), colors.text, weight = FontWeight.SemiBold)
-            TextWithMeta(l.address, TgTheme.type.footnote.copy(color = colors.meta), { if (showMeta) MetaRow(m, colors.meta) }, maxTextWidth = minOf(maxMedia, 260.dp) - 16.dp)
-        }
+    Column(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp)) {
+        T(l.title, TgTheme.type.subheadline.copy(textDirection = TextDirection.Content), colors.text, weight = FontWeight.SemiBold)
+        TextWithMeta(l.address, TgTheme.type.footnote.copy(color = colors.meta), { if (showMeta) MetaRow(m, colors.meta) })
     }
 }
 
@@ -1099,10 +1040,10 @@ private fun ContactBody(m: Message, ct: MessageContent.Contact, colors: BubbleCo
             Modifier.padding(horizontal = 10.dp).then(if (ct.userId != 0L) Modifier.fadeClickable(onClick = openChat) else Modifier),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Avatar(ct.name, if (ct.userId != 0L) ct.userId else ct.phone.hashCode().toLong(), 40.dp)
+            Avatar(ct.name, if (ct.userId != 0L) ct.userId else ct.phone.hashCode().toLong(), 44.dp)
             Spacer(Modifier.width(10.dp))
             Column {
-                T(ct.name, bubbleText().fileTitle, colors.fileTitle, weight = FontWeight.SemiBold, maxLines = 1)
+                T(ct.name, TgTheme.type.body.copy(fontSize = 16.sp, textDirection = TextDirection.Content), colors.fileTitle, weight = FontWeight.SemiBold, maxLines = 1)
                 T(ct.phone, TgTheme.type.footnote, colors.meta, maxLines = 1)
             }
         }
@@ -1127,8 +1068,7 @@ private fun LinkBody(m: Message, l: MessageContent.Link, colors: BubbleColors, t
         val rich = richFor(m, l.text, l.entities, colors)
         BasicText(rich, style = bodyStyle(colors), inlineContent = remember(rich) { appleEmojiInlineContent(rich) })
         Spacer(Modifier.height(6.dp))
-        // The preview's long description must not stretch a short message's bubble to the full width.
-        CapWidth(minOf(textMax, 260.dp)) { Column(
+        Column(
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedRectangle(6.dp))
@@ -1137,111 +1077,89 @@ private fun LinkBody(m: Message, l: MessageContent.Link, colors: BubbleColors, t
                 .then(if (url != null) Modifier.fadeClickable { handler(Entity(0, url.length, EntityType.Url), url) } else Modifier)
                 .padding(start = 11.dp, end = 8.dp, top = 5.dp, bottom = 6.dp)
         ) {
-            val style = bubbleText().header
+            val style = TgTheme.type.footnote.copy(fontSize = 14.sp, lineHeight = 18.sp, textDirection = TextDirection.Content)
             if (l.site.isNotBlank()) T(l.site, style, colors.accent, weight = FontWeight.SemiBold, maxLines = 1)
             if (l.title.isNotBlank()) T(l.title, style, colors.text, weight = FontWeight.SemiBold, maxLines = 2)
             if (l.description.isNotBlank()) T(l.description, style, colors.text, maxLines = 4)
-        } }
+        }
         if (showMeta) Box(Modifier.align(Alignment.End).padding(top = 4.dp)) { MetaRow(m, colors.meta) }
     }
 }
 
-/**
- * Telegram-iOS reaction button (ReactionButtonListComponent): a capsule in the bubble's accent tint with the
- * emoji and its counter; the chosen one is filled with the accent and shows a white counter.
- */
 @Composable
 private fun ReactionChip(r: Reaction, colors: BubbleColors, onReact: (String) -> Unit) {
-    val scale = LocalAppSettings.current.textScale.coerceIn(0.85f, 1.3f)
     Row(
         Modifier
-            .height((28f * scale).dp)
+            .height(28.dp)
             .clip(Capsule())
             .background(if (r.chosen) colors.reactionActiveBg else colors.reactionBg)
             .bounceClickable { onReact(r.emoji) }
-            .padding(start = 8.dp, end = 10.dp),
+            .padding(start = 7.dp, end = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        com.abtin.tglass.core.emoji.ReactionGlyph(r.emoji, (17f * scale).dp)
+        com.abtin.tglass.core.emoji.ReactionGlyph(r.emoji, 19.dp)
         Spacer(Modifier.width(4.dp))
-        T(formatCount(r.count), bubbleText().reaction, if (r.chosen) colors.reactionActiveFg else colors.reactionFg, weight = FontWeight.SemiBold, maxLines = 1)
+        T(formatCount(r.count), TgTheme.type.footnote.copy(fontSize = 13.sp), if (r.chosen) colors.reactionActiveFg else colors.reactionFg, weight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 
-/**
- * iOS reactions: small capsules wrapping into rows inside the bubble (never wider than [limit] on their own),
- * with the time on the last row when it fits, otherwise on its own line at the bottom right.
- */
+/** iOS reactions: small capsules wrapping inside the bubble, with the time on the last row when it fits. */
 @Composable
 private fun ReactionsWithMeta(
     reactions: List<Reaction>,
     colors: BubbleColors,
     meta: @Composable () -> Unit,
     onReact: (String) -> Unit,
-    limit: Dp,
     modifier: Modifier = Modifier,
 ) {
-    val policy = remember(limit) { ReactionsPolicy(limit) }
     Layout(
         modifier = modifier,
         content = {
             reactions.forEach { r -> ReactionChip(r, colors, onReact) }
             meta()
         },
-        measurePolicy = policy,
+        measurePolicy = ReactionsPolicy,
     )
 }
 
-private class ReactionsPolicy(private val limit: Dp) : MeasurePolicy {
-    private class Flow(val positions: List<Pair<Int, Int>>, val widest: Int, val lastRowW: Int, val lastRowY: Int, val lastRowH: Int)
-
-    /** Places items of [widths] × [heights] left to right, wrapping at [maxW]. */
-    private fun flow(widths: List<Int>, heights: List<Int>, maxW: Int, spacing: Int): Flow {
-        val positions = ArrayList<Pair<Int, Int>>(widths.size)
+private object ReactionsPolicy : MeasurePolicy {
+    override fun MeasureScope.measure(measurables: List<Measurable>, constraints: Constraints): MeasureResult {
+        val spacing = 6.dp.roundToPx()
+        val gap = 8.dp.roundToPx()
+        val maxW = if (constraints.hasBoundedWidth) constraints.maxWidth else Constraints.Infinity
+        val chips = measurables.dropLast(1).map { it.measure(Constraints(maxWidth = maxW)) }
+        val mp = measurables.last().measure(Constraints())
+        val positions = ArrayList<Pair<Int, Int>>()
         var x = 0
         var y = 0
         var rowH = 0
         var widest = 0
-        widths.forEachIndexed { i, w ->
-            if (x > 0 && x + w > maxW) {
+        chips.forEach { p ->
+            if (x > 0 && x + p.width > maxW) {
                 y += rowH + spacing
                 x = 0
                 rowH = 0
             }
             positions += x to y
-            x += w + spacing
-            rowH = max(rowH, heights[i])
+            x += p.width + spacing
+            rowH = max(rowH, p.height)
             widest = max(widest, x - spacing)
         }
-        return Flow(positions, widest, (x - spacing).coerceAtLeast(0), y, rowH)
-    }
-
-    override fun MeasureScope.measure(measurables: List<Measurable>, constraints: Constraints): MeasureResult {
-        val spacing = 6.dp.roundToPx()
-        val gap = 8.dp.roundToPx()
-        val maxW = if (constraints.hasBoundedWidth) constraints.maxWidth else limit.roundToPx()
-        val chips = measurables.dropLast(1).map { it.measure(Constraints(maxWidth = maxW)) }
-        val mp = measurables.last().measure(Constraints())
-        val f = flow(chips.map { it.width }, chips.map { it.height }, maxW, spacing)
-        val inline = f.lastRowW + gap + mp.width <= maxW
-        val width = max(constraints.minWidth, if (inline) max(f.widest, f.lastRowW + gap + mp.width) else max(f.widest, mp.width)).coerceAtMost(maxW)
-        val height = if (inline) f.lastRowY + max(f.lastRowH, mp.height) else f.lastRowY + f.lastRowH + 4.dp.roundToPx() + mp.height
+        val lastRowW = (x - spacing).coerceAtLeast(0)
+        val inline = lastRowW + gap + mp.width <= maxW
+        val width = max(constraints.minWidth, if (inline) max(widest, lastRowW + gap + mp.width) else max(widest, mp.width)).coerceAtMost(maxW)
+        val height = if (inline) y + max(rowH, mp.height) else y + rowH + 4.dp.roundToPx() + mp.height
         return layout(width, height) {
-            chips.forEachIndexed { i, p -> p.place(f.positions[i].first, f.positions[i].second) }
-            if (inline) mp.place(width - mp.width, f.lastRowY + f.lastRowH - mp.height - 1.dp.roundToPx())
+            chips.forEachIndexed { i, p -> p.place(positions[i].first, positions[i].second) }
+            if (inline) mp.place(width - mp.width, y + rowH - mp.height - 1.dp.roundToPx())
             else mp.place(width - mp.width, height - mp.height)
         }
     }
 
     override fun IntrinsicMeasureScope.maxIntrinsicWidth(measurables: List<IntrinsicMeasurable>, height: Int): Int {
         val spacing = 6.dp.roundToPx()
-        val gap = 8.dp.roundToPx()
-        val maxW = limit.roundToPx().coerceAtLeast(1)
-        val chips = measurables.dropLast(1)
-        val widths = chips.map { it.maxIntrinsicWidth(height) }
-        val f = flow(widths, widths.map { 0 }, maxW, spacing)
-        val metaW = measurables.last().maxIntrinsicWidth(height)
-        return if (f.lastRowW + gap + metaW <= maxW) max(f.widest, f.lastRowW + gap + metaW) else max(f.widest, metaW)
+        val chips = measurables.dropLast(1).sumOf { it.maxIntrinsicWidth(height) + spacing }
+        return chips - spacing + 8.dp.roundToPx() + measurables.last().maxIntrinsicWidth(height)
     }
 
     override fun IntrinsicMeasureScope.minIntrinsicWidth(measurables: List<IntrinsicMeasurable>, height: Int): Int =
