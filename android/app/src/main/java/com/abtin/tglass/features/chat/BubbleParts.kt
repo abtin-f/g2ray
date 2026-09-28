@@ -73,7 +73,7 @@ import kotlin.math.roundToInt
  * Text styles of the bubble parts, Telegram-iOS sizes at the 17 pt base (`baseDisplaySize * n / 17`) scaled
  * with Settings → Text Size, like the message text itself.
  */
-internal class BubbleText(scale: Float) {
+internal class BubbleText(private val scale: Float) {
     private fun style(size: Float, line: Float) = TextStyle(
         fontFamily = com.abtin.tglass.core.design.InterText,
         fontSize = (size * scale).sp,
