@@ -4102,6 +4102,85 @@ class TdRepository(context: Context) : TelegramRepository {
         switchTargetState.value = null
     }
     // ---- end Folder pins ----
+
+    // ---- Message info & reaction effects ----
+    private val reactionAnims = mutableStateMapOf<String, com.abtin.tglass.data.ReactionAnimations>()
+    private val reactionAnimsAsked = HashSet<String>()
+
+    override fun reactionAnimations(emoji: String): com.abtin.tglass.data.ReactionAnimations? = reactionAnims[emoji.replace("\uFE0F", "")]
+
+    override fun loadReactionAnimations(emojis: Collection<String>) {
+        for (emoji in emojis) {
+            val key = emoji.replace("\uFE0F", "")
+            if (com.abtin.tglass.data.CustomReactions.idOf(emoji) != null || !reactionAnimsAsked.add(key)) continue
+            scope.launch {
+                when (val r = client.getEmojiReaction(emoji)) {
+                    is TdlResult.Failure -> reactionAnimsAsked.remove(key)
+                    is TdlResult.Success -> {
+                        val e = r.result
+                        fun tgs(s: Sticker?): ImageRef? = if (s != null && s.format is StickerFormatTgs) imageOf(s.sticker, null) else null
+                        reactionAnims[key] = com.abtin.tglass.data.ReactionAnimations(
+                            emoji = emoji,
+                            appear = tgs(e.appearAnimation),
+                            select = tgs(e.selectAnimation),
+                            activate = tgs(e.activateAnimation),
+                            effect = tgs(e.effectAnimation),
+                            around = tgs(e.aroundAnimation),
+                            center = tgs(e.centerAnimation),
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    override fun loadMessageSeenInfo(chatId: Long, messageId: Long, onResult: (com.abtin.tglass.data.MessageSeenInfo?) -> Unit) {
+        scope.launch {
+            val props = (client.getMessageProperties(chatId, messageId) as? TdlResult.Success)?.result
+            if (props == null) return@launch onResult(null)
+            when {
+                props.canGetViewers -> {
+                    val v = (client.getMessageViewers(chatId, messageId) as? TdlResult.Success)?.result
+                    if (v == null) return@launch onResult(null)
+                    v.viewers.forEach { if (userMap[it.userId] == null) client.getUser(it.userId).let { u -> if (u is TdlResult.Success) onUser(u.result) } }
+                    onResult(
+                        com.abtin.tglass.data.MessageSeenInfo(
+                            viewers = v.viewers.map { com.abtin.tglass.data.MessageViewerInfo(it.userId, it.viewDate * 1000L) },
+                        )
+                    )
+                }
+                props.canGetReadDate -> {
+                    val d = (client.getMessageReadDate(chatId, messageId) as? TdlResult.Success)?.result
+                    onResult(if (d is MessageReadDateRead) com.abtin.tglass.data.MessageSeenInfo(readAt = d.readDate * 1000L) else null)
+                }
+                else -> onResult(null)
+            }
+        }
+    }
+
+    override fun loadAddedReactions(chatId: Long, messageId: Long, emoji: String?, offset: String, limit: Int, onResult: (com.abtin.tglass.data.AddedReactionsPage?) -> Unit) {
+        scope.launch {
+            val type: ReactionType? = emoji?.let { e ->
+                com.abtin.tglass.data.CustomReactions.idOf(e)?.let { ReactionTypeCustomEmoji(it) } ?: ReactionTypeEmoji(e)
+            }
+            val res = (client.getMessageAddedReactions(chatId, messageId, type, offset, limit.coerceIn(1, 100)) as? TdlResult.Success)?.result
+            if (res == null) return@launch onResult(null)
+            val items = res.reactions.mapNotNull { a ->
+                val who = pollSenderId(a.senderId) ?: return@mapNotNull null
+                val em = when (val t = a.type) {
+                    is ReactionTypeEmoji -> t.emoji
+                    is ReactionTypeCustomEmoji -> com.abtin.tglass.data.CustomReactions.key(t.customEmojiId)
+                    else -> return@mapNotNull null
+                }
+                com.abtin.tglass.data.AddedReactionInfo(who, em, a.date * 1000L, a.isOutgoing)
+            }
+            items.forEach { i ->
+                if (i.senderId > 0 && userMap[i.senderId] == null) client.getUser(i.senderId).let { u -> if (u is TdlResult.Success) onUser(u.result) }
+            }
+            onResult(com.abtin.tglass.data.AddedReactionsPage(items, res.totalCount, res.nextOffset))
+        }
+    }
+    // ---- end Message info & reaction effects ----
 }
 
 private const val GIFTS_ENABLED = false

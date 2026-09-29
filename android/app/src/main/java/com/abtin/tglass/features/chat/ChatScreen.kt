@@ -251,6 +251,8 @@ fun ChatScreen(chatId: Long) {
     val searchGeneration = remember { intArrayOf(0) }
     // Poll voters page (View Results).
     var pollResults by remember { mutableStateOf<PollResultsTarget?>(null) }
+    var messageInfo by remember { mutableStateOf<MessageInfoTarget?>(null) }
+    val reactionEffects = remember { com.abtin.tglass.core.emoji.ReactionEffectsState() }
     LaunchedEffect(ChatSearchRequest.chatId) {
         if (ChatSearchRequest.chatId == chatId) {
             ChatSearchRequest.chatId = null
@@ -557,6 +559,12 @@ fun ChatScreen(chatId: Long) {
         sheet.show(deleteAlert(repo, chat, chosen, caps) { selected.clear(); selecting = false })
     }
 
+    fun react(m: Message, emoji: String) {
+        // Telegram plays the reaction's animation for a newly added reaction only (not when it is taken back).
+        if (m.reactions.none { it.chosen && com.abtin.tglass.ui.components.sameReaction(it.emoji, emoji) }) reactionEffects.expect(emoji)
+        repo.toggleReaction(chatId, m.id, emoji)
+    }
+
     fun openMenu(m: Message, bounds: Rect) {
         focus.clearFocus()
         keyboard?.hide()
@@ -588,12 +596,13 @@ fun ChatScreen(chatId: Long) {
                 }
             }
         }
+        val info = if (m.content is MessageContent.Service) null else loadMessageInfo(repo, m, chat.type)
         val actionsFor: () -> List<MenuAction> = {
             val k = caps.value
             val canDelete = k?.let { it.canDeleteForSelf || it.canDeleteForAll } ?: (!isChannel || chat.canPost)
             val canLink = (isChannel || isGroup) && (k?.canGetLink ?: (chat.username != null))
             val canReport = !m.outgoing && (isChannel || isGroup) && (k?.canReport ?: !repo.isLive)
-            listOfNotNull(
+            (if (info != null) messageInfoActions(repo, m, chat.type, info) { mode -> messageInfo = MessageInfoTarget(chatId, m.id, mode) } else emptyList()) + listOfNotNull(
                 // Top row of the card (Telegram iOS 26): Select · Copy · Delete
                 MenuAction("Select", TgIcons.CtxSelect, quick = true) { selecting = true; selected.clear(); selected.add(m.id) },
                 if (hasText) MenuAction("Copy", TgIcons.CtxCopy, quick = true) { copy(m) } else null,
@@ -645,7 +654,7 @@ fun ChatScreen(chatId: Long) {
                 alignEnd = m.outgoing,
                 actions = actionsFor(),
                 menuReactions = reactions,
-                onReact = { e -> repo.toggleReaction(chatId, m.id, e) },
+                onReact = { e -> react(m, e) },
                 dynamicActions = actionsFor,
             ) {
                 Box(Modifier.fillMaxSize(), contentAlignment = if (m.outgoing) Alignment.TopEnd else Alignment.TopStart) {
@@ -665,7 +674,10 @@ fun ChatScreen(chatId: Long) {
 
     val videoNoteRecorder = com.abtin.tglass.core.media.rememberVideoNoteRecorder()
 
-    androidx.compose.runtime.CompositionLocalProvider(LocalBackdrop provides backdrop, LocalLinkHandler provides linkHandler) {
+    androidx.compose.runtime.CompositionLocalProvider(
+        LocalBackdrop provides backdrop, LocalLinkHandler provides linkHandler,
+        com.abtin.tglass.core.emoji.LocalReactionEffects provides reactionEffects,
+    ) {
         Box(Modifier.fillMaxSize()) {
             // Z0: wallpaper + messages (the glass source)
             Box(Modifier.fillMaxSize().layerBackdrop(backdrop)) {
@@ -721,7 +733,7 @@ fun ChatScreen(chatId: Long) {
                                     onLongPress = { b -> if (!selecting) { Haptics.longPress(view); openMenu(m, b) } },
                                     onSwipeReply = { replyToId = m.id; editingId = null; focusRequester.requestFocus() },
                                     onReplyClick = { m.replyToId?.let { jumpToAny(it) } },
-                                    onReact = { e -> repo.toggleReaction(chatId, m.id, e) },
+                                    onReact = { e -> react(m, e) },
                                     onVote = { o -> repo.votePoll(chatId, m.id, listOf(o)) },
                                     pollActions = if (m.content is MessageContent.Poll) PollActions(
                                         vote = { ids -> repo.votePoll(chatId, m.id, ids) },
@@ -738,6 +750,9 @@ fun ChatScreen(chatId: Long) {
                     }
                 }
             }
+
+            // Big reaction effects: a plain Lottie overlay above the list layer (nothing glass in here)
+            com.abtin.tglass.core.emoji.ReactionEffectsOverlay(reactionEffects)
 
             // Camera circle while a video message is recorded (under the header and composer)
             VideoNoteRecordingOverlay(videoNoteRecorder)
@@ -982,6 +997,7 @@ fun ChatScreen(chatId: Long) {
             }
 
             PollResultsPage(pollResults, onDismiss = { pollResults = null })
+            MessageInfoPage(messageInfo, onDismiss = { messageInfo = null })
         }
     }
 }
