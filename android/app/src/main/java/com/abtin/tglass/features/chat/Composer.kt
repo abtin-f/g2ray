@@ -52,7 +52,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -64,6 +66,8 @@ import com.abtin.tglass.core.media.RecordedVoice
 import com.abtin.tglass.core.media.VideoNoteRecorder
 import com.abtin.tglass.core.media.VoicePlayer
 import com.abtin.tglass.core.media.VoiceRecorder
+import com.abtin.tglass.data.Entity
+import com.abtin.tglass.data.EntityType
 import com.abtin.tglass.data.Message
 import com.abtin.tglass.ui.components.Haptics
 import com.abtin.tglass.ui.components.Icon
@@ -108,12 +112,30 @@ fun Composer(
     /** Camera for round video messages; when set, a tap on the mic switches it to the camera (Telegram). */
     videoRecorder: VideoNoteRecorder? = null,
     onVideoNote: (RecordedVideoNote) -> Unit = {},
+    /** Formatting entities of the typed text (bold, italic, links...), kept in sync with [text]. */
+    onEntities: (List<Entity>) -> Unit = {},
 ) {
     val c = TgTheme.colors
     val view = LocalView.current
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     TrackKeyboardHeight()
+
+    // The field holds a TextFieldValue (selection) so the Format bar can style the selected range; [text] stays the source of truth.
+    var tfv by remember { mutableStateOf(TextFieldValue(text)) }
+    var entities by remember { mutableStateOf(emptyList<Entity>()) }
+    var fieldFocused by remember { mutableStateOf(false) }
+    var linkMode by remember { mutableStateOf(false) }
+    val shown = if (tfv.text == text) tfv else TextFieldValue(text, TextRange(text.length))
+    val currentOnEntities by rememberUpdatedState(onEntities)
+    LaunchedEffect(text) {
+        // Changed from outside (sent, emoji added, edit started): adopt it and fix the entities.
+        if (tfv.text != text) {
+            entities = if (text.isEmpty()) emptyList() else adjustEntities(tfv.text, text, entities)
+            tfv = TextFieldValue(text, TextRange(text.length))
+            currentOnEntities(entities)
+        }
+    }
 
     val recorder = remember { VoiceRecorder(context.applicationContext) }
     val micPermission = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) {}
@@ -276,6 +298,32 @@ fun Composer(
             }
         }
 
+        // iOS "Format" menu while text is selected.
+        val sel = shown.selection
+        AnimatedVisibility(
+            visible = !sel.collapsed && (fieldFocused || linkMode) && !recording && preview == null,
+            enter = fadeIn() + scaleIn(initialScale = 0.9f),
+            exit = fadeOut() + scaleOut(targetScale = 0.9f),
+        ) {
+            FormatBar(
+                entities = entities,
+                selStart = sel.min,
+                selEnd = sel.max,
+                onToggle = { t ->
+                    entities = toggleEntity(entities, sel.min, sel.max, t)
+                    currentOnEntities(entities)
+                },
+                onLink = { u ->
+                    entities = toggleEntity(entities, sel.min, sel.max, EntityType.TextUrl, u)
+                    currentOnEntities(entities)
+                    runCatching { focusRequester.requestFocus() }
+                },
+                linkMode = linkMode,
+                onLinkMode = { linkMode = it },
+                modifier = Modifier.padding(start = 50.dp, bottom = 6.dp),
+            )
+        }
+
         Row(verticalAlignment = Alignment.Bottom) {
             // "+" (attachments); hidden while recording, a red trash can while a recorded voice is waiting to be sent.
             AnimatedVisibility(
@@ -315,10 +363,20 @@ fun Composer(
                             if (text.isEmpty()) T("Message", TgTheme.type.body, c.secondaryText, maxLines = 1)
                             // Apple emoji drawn over the (transparent) system glyphs.
                             val (emojiField, emojiTransformation) = com.abtin.tglass.core.emoji.rememberAppleEmojiField(maxLines = 8)
+                            val fieldTransformation = remember(entities, emojiTransformation, c.accent, c.text) {
+                                formatTransformation(entities, c.accent, c.text.copy(alpha = 0.22f), emojiTransformation)
+                            }
                             BasicTextField(
-                                value = text,
-                                onValueChange = onTextChange,
-                                visualTransformation = emojiTransformation,
+                                value = shown,
+                                onValueChange = { nv ->
+                                    if (nv.text != shown.text) {
+                                        entities = adjustEntities(shown.text, nv.text, entities)
+                                        currentOnEntities(entities)
+                                    }
+                                    tfv = nv
+                                    if (nv.text != text) onTextChange(nv.text)
+                                },
+                                visualTransformation = fieldTransformation,
                                 onTextLayout = emojiField.onTextLayout,
                                 // Content direction: Persian / Arabic lines go right-to-left.
                                 textStyle = TgTheme.type.body.copy(color = c.text, textDirection = TextDirection.Content),
@@ -326,7 +384,7 @@ fun Composer(
                                 minLines = 1,
                                 maxLines = 8,
                                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                                modifier = Modifier.fillMaxWidth().focusRequester(focusRequester).onFocusChanged { onFocus(it.isFocused) }.then(emojiField.modifier),
+                                modifier = Modifier.fillMaxWidth().focusRequester(focusRequester).onFocusChanged { fieldFocused = it.isFocused; onFocus(it.isFocused) }.then(emojiField.modifier),
                             )
                         }
                         Box(Modifier.height(ComposerHeight).width(40.dp).fadeClickable(onClick = onTogglePanel), contentAlignment = Alignment.Center) {

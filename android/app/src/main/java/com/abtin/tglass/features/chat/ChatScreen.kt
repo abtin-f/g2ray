@@ -74,6 +74,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.first
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -209,6 +211,21 @@ fun ChatScreen(chatId: Long) {
     var replyToId by rememberSaveable { mutableStateOf<Long?>(null) }
     var editingId by rememberSaveable { mutableStateOf<Long?>(null) }
     var panelOpen by rememberSaveable { mutableStateOf(false) }
+    // Emoji panel -> keyboard: the panel stays under the rising keyboard until it is fully up, then goes away.
+    var panelHandover by remember { mutableStateOf(false) }
+    var composeEntities by remember { mutableStateOf(emptyList<com.abtin.tglass.data.Entity>()) }
+    val imeInsets = WindowInsets.ime
+    val navInsets = WindowInsets.navigationBars
+    LaunchedEffect(panelHandover) {
+        if (!panelHandover) return@LaunchedEffect
+        kotlinx.coroutines.withTimeoutOrNull(1200) {
+            snapshotFlow { imeInsets.getBottom(density) - navInsets.getBottom(density) }.first { px ->
+                px > 0 && px >= KeyboardHeight.dp * density.density - 2f
+            }
+        }
+        panelOpen = false
+        panelHandover = false
+    }
     var attachOpen by rememberSaveable { mutableStateOf(false) }
     var attachMenuOpen by remember { mutableStateOf(false) }
     var attachAction by remember { mutableStateOf<AttachAction?>(null) }
@@ -421,9 +438,16 @@ fun ChatScreen(chatId: Long) {
             else if (t.isNotEmpty()) repo.editText(chatId, editId, t)
             editingId = null
         } else if (t.isNotEmpty()) {
-            repo.sendText(chatId, t, replyToId)
+            val lead = text.length - text.trimStart().length
+            val ents = composeEntities.mapNotNull { e ->
+                val st = (e.start - lead).coerceAtLeast(0)
+                val en = (e.end - lead).coerceAtMost(t.length)
+                if (en > st) e.copy(start = st, end = en) else null
+            }
+            if (ents.isEmpty()) repo.sendText(chatId, t, replyToId) else repo.sendFormattedText(chatId, t, ents, replyToId)
             replyToId = null
         }
+        composeEntities = emptyList()
         text = ""
     }
 
@@ -810,7 +834,7 @@ fun ChatScreen(chatId: Long) {
                 Modifier
                     .align(Alignment.BottomCenter)
                     .onSizeChanged { bottomHeight = it.height }
-                    .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))
+                    .windowInsetsPadding(WindowInsets.navigationBars)
             ) {
                 // Scroll-to-bottom
                 val showDown by remember { derivedStateOf { listState.firstVisibleItemIndex > 2 } }
@@ -883,19 +907,22 @@ fun ChatScreen(chatId: Long) {
                             replyName = replyToId?.let { r -> messages.firstOrNull { it.id == r }?.let { repo.senderName(it) } },
                             editing = editingId?.let { e -> messages.firstOrNull { it.id == e } },
                             onCancelContext = { if (editingId != null) text = ""; replyToId = null; editingId = null },
-                            panelOpen = panelOpen,
+                            panelOpen = panelOpen && !panelHandover,
                             onTogglePanel = {
-                                if (panelOpen) {
-                                    panelOpen = false
+                                if (panelOpen && !panelHandover) {
+                                    // Keyboard up, panel stays (same height) until the keyboard has fully arrived.
+                                    panelHandover = true
                                     focusRequester.requestFocus()
                                     keyboard?.show()
                                 } else {
+                                    // Panel takes the keyboard's place in the same frame.
+                                    panelHandover = false
+                                    panelOpen = true
                                     focus.clearFocus()
                                     keyboard?.hide()
-                                    panelOpen = true
                                 }
                             },
-                            onAttach = { focus.clearFocus(); keyboard?.hide(); panelOpen = false; attachMenuOpen = true },
+                            onAttach = { focus.clearFocus(); keyboard?.hide(); panelOpen = false; panelHandover = false; attachMenuOpen = true },
                             onSend = { send() },
                             onVoice = { secs, path, wave ->
                                 repo.sendContent(
@@ -910,7 +937,8 @@ fun ChatScreen(chatId: Long) {
                                 replyToId = null
                             },
                             focusRequester = focusRequester,
-                            onFocus = { if (it) panelOpen = false },
+                            onFocus = { if (it && panelOpen) panelHandover = true },
+                            onEntities = { composeEntities = it },
                             onSendLongPress = if (editingId == null) ({
                                 sheet.show(SheetRequest(actions = listOf(SheetAction("Send Without Sound") { sendSilently() })))
                             }) else null,
@@ -935,19 +963,20 @@ fun ChatScreen(chatId: Long) {
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
                             )
                         }
-                        AnimatedVisibility(panelOpen) {
-                            EmojiPanel(
-                                onEmoji = { e -> text += e },
-                                onSticker = { e -> repo.sendContent(chatId, MessageContent.Sticker(e), replyToId); replyToId = null },
-                                onGif = { i -> repo.sendContent(chatId, MessageContent.Photo(i + 3, 1.4f, null, "🎞"), replyToId); replyToId = null },
-                                onStickerItem = { st -> repo.sendSticker(chatId, st, replyToId); replyToId = null },
-                                onGifItem = { g -> repo.sendGif(chatId, g, replyToId); replyToId = null },
-                                onBackspace = { text = dropLastGrapheme(text) },
-                                onSwitchKeyboard = { panelOpen = false; focusRequester.requestFocus(); keyboard?.show() },
-                                chatId = chatId,
-                            )
-                        }
                     }
+                }
+                // Keyboard / emoji panel area: exactly as tall as the keyboard, so switching between them never moves the chat.
+                KeyboardArea(open = panelOpen, panelHeight = (KeyboardHeight.dp.takeIf { it > 0f } ?: KeyboardHeight.DefaultDp).dp) {
+                    EmojiPanel(
+                        onEmoji = { e -> text += e },
+                        onSticker = { e -> repo.sendContent(chatId, MessageContent.Sticker(e), replyToId); replyToId = null },
+                        onGif = { i -> repo.sendContent(chatId, MessageContent.Photo(i + 3, 1.4f, null, "🎞"), replyToId); replyToId = null },
+                        onStickerItem = { st -> repo.sendSticker(chatId, st, replyToId); replyToId = null },
+                        onGifItem = { g -> repo.sendGif(chatId, g, replyToId); replyToId = null },
+                        onBackspace = { text = dropLastGrapheme(text) },
+                        onSwitchKeyboard = { panelHandover = true; focusRequester.requestFocus(); keyboard?.show() },
+                        chatId = chatId,
+                    )
                 }
             }
 

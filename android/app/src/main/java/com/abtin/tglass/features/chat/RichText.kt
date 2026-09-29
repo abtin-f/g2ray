@@ -7,6 +7,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.ParagraphStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
@@ -14,12 +15,22 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextIndent
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.toArgb
 import com.abtin.tglass.core.emoji.CustomEmojiSpan
 import com.abtin.tglass.core.emoji.appendWithAppleEmoji
 import com.abtin.tglass.core.emoji.appleEmojiKey
 import com.abtin.tglass.data.Entity
 import com.abtin.tglass.data.EntityType
 import com.abtin.tglass.features.main.LocalRepository
+
+/** String annotation of quote / code-block ranges: "kind:argbColor". */
+const val BlockDecorTag = "tglass.block"
+const val BlockQuote = "q"
+const val BlockPre = "p"
 
 /** What to do when a link, @mention, #hashtag or /command in a message is tapped. */
 val LocalLinkHandler = staticCompositionLocalOf<(Entity, String) -> Unit> { { _, _ -> } }
@@ -71,6 +82,18 @@ fun rememberRichText(
     return remember(text, all, custom, link, codeBackground, spoilerColor, spoilersRevealed, handler, underlineLinks, emojiKey) {
         val linkStyle = SpanStyle(color = link, textDecoration = if (underlineLinks) TextDecoration.Underline else null)
         buildAnnotatedString {
+            val blockRanges = ArrayList<IntRange>()
+            // Marks a block (code / quote) for background drawing and insets its paragraph(s); paragraphs must end at newlines.
+            fun addBlock(kind: String, color: Color, start: Int, end: Int, indent: TextUnit) {
+                addStringAnnotation(BlockDecorTag, kind + ":" + color.toArgb(), start, end)
+                var ps = start
+                while (ps > 0 && text[ps - 1] != '\n') ps--
+                var pe = text.indexOf('\n', end - 1).let { if (it < 0) text.length else it + 1 }
+                if (pe < end) pe = end
+                if (blockRanges.any { it.first < pe && ps <= it.last }) return
+                blockRanges += ps until pe
+                addStyle(ParagraphStyle(textIndent = TextIndent(indent, indent)), ps, pe)
+            }
             // Apple emoji inline (same offsets); hidden spoilers keep their glyphs so the emoji stay covered.
             appendWithAppleEmoji(
                 text,
@@ -88,8 +111,15 @@ fun rememberRichText(
                     EntityType.Italic -> addStyle(SpanStyle(fontStyle = FontStyle.Italic), start, end)
                     EntityType.Underline -> addStyle(SpanStyle(textDecoration = TextDecoration.Underline), start, end)
                     EntityType.Strike -> addStyle(SpanStyle(textDecoration = TextDecoration.LineThrough), start, end)
-                    EntityType.Code, EntityType.Pre -> addStyle(SpanStyle(fontFamily = FontFamily.Monospace, background = codeBackground), start, end)
-                    EntityType.Quote -> addStyle(SpanStyle(fontStyle = FontStyle.Italic), start, end)
+                    // Inline code: monospace a bit smaller than the text (15 of 17), tinted chip.
+                    EntityType.Code -> addStyle(SpanStyle(fontFamily = FontFamily.Monospace, fontSize = 0.88.em, background = codeBackground), start, end)
+                    // Code block: rounded background drawn by TextWithMeta (BlockDecorTag), text inset like iOS.
+                    EntityType.Pre -> {
+                        addStyle(SpanStyle(fontFamily = FontFamily.Monospace, fontSize = 0.88.em), start, end)
+                        addBlock(BlockPre, codeBackground, start, end, 8.sp)
+                    }
+                    // Quote: accent bar on the left (drawn by TextWithMeta), text inset.
+                    EntityType.Quote -> addBlock(BlockQuote, link, start, end, 12.sp)
                     EntityType.CustomEmoji -> {}
                     EntityType.Spoiler -> if (!spoilersRevealed) {
                         addStyle(SpanStyle(color = Color.Transparent, background = spoilerColor), start, end)

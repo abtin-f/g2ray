@@ -767,6 +767,11 @@ interface TelegramRepository {
      */
     val switchingAccount: AccountInfo? get() = null
     // ---- end Folder pins ----
+
+    // ---- Text formatting ----
+    /** Sends text with formatting entities (bold, italic, ..., links); demo ignores the formatting. */
+    fun sendFormattedText(chatId: Long, text: String, entities: List<Entity>, replyTo: Long?) = sendText(chatId, text, replyTo)
+    // ---- end Text formatting ----
 }
 
 /** Sticker sets "installed" in the demo (the demo has no server). */
