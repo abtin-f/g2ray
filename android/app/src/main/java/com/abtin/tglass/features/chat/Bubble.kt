@@ -631,10 +631,29 @@ fun TextWithMeta(text: AnnotatedString, style: TextStyle, meta: @Composable () -
     val inlineMap = remember(text) { appleEmojiInlineContent(text) }
     val placeholders = remember(text) { appleEmojiPlaceholders(text) }
     val policy = remember(text, resolved, maxTextWidth, measurer) { TextMetaPolicy(text, resolved, maxTextWidth, measurer, holder, placeholders) }
+    // Quote bars / code-block backgrounds (annotated by rememberRichText); nothing extra for plain texts.
+    val blocks = remember(text) { text.getStringAnnotations(BlockDecorTag, 0, text.length) }
+    val decor = if (blocks.isEmpty()) Modifier else Modifier.drawBehind {
+        val l = holder[0] ?: return@drawBehind
+        for (b in blocks) {
+            val color = Color(b.item.substringAfter(':').toIntOrNull() ?: continue)
+            val end = b.end.coerceAtMost(l.layoutInput.text.length)
+            if (b.start >= end) continue
+            val top = l.getLineTop(l.getLineForOffset(b.start))
+            val bottom = l.getLineBottom(l.getLineForOffset((end - 1).coerceAtLeast(b.start)))
+            if (b.item.startsWith(BlockQuote)) {
+                val r = CornerRadius(3.dp.toPx())
+                drawRoundRect(color.copy(alpha = 0.10f), Offset(0f, top), Size(size.width, bottom - top), CornerRadius(4.dp.toPx()))
+                drawRoundRect(color, Offset(0f, top), Size(3.dp.toPx(), bottom - top), r)
+            } else {
+                drawRoundRect(color, Offset(-2.dp.toPx(), top - 2.dp.toPx()), Size(size.width + 4.dp.toPx(), bottom - top + 4.dp.toPx()), CornerRadius(6.dp.toPx()))
+            }
+        }
+    }
     Layout(
         modifier = modifier,
         content = {
-            BasicText(text, style = resolved, onTextLayout = { holder[0] = it }, inlineContent = inlineMap)
+            BasicText(text, style = resolved, onTextLayout = { holder[0] = it }, inlineContent = inlineMap, modifier = decor)
             // Always one child here, even when [meta] draws nothing (0×0 then).
             Box { meta() }
         },

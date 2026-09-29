@@ -203,11 +203,20 @@ data class TgTypography(
  */
 @OptIn(ExperimentalTextApi::class)
 private fun interFamily(opticalSize: Float) = FontFamily(
-    listOf(400, 500, 600, 700).map { w ->
-        Font(
-            R.font.inter,
-            weight = FontWeight(w),
-            variationSettings = FontVariation.Settings(FontVariation.weight(w), FontVariation.Setting("opsz", opticalSize)),
+    listOf(400, 500, 600, 700).flatMap { w ->
+        listOf(
+            Font(
+                R.font.inter,
+                weight = FontWeight(w),
+                variationSettings = FontVariation.Settings(FontVariation.weight(w), FontVariation.Setting("opsz", opticalSize)),
+            ),
+            // Real italic faces (Inter Italic variable), so italic text is never synthesized.
+            Font(
+                R.font.inter_italic,
+                weight = FontWeight(w),
+                style = androidx.compose.ui.text.font.FontStyle.Italic,
+                variationSettings = FontVariation.Settings(FontVariation.weight(w), FontVariation.Setting("opsz", opticalSize)),
+            ),
         )
     }
 )

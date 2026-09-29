@@ -820,6 +820,11 @@ interface TelegramRepository {
     /** Fetches the animations of these reactions (TDLib getEmojiReaction); [reactionAnimations] turns non-null. */
     fun loadReactionAnimations(emojis: Collection<String>) {}
     // ---- end Message info & reaction effects ----
+
+    // ---- Text formatting ----
+    /** Sends text with formatting entities (bold, italic, ..., links); demo ignores the formatting. */
+    fun sendFormattedText(chatId: Long, text: String, entities: List<Entity>, replyTo: Long?) = sendText(chatId, text, replyTo)
+    // ---- end Text formatting ----
 }
 
 /** "❤" and "❤️" are the same reaction. */

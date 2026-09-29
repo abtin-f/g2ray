@@ -4191,6 +4191,29 @@ class TdRepository(context: Context) : TelegramRepository {
         }
     }
     // ---- end Message info & reaction effects ----
+
+    // ---- Text formatting ----
+    override fun sendFormattedText(chatId: Long, text: String, entities: List<Entity>, replyTo: Long?) {
+        val out = entities.mapNotNull { e ->
+            val len = e.end - e.start
+            if (len <= 0 || e.start < 0 || e.end > text.length) return@mapNotNull null
+            val t: TextEntityType = when (e.type) {
+                EntityType.Bold -> TextEntityTypeBold()
+                EntityType.Italic -> TextEntityTypeItalic()
+                EntityType.Underline -> TextEntityTypeUnderline()
+                EntityType.Strike -> TextEntityTypeStrikethrough()
+                EntityType.Code -> TextEntityTypeCode()
+                EntityType.Pre -> TextEntityTypePre()
+                EntityType.Spoiler -> TextEntityTypeSpoiler()
+                EntityType.Quote -> TextEntityTypeBlockQuote()
+                EntityType.TextUrl -> TextEntityTypeTextUrl(e.url ?: return@mapNotNull null)
+                else -> return@mapNotNull null
+            }
+            TextEntity(e.start, len, t)
+        }
+        send(chatId, replyTo, InputMessageText(FormattedText(text, out.toTypedArray()), null, true))
+    }
+    // ---- end Text formatting ----
 }
 
 private const val GIFTS_ENABLED = false

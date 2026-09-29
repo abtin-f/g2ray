@@ -55,6 +55,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -70,6 +71,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalContext
@@ -181,6 +185,38 @@ internal fun TrackKeyboardHeight() {
             val d = px / density.density
             if (d in 150f..600f) KeyboardHeight.update(context, d)
         }
+    }
+}
+
+/**
+ * The space under the composer taken by the keyboard and / or the emoji panel (Telegram iOS): its height is
+ * max(keyboard, panel), so keyboard <-> panel switches never move the chat. The panel keeps the last keyboard height and
+ * is laid out at that height in the very frame it is shown. From a closed state (no keyboard) it springs up / down.
+ * The height is computed while measuring, so keyboard animation frames never recompose the screen.
+ */
+@Composable
+internal fun KeyboardArea(open: Boolean, panelHeight: Dp, content: @Composable () -> Unit) {
+    val ime = WindowInsets.ime
+    val nav = WindowInsets.navigationBars
+    val density = LocalDensity.current
+    val progress = remember { Animatable(if (open) 1f else 0f) }
+    LaunchedEffect(open) {
+        val imeUp = ime.getBottom(density) - nav.getBottom(density) > 0
+        val target = if (open) 1f else 0f
+        if (imeUp) progress.snapTo(target)
+        else progress.animateTo(target, spring(dampingRatio = 0.86f, stiffness = 420f))
+    }
+    val visible by remember { derivedStateOf { progress.value > 0.001f } }
+    Layout(
+        content = { if (open || visible) content() },
+        modifier = Modifier.fillMaxWidth().clipToBounds(),
+    ) { measurables, c ->
+        val imePx = (ime.getBottom(this) - nav.getBottom(this)).coerceAtLeast(0)
+        val panelPx = panelHeight.roundToPx()
+        val shown = if (open && imePx > 0) panelPx else (panelPx * progress.value).toInt()
+        val h = maxOf(imePx, shown)
+        val placeables = measurables.map { it.measure(Constraints.fixed(c.maxWidth, panelPx)) }
+        layout(c.maxWidth, h) { placeables.forEach { it.place(0, minOf(0, h - panelPx)) } }
     }
 }
 
