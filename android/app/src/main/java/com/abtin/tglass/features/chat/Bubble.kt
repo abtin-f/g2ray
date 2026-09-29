@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -61,6 +62,9 @@ import androidx.compose.ui.layout.MeasureResult
 import androidx.compose.ui.layout.MeasureScope
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.animation.togetherWith
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -1153,8 +1157,54 @@ private fun LinkBody(m: Message, l: MessageContent.Link, colors: BubbleColors, t
 @Composable
 private fun ReactionChip(r: Reaction, colors: BubbleColors, onReact: (String) -> Unit) {
     val scale = LocalAppSettings.current.textScale.coerceIn(0.85f, 1.3f)
+    val animations = LocalAppSettings.current.animations
+    val repo = LocalRepository.current
+    val effects = com.abtin.tglass.core.emoji.LocalReactionEffects.current
+    val emojiSize = (17f * scale).dp
+    // When the user has just added this reaction: Telegram's center animation in the chip + the big effect over the list.
+    var playing by remember { mutableStateOf(false) }
+    val coordsHolder = remember { arrayOfNulls<androidx.compose.ui.layout.LayoutCoordinates>(1) }
+    val anims = if (r.chosen && effects != null) repo.reactionAnimations(r.emoji) else null
+    LaunchedEffect(r.chosen) {
+        if (r.chosen && effects != null && effects.consume(r.emoji)) {
+            if (animations) {
+                repo.loadReactionAnimations(listOf(r.emoji))
+                // Give TDLib a moment to answer and the files a moment to arrive (still shows the static emoji meanwhile).
+                var tries = 0
+                while (tries < 12 && repo.reactionAnimations(r.emoji) == null) { kotlinx.coroutines.delay(100); tries++ }
+                val a = repo.reactionAnimations(r.emoji)
+                val big = a?.around ?: a?.effect
+                val small = a?.center ?: a?.activate
+                big?.let { repo.requestImage(it) }
+                small?.let { repo.requestImage(it) }
+                tries = 0
+                while (tries < 10 && ((big != null && repo.filePath(big) == null) || (small != null && repo.filePath(small) == null))) { kotlinx.coroutines.delay(100); tries++ }
+                val lc = coordsHolder[0]
+                if (lc != null && lc.isAttached) {
+                    val pos = lc.positionInWindow()
+                    val c = androidx.compose.ui.geometry.Offset(pos.x + lc.size.width / 2f, pos.y + lc.size.height / 2f)
+                    effects.play(r.emoji, big?.let { repo.filePath(it) }, c)
+                }
+                if (small != null && repo.filePath(small) != null) playing = true
+            }
+        }
+    }
+    val centerPath = if (playing) (anims?.center ?: anims?.activate)?.let { repo.filePath(it) } else null
+    // A little pop whenever the counter changes, and a rolling number.
+    val pop = remember { androidx.compose.animation.core.Animatable(1f) }
+    val prevCount = remember { intArrayOf(r.count) }
+    LaunchedEffect(r.count) {
+        val changed = r.count != prevCount[0]
+        prevCount[0] = r.count
+        if (changed && animations) {
+            pop.snapTo(1.12f)
+            pop.animateTo(1f, androidx.compose.animation.core.spring(0.45f, 500f))
+        }
+    }
     Row(
         Modifier
+            .onPlaced { coordsHolder[0] = it }
+            .graphicsLayer { scaleX = pop.value; scaleY = pop.value }
             .height((28f * scale).dp)
             .clip(Capsule())
             .background(if (r.chosen) colors.reactionActiveBg else colors.reactionBg)
@@ -1162,9 +1212,34 @@ private fun ReactionChip(r: Reaction, colors: BubbleColors, onReact: (String) ->
             .padding(start = 8.dp, end = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        com.abtin.tglass.core.emoji.ReactionGlyph(r.emoji, (17f * scale).dp)
+        Box(Modifier.size(emojiSize), contentAlignment = Alignment.Center) {
+            if (centerPath != null) {
+                // The animation is larger than the emoji (it has room for its own sparkles); it does not affect layout.
+                com.abtin.tglass.core.emoji.OneShotTgs(
+                    centerPath, Modifier.requiredSize(emojiSize * 2.2f), onDone = { playing = false },
+                    fallback = { com.abtin.tglass.core.emoji.ReactionGlyph(r.emoji, emojiSize) },
+                )
+            } else {
+                com.abtin.tglass.core.emoji.ReactionGlyph(r.emoji, emojiSize)
+            }
+        }
         Spacer(Modifier.width(4.dp))
-        T(formatCount(r.count), bubbleText().reaction, if (r.chosen) colors.reactionActiveFg else colors.reactionFg, weight = FontWeight.SemiBold, maxLines = 1)
+        val countColor = if (r.chosen) colors.reactionActiveFg else colors.reactionFg
+        if (animations) {
+            androidx.compose.animation.AnimatedContent(
+                targetState = r.count,
+                transitionSpec = {
+                    val up = targetState > initialState
+                    (androidx.compose.animation.slideInVertically { h -> if (up) h else -h } + androidx.compose.animation.fadeIn()) togetherWith
+                        (androidx.compose.animation.slideOutVertically { h -> if (up) -h else h } + androidx.compose.animation.fadeOut())
+                },
+                label = "reactionCount",
+            ) { n ->
+                T(formatCount(n), bubbleText().reaction, countColor, weight = FontWeight.SemiBold, maxLines = 1)
+            }
+        } else {
+            T(formatCount(r.count), bubbleText().reaction, countColor, weight = FontWeight.SemiBold, maxLines = 1)
+        }
     }
 }
 

@@ -76,6 +76,10 @@ class MenuAction(
     val groupStart: Boolean = false,
     /** Shown as an icon-over-label button in the row at the top of the menu (Telegram iOS 26: Select · Copy · Delete). */
     val quick: Boolean = false,
+    /** Drawn at the end of the row (e.g. stacked avatars of the people who saw the message). */
+    val trailing: (@Composable () -> Unit)? = null,
+    /** Draws a hairline under this row (separates the message info rows from the actions). */
+    val groupEnd: Boolean = false,
     val onClick: () -> Unit,
 )
 
@@ -387,6 +391,10 @@ private fun MenuList(actions: List<MenuAction>, backdrop: Backdrop, enabled: Boo
                 }
                 Spacer(Modifier.width(8.dp))
                 T(a.title, TgTheme.type.body, color, modifier = Modifier.weight(1f), maxLines = 1)
+                a.trailing?.invoke()
+            }
+            if (a.groupEnd && i < rows.lastIndex) {
+                Box(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 5.dp).height(0.5.dp).background(hairline))
             }
         }
     }
@@ -408,6 +416,8 @@ private fun ReactionsControl(
     val fit = ((LocalConfiguration.current.screenWidthDp - 16 - 10 - 46) / ReactionSlot.value).toInt().coerceIn(3, VisibleReactions)
     val top = reactions.top.take(fit)
     val all = reactions.all.ifEmpty { reactions.top }
+    val repo = com.abtin.tglass.features.main.LocalRepository.current
+    LaunchedEffect(top) { repo.loadReactionAnimations(top) }
     val canExpand = all.size > top.size
     if (!expanded) {
         Row(
@@ -418,7 +428,7 @@ private fun ReactionsControl(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             top.forEachIndexed { i, e ->
-                ReactionItem(e, reactions.isChosen(e), popDelay = 22L * i, onClick = { onReact(e) })
+                ReactionItem(e, reactions.isChosen(e), popDelay = 22L * i, animated = true, onClick = { onReact(e) })
             }
             if (canExpand) {
                 Box(
@@ -479,7 +489,7 @@ private fun ReactionsControl(
 }
 
 @Composable
-private fun ReactionItem(emoji: String, chosen: Boolean, popDelay: Long, onClick: () -> Unit) {
+private fun ReactionItem(emoji: String, chosen: Boolean, popDelay: Long, animated: Boolean = false, onClick: () -> Unit) {
     val c = TgTheme.colors
     val animations = LocalAppSettings.current.animations
     val pop = remember { Animatable(if (animations) 0f else 1f) }
@@ -506,6 +516,15 @@ private fun ReactionItem(emoji: String, chosen: Boolean, popDelay: Long, onClick
         if (chosen) {
             Box(Modifier.size(42.dp).clip(Capsule()).background(if (c.isDark) Color.White.copy(0.2f) else c.accent.copy(alpha = 0.16f)))
         }
-        com.abtin.tglass.core.emoji.EmojiGlyph(emoji, 34.dp)
+        val glyph: @Composable () -> Unit = { com.abtin.tglass.core.emoji.EmojiGlyph(emoji, 34.dp) }
+        // Telegram plays the reaction's "appear" animation once when the bar opens (only the few visible ones), then rests on the emoji.
+        val repo = com.abtin.tglass.features.main.LocalRepository.current
+        val appear = if (animated && animations) repo.reactionAnimations(emoji)?.appear else null
+        val path = appear?.let { repo.filePath(it) }
+        LaunchedEffect(appear?.fileId, path) { if (appear != null && path == null) repo.requestImage(appear) }
+        var played by remember { mutableStateOf(false) }
+        if (path != null && !played) {
+            com.abtin.tglass.core.emoji.OneShotTgs(path, Modifier.size(44.dp), onDone = { played = true }, fallback = glyph)
+        } else glyph()
     }
 }

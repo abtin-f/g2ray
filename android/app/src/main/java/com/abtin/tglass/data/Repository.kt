@@ -772,7 +772,58 @@ interface TelegramRepository {
     /** Drops deleted messages from the cached shared-media lists of [chatId] (the demo derives them from the history). */
     fun forgetSharedMessages(chatId: Long, ids: Set<Long>) {}
     // ---- end Profile media grid ----
+
+    // ---- Message info & reaction effects ----
+    /**
+     * Who saw a message (Telegram iOS "Read at 14:32" / "N Seen"): read date in private chats, viewers in small groups.
+     * [onResult] gets null when nothing can be shown (the menu row stays hidden).
+     */
+    fun loadMessageSeenInfo(chatId: Long, messageId: Long, onResult: (MessageSeenInfo?) -> Unit) {
+        val m = findMessage(chatId, messageId)
+        val chat = chat(chatId)
+        if (m == null || chat == null || !m.outgoing) return onResult(null)
+        when (chat.type) {
+            ChatType.Private -> onResult(if (m.status == MessageStatus.Read) MessageSeenInfo(readAt = m.date + 95_000L) else null)
+            ChatType.Group -> onResult(
+                MessageSeenInfo(
+                    viewers = users.values.filter { it.id != me.id }.take(4).mapIndexed { i, u -> MessageViewerInfo(u.id, m.date + (40L + i * 70L) * 1000L) }
+                )
+            )
+            else -> onResult(null)
+        }
+    }
+
+    /**
+     * People who put reactions on a message ([emoji] null = all reactions), [limit] per page from [offset] ("" = first).
+     * [onResult] gets null when the list is not available.
+     */
+    fun loadAddedReactions(chatId: Long, messageId: Long, emoji: String?, offset: String, limit: Int, onResult: (AddedReactionsPage?) -> Unit) {
+        val m = findMessage(chatId, messageId)
+        if (m == null || m.reactions.isEmpty()) return onResult(null)
+        val pool = users.values.filter { it.id != me.id }.ifEmpty { return onResult(null) }
+        var n = 0
+        val all = m.reactions.filter { emoji == null || sameEmoji(it.emoji, emoji) }.flatMap { r ->
+            val who = mutableListOf<AddedReactionInfo>()
+            if (r.chosen) who += AddedReactionInfo(me.id, r.emoji, m.date + 30_000L, outgoing = true)
+            repeat(minOf(r.count - if (r.chosen) 1 else 0, 5)) { i -> who += AddedReactionInfo(pool[(n++) % pool.size].id, r.emoji, m.date + (60L + i * 45L) * 1000L) }
+            who
+        }
+        val from = offset.toIntOrNull() ?: 0
+        val page = all.drop(from).take(limit)
+        val total = m.reactions.filter { emoji == null || sameEmoji(it.emoji, emoji) }.sumOf { it.count }
+        onResult(AddedReactionsPage(page, total, if (from + page.size < all.size) (from + page.size).toString() else ""))
+    }
+
+    /** Telegram's TGS animations of an emoji reaction once [loadReactionAnimations] fetched them (observed state); null otherwise. */
+    fun reactionAnimations(emoji: String): ReactionAnimations? = null
+
+    /** Fetches the animations of these reactions (TDLib getEmojiReaction); [reactionAnimations] turns non-null. */
+    fun loadReactionAnimations(emojis: Collection<String>) {}
+    // ---- end Message info & reaction effects ----
 }
+
+/** "❤" and "❤️" are the same reaction. */
+private fun sameEmoji(a: String, b: String) = a.replace("\uFE0F", "") == b.replace("\uFE0F", "")
 
 /** Sticker sets "installed" in the demo (the demo has no server). */
 private val demoInstalledSets = HashSet<Long>()
