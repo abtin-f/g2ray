@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -58,7 +59,10 @@ import com.abtin.tglass.data.ProfileGift
 import com.abtin.tglass.data.SharedKind
 import com.abtin.tglass.data.TelegramRepository
 import com.abtin.tglass.data.User
+import com.abtin.tglass.features.chat.ChatJumpRequest
+import com.abtin.tglass.features.chat.deleteAlert
 import com.abtin.tglass.features.main.LocalRepository
+import com.abtin.tglass.features.media.ForwardSheet
 import com.abtin.tglass.ui.components.CollapsedTitle
 import com.abtin.tglass.ui.components.GlassTextButton
 import com.abtin.tglass.ui.components.GlassTopBar
@@ -154,6 +158,8 @@ fun ProfileScreen(chatId: Long) {
 
     // ---- Header state (pull to expand) ----
     val listState = rememberLazyListState()
+    val grid = remember(chatId) { MediaGridState(scope, listState) }
+    var forwardIds by remember { mutableStateOf<List<Long>?>(null) }
     val header = remember { HeaderState(scope) { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0 } }
     header.thresholdPx = with(density) { 64.dp.toPx() }
     header.maxPullPx = with(density) { 220.dp.toPx() }
@@ -263,6 +269,7 @@ fun ProfileScreen(chatId: Long) {
             if (canEditContact && isContact) SheetAction("Edit Contact") { editOpen = true } else null,
             if (rights?.changeInfo == true && (isGroup || isChannel)) SheetAction(if (isChannel) "Edit Channel" else "Edit Group") { nav.push(Route.EditChat(chat.id)) } else null,
             if (canInvite && (isGroup || isChannel)) SheetAction(if (isChannel) "Add Subscribers" else "Add Members") { nav.push(Route.AddMembers(chat.id)) } else null,
+            if (!repo.isLive || (repo.sharedCount(chatId, SharedKind.Media) ?: 0) > 0) SheetAction("Select") { grid.selectRequest = true } else null,
             SheetAction("Search Messages") { searchInChat() },
             publicLink?.let { l -> SheetAction(if (isUserChat) "Share Contact" else "Share Link") { shareText(context, l) } },
             publicLink?.let { l -> SheetAction("QR Code") { qrLink = l } },
@@ -356,6 +363,16 @@ fun ProfileScreen(chatId: Long) {
             else -> Unit
         }
     }
+    LaunchedEffect(grid.selectRequest, tabs.size) {
+        if (grid.selectRequest && tabs.contains(ProfileTab.Media)) {
+            grid.selectRequest = false
+            tabKey = ProfileTab.Media.name
+            grid.selected.clear()
+            grid.selecting = true
+        }
+    }
+    LaunchedEffect(currentTab) { if (currentTab != ProfileTab.Media && grid.selecting) grid.clear() }
+    androidx.activity.compose.BackHandler(enabled = grid.selecting) { grid.clear() }
     val slide = remember { Animatable(0f) }
     val pill = remember { Animatable(0f) }
     LaunchedEffect(selected, tabs.size) { if (!pill.isRunning && slide.value == 0f) pill.snapTo(selected.toFloat()) }
@@ -448,6 +465,7 @@ fun ProfileScreen(chatId: Long) {
             LazyColumn(
                 Modifier
                     .fillMaxSize()
+                    .mediaPinch(grid, currentTab == ProfileTab.Media)
                     .nestedScroll(header.connection)
                     .layerBackdrop(backdrop)
                     .background(palette.page),
@@ -501,6 +519,7 @@ fun ProfileScreen(chatId: Long) {
                         commonGroups = commonGroups,
                         palette = palette,
                         itemModifier = itemModifier,
+                        grid = grid,
                         onOpenMedia = { m -> nav.push(Route.Media(chat.id, m.id)) },
                         onGift = { g -> showGift(sheet, g) },
                         onOpenPost = { i -> posts.getOrNull(i)?.let { nav.push(Route.Stories(it.userId, postsOf = chat.id, startIndex = i)) } },
@@ -525,6 +544,7 @@ fun ProfileScreen(chatId: Long) {
                 center = { CollapsedTitle(name, chat.id, collapse, saved = isSaved, photoPeer = photoPeer) },
                 right = {
                     when {
+                        grid.selecting -> GlassTextButton("Cancel", { grid.clear() }, bold = true)
                         canEditContact && isContact -> GlassTextButton("Edit", { editOpen = true })
                         canEditContact -> GlassTextButton("Add Contact", { editOpen = true })
                         rights?.changeInfo == true && (isGroup || isChannel) -> GlassTextButton("Edit", { nav.push(Route.EditChat(chat.id)) })
@@ -543,6 +563,39 @@ fun ProfileScreen(chatId: Long) {
             }
             if (actions.isNotEmpty() && buttonsAlpha > 0f) {
                 ProfileActionsOverlay(actions, palette, y = { buttonsY }, alpha = { buttonsAlpha }, enabled = buttonsAlpha > 0.5f)
+            }
+
+            // Selection bar: an overlay above the list (outside its backdrop layer).
+            if (grid.selecting) {
+                val chosen = repo.sharedMedia(chatId, MediaKind.Media).filter { it.id in grid.selected }
+                val delivered = chosen.map { it.id }
+                MediaSelectionBar(
+                    count = grid.selected.size,
+                    canForward = delivered.isNotEmpty(),
+                    canShow = delivered.size == 1 && grid.selected.size == 1,
+                    canDelete = grid.selected.isNotEmpty(),
+                    onForward = { forwardIds = delivered },
+                    onShow = {
+                        ChatJumpRequest.request(chat.id, delivered.first())
+                        grid.clear()
+                        openChat()
+                    },
+                    onDelete = {
+                        if (chosen.isEmpty()) {
+                            sheet.alert("Demo Mode", "Sample media can't be deleted.")
+                        } else {
+                            val ids = chosen.map { it.id }.toSet()
+                            sheet.show(deleteAlert(repo, chat, chosen, null) {
+                                repo.forgetSharedMessages(chat.id, ids)
+                                grid.clear()
+                            })
+                        }
+                    },
+                    modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter).padding(bottom = navBottom + 8.dp),
+                )
+            }
+            forwardIds?.let { ids ->
+                ForwardSheet(fromChatId = chat.id, messageIds = ids, onDismiss = { forwardIds = null }, onDone = { forwardIds = null; grid.clear() })
             }
 
             // Sticky tab switcher: follows its placeholder, then pins under the top bar.
@@ -720,6 +773,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.profileTabContent(
     commonGroups: List<Long>,
     palette: ProfilePalette,
     itemModifier: Modifier,
+    grid: MediaGridState,
     onOpenMedia: (Message) -> Unit,
     onGift: (ProfileGift) -> Unit,
     onOpenPost: (Int) -> Unit,
@@ -759,7 +813,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.profileTabContent(
             else (0 until 15).map { null to MessageContent.Photo(it + chat.id.toInt(), 1f, emoji = listOf("🏔", "🌅", "🐈", "🍜", "🌸", "🎨", "🌊")[it % 7], video = it % 4 == 1, duration = 14 + it * 7) }
             val all: List<Pair<Message?, MessageContent.Photo>> = tiles + fillers
             if (all.isEmpty()) emptyTab("empty-${tab.name}", tab.title, palette, itemModifier)
-            else mediaGrid(tab.name, all, itemModifier, onOpenMedia)
+            else mediaGrid(tab.name, all, itemModifier, onOpenMedia, grid = if (tab == ProfileTab.Media) grid else null)
         }
         ProfileTab.Files, ProfileTab.Links, ProfileTab.Voice, ProfileTab.Music -> {
             val list = when (tab) {

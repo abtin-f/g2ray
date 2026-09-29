@@ -767,6 +767,11 @@ interface TelegramRepository {
      */
     val switchingAccount: AccountInfo? get() = null
     // ---- end Folder pins ----
+
+    // ---- Profile media grid ----
+    /** Drops deleted messages from the cached shared-media lists of [chatId] (the demo derives them from the history). */
+    fun forgetSharedMessages(chatId: Long, ids: Set<Long>) {}
+    // ---- end Profile media grid ----
 }
 
 /** Sticker sets "installed" in the demo (the demo has no server). */

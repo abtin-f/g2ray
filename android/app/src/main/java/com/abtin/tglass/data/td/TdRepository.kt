@@ -4102,6 +4102,16 @@ class TdRepository(context: Context) : TelegramRepository {
         switchTargetState.value = null
     }
     // ---- end Folder pins ----
+
+    // ---- Profile media grid ----
+    override fun forgetSharedMessages(chatId: Long, ids: Set<Long>) {
+        for (k in sharedMediaStore.keys.toList()) {
+            if (!k.startsWith("$chatId:")) continue
+            val list = sharedMediaStore[k] ?: continue
+            sharedMediaStore[k] = list.filter { it.id !in ids }
+        }
+    }
+    // ---- end Profile media grid ----
 }
 
 private const val GIFTS_ENABLED = false

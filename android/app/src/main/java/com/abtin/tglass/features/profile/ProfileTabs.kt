@@ -177,45 +177,6 @@ internal fun LazyListScope.emptyTab(key: String, title: String, palette: Profile
     }
 }
 
-/** 3-column media grid (photos with video durations, or GIFs). [tiles] may contain demo placeholders (null message). */
-internal fun LazyListScope.mediaGrid(
-    prefix: String,
-    tiles: List<Pair<Message?, MessageContent.Photo>>,
-    itemModifier: Modifier,
-    onOpen: (Message) -> Unit,
-) {
-    tiles.chunked(3).forEachIndexed { r, row ->
-        item(key = "$prefix-row$r") {
-            Row(itemModifier.fillMaxWidth().padding(bottom = 1.5.dp), horizontalArrangement = Arrangement.spacedBy(1.5.dp)) {
-                row.forEach { (m, p) ->
-                    val (a, b) = avatarColors(p.seed.toLong())
-                    Box(
-                        Modifier.weight(1f).aspectRatio(1f).background(Brush.linearGradient(listOf(a, b)))
-                            .then(if (m != null) Modifier.bounceClickable { onOpen(m) } else Modifier),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        if (p.image != null) TgImage(p.image, Modifier.matchParentSize(), maxPx = 360)
-                        else T(p.emoji, TgTheme.type.body.copy(fontSize = 34.sp, lineHeight = 40.sp))
-                        val label = when {
-                            p.loop -> "GIF"
-                            p.video && p.duration > 0 -> formatDuration(p.duration)
-                            else -> null
-                        }
-                        if (label != null) {
-                            T(
-                                label, TgTheme.type.caption2, Color.White, weight = FontWeight.SemiBold,
-                                modifier = Modifier.align(Alignment.BottomEnd).padding(5.dp)
-                                    .clip(Capsule()).background(Color.Black.copy(alpha = 0.35f)).padding(horizontal = 5.dp, vertical = 1.dp),
-                            )
-                        }
-                    }
-                }
-                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
-            }
-        }
-    }
-}
-
 /** Posts tab: 3-column grid of story covers (pinned ones first, with a pin), like Telegram's profile stories. */
 internal fun LazyListScope.postsGrid(posts: List<Story>, itemModifier: Modifier, onOpen: (Int) -> Unit) {
     posts.chunked(3).forEachIndexed { r, row ->
