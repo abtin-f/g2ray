@@ -48,6 +48,7 @@ fun InAppBannerHost(onOpen: (Long) -> Unit) {
     var current by remember { mutableStateOf<Banner?>(null) }
     var visible by remember { mutableStateOf(false) }
     var shown by remember { mutableStateOf(0) }
+    com.abtin.tglass.ui.components.RequireRootBackdrop(visible)
     LaunchedEffect(Unit) {
         InAppAlerts.attach(view.context)
         InAppBanners.flow.collect { b ->

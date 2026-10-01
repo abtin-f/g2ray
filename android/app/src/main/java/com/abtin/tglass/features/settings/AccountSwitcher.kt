@@ -156,6 +156,7 @@ fun AccountSwitcherHost() {
     }
     // Outside the context-menu host's recorded content (like the action sheet), so its glass can refract it.
     val backdrop = LocalContextMenu.current.backdrop
+    com.abtin.tglass.ui.components.RequireRootBackdrop(state.visible)
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomEnd) {
         AnimatedVisibility(
             state.visible && repo.isLive,

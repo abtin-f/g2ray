@@ -125,13 +125,13 @@ class TdRepository(context: Context) : TelegramRepository {
     private var folderInfos by mutableStateOf<List<ChatFolderInfo>>(emptyList())
 
     // ---- Observed state ----
-    private val chatMap = mutableStateMapOf<Long, UiChat>()
-    private val userMap = mutableStateMapOf<Long, UiUser>()
-    private val lastMessages = mutableStateMapOf<Long, UiMessage>()
+    private val chatMap = KeyedStateMap<Long, UiChat>()
+    private val userMap = KeyedStateMap<Long, UiUser>()
+    private val lastMessages = KeyedStateMap<Long, UiMessage>()
     private val messageStore = mutableStateMapOf<Long, SnapshotStateList<UiMessage>>()
-    private val avatars = mutableStateMapOf<Long, ImageRef>()
-    private val filePaths = mutableStateMapOf<Int, String>()
-    private val fileProgressMap = mutableStateMapOf<Int, Float>()
+    private val avatars = KeyedStateMap<Long, ImageRef>()
+    private val filePaths = KeyedStateMap<Int, String>()
+    private val fileProgressMap = KeyedStateMap<Int, Float>()
     private val contactIds = mutableStateListOf<Long>()
     private val chatInfos = mutableStateMapOf<Long, ChatInfo>()
     private val sharedMediaStore = mutableStateMapOf<String, List<UiMessage>>()
@@ -162,7 +162,7 @@ class TdRepository(context: Context) : TelegramRepository {
     override val connectionStatus: String? get() = if (auth == AuthStep.Ready) connection else null
     override val savedChatId: Long get() = myId
     override val me: UiUser get() = userMap[myId] ?: UiUser(myId, "")
-    override val users: Map<Long, UiUser> get() = userMap
+    override val users: Map<Long, UiUser> by lazy(LazyThreadSafetyMode.NONE) { userMap.asReadOnlyMap() }
     override val chats: List<UiChat> get() = sortedChats
     override val calls: List<CallRecord> get() = callList
     override val sessions: List<UiSession> get() = sessionList
@@ -636,18 +636,34 @@ class TdRepository(context: Context) : TelegramRepository {
         updatesJob?.cancel()
         // Subscribe before the first request so no update is missed.
         updatesJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
-            // One bad update must never stop the stream (that would silently freeze chats and notifications).
+            // A burst (login, reconnect, hundreds of chats / files at once) used to be one long main-thread block = dropped
+            // frames. Handle in slices of ~6 ms and yield to the looper (a frame can run) before continuing; order is kept.
+            var sliceStart = 0L
+            var lastEnd = 0L
             client.allUpdates.collect { u ->
-                try {
-                    handle(u)
-                } catch (e: Exception) {
-                    android.util.Log.e("TGlass", "Failed to handle ${u::class.simpleName}", e)
+                val t0 = System.nanoTime()
+                if (t0 - lastEnd > 2_000_000L) sliceStart = t0
+                handleSafely(u)
+                lastEnd = System.nanoTime()
+                if (lastEnd - sliceStart >= 6_000_000L) {
+                    kotlinx.coroutines.yield()
+                    sliceStart = System.nanoTime()
+                    lastEnd = sliceStart
                 }
             }
         }
         scope.launch {
             client.setLogVerbosityLevel(1)
             client.getAuthorizationState()
+        }
+    }
+
+    /** One bad update must never stop the stream (that would silently freeze chats and notifications). */
+    private fun handleSafely(u: Update) {
+        try {
+            handle(u)
+        } catch (e: Exception) {
+            android.util.Log.e("TGlass", "Failed to handle ${u::class.simpleName}", e)
         }
     }
 
@@ -862,7 +878,7 @@ class TdRepository(context: Context) : TelegramRepository {
                 else -> null
             }
             is UpdateUser -> onUser(u.user)
-            is UpdateUserStatus -> rawUsers[u.userId]?.let { old -> onUser(copyStatus(old, u.status)) }
+            is UpdateUserStatus -> rawUsers[u.userId]?.let { old -> onUser(copyStatus(old, u.status), republish = false) }
             is UpdateBasicGroup -> {
                 basicGroups[u.basicGroup.id] = u.basicGroup
                 chatStates.values.filter { (it.type as? ChatTypeBasicGroup)?.basicGroupId == u.basicGroup.id }.forEach { publish(it) }
@@ -1058,9 +1074,11 @@ class TdRepository(context: Context) : TelegramRepository {
         }
     }
 
-    private fun onUser(u: User) {
+    private fun onUser(u: User, republish: Boolean = true) {
         rawUsers[u.id] = u
         userMap[u.id] = withStoryFlags(mapUser(u))
+        // Status-only updates (the most frequent ones) change neither the photo nor anything a chat row shows.
+        if (!republish) return
         val photo = u.profilePhoto
         if (photo != null) avatars[u.id] = imageOf(photo.small, photo.minithumbnail) else if (chatStates[u.id]?.photo == null) avatars.remove(u.id)
         chatStates[u.id]?.let { publish(it) }
@@ -1073,7 +1091,12 @@ class TdRepository(context: Context) : TelegramRepository {
             downloading.remove(f.id)
         } else if (f.id in downloading) {
             val total = if (f.size > 0) f.size else f.expectedSize
-            if (total > 0) fileProgressMap[f.id] = (f.local.downloadedSize.toFloat() / total).coerceIn(0f, 1f)
+            if (total > 0) {
+                val p = (f.local.downloadedSize.toFloat() / total).coerceIn(0f, 1f)
+                // Progress rings don't need more than ~100 steps; skipping the rest saves a recomposition each.
+                val prev = fileProgressMap[f.id]
+                if (prev == null || kotlin.math.abs(p - prev) >= 0.01f || p >= 1f) fileProgressMap[f.id] = p
+            }
         }
     }
 

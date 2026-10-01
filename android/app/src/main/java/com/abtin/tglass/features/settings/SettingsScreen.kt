@@ -356,6 +356,13 @@ private fun LazyListScope.powerSaving() {
             Cell("Autoplay GIFs", chevron = false, divider = false, trailing = { IOSSwitch(s.autoplayGif, { s.updateAutoplayGif(it) }) })
         }
     }
+    gap()
+    item {
+        val s = LocalAppSettings.current
+        Section(header = "Diagnostics", footer = "Shows the frames drawn per second, the slowest frame and the number of slow frames of the last second in the top corner. Handy for reporting lag; off by default.") {
+            Cell("Performance Overlay", chevron = false, divider = false, trailing = { IOSSwitch(s.perfOverlay, { s.updatePerfOverlay(it) }) })
+        }
+    }
 }
 
 private fun LazyListScope.notifications() {

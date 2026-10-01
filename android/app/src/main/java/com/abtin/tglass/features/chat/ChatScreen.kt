@@ -145,9 +145,10 @@ import java.time.ZoneId
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
+/** Same calendar day in the device time zone (epoch-day arithmetic: this runs for every visible row on every recomposition). */
 private fun sameDay(a: Long, b: Long): Boolean {
-    val z = ZoneId.systemDefault()
-    return Instant.ofEpochMilli(a).atZone(z).toLocalDate() == Instant.ofEpochMilli(b).atZone(z).toLocalDate()
+    val tz = java.util.TimeZone.getDefault()
+    return Math.floorDiv(a + tz.getOffset(a), 86_400_000L) == Math.floorDiv(b + tz.getOffset(b), 86_400_000L)
 }
 
 private fun groupable(a: Message?, b: Message?): Boolean =
@@ -205,6 +206,8 @@ fun ChatScreen(chatId: Long) {
     }
     val backdrop = rememberLayerBackdrop()
     val listState = rememberLazyListState()
+    // Unread count of the other chats (back button badge): recomposes only when the number itself changes.
+    val backBadge by remember(chatId, repo) { derivedStateOf { repo.chats.filter { it.id != chatId && !it.archived && !it.muted }.sumOf { it.unread } } }
     val focusRequester = remember { FocusRequester() }
 
     var text by rememberSaveable { mutableStateOf(chat.draft ?: "") }
@@ -243,7 +246,8 @@ fun ChatScreen(chatId: Long) {
     val messages = repo.messages(chatId)
     val reversed = messages.asReversed()
     // Media albums become one list item (one bubble with a grid).
-    val items = buildChatItems(messages)
+    // Derived: rebuilt only when the message list changes (not on every keystroke of the composer).
+    val items by remember(chatId, repo) { derivedStateOf { buildChatItems(repo.messages(chatId)) } }
     val reversedItems = items.asReversed()
     fun itemIndexOf(id: Long) = reversedItems.indexOfFirst { it.contains(id) }
     val isGroup = chat.type == ChatType.Group
@@ -803,7 +807,7 @@ fun ChatScreen(chatId: Long) {
                         }
                         Spacer(Modifier.width(80.dp))
                     } else {
-                        BackButton({ nav.pop() }, badge = repo.chats.filter { it.id != chatId && !it.archived && !it.muted }.sumOf { it.unread })
+                        BackButton({ nav.pop() }, badge = backBadge)
                         Box(Modifier.weight(1f).padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
                             val (subtitle, active) = chatSubtitle(chat, repo)
                             GlassBox(onClick = { nav.push(Route.Profile(chatId)) }, modifier = Modifier.height(48.dp)) {
@@ -912,7 +916,8 @@ fun ChatScreen(chatId: Long) {
                                 modifier = Modifier.align(Alignment.Start).padding(start = 12.dp, top = 4.dp),
                             )
                         }
-                        Composer(
+                        // Own recomposition scope: the text is read here, so a keystroke recomposes the composer only.
+                        ScopedRead { Composer(
                             text = text,
                             onTextChange = {
                                 text = it
@@ -962,7 +967,7 @@ fun ChatScreen(chatId: Long) {
                                 repo.sendContent(chatId, note.toContent(), replyToId)
                                 replyToId = null
                             },
-                        )
+                        ) }
                         AnimatedVisibility(replyKb != null && hiddenKeyboardId != replyKb.messageId && !panelOpen && !imeVisible) {
                             if (replyKb != null) ReplyKeyboardPanel(
                                 keyboard = replyKb,
@@ -1030,6 +1035,10 @@ fun ChatScreen(chatId: Long) {
         }
     }
 }
+
+/** Runs [content] in its own recomposition scope: state it reads (e.g. the composer text) recomposes only this part. */
+@Composable
+private fun ScopedRead(content: @Composable () -> Unit) = content()
 
 fun groupFor(messages: List<Message>, idx: Int, isGroup: Boolean): BubbleGroup {
     val m = messages.getOrNull(idx) ?: return BubbleGroup(false, false, false, false)
@@ -1140,7 +1149,9 @@ private fun MessageRow(
     val view = LocalView.current
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
-    val bounds = remember { arrayOf(Rect.Zero) }
+    // Only the coordinates are kept (computing boundsInRoot for every bubble on every scroll frame was wasted work).
+    val coords = remember { arrayOfNulls<androidx.compose.ui.layout.LayoutCoordinates>(1) }
+    fun currentBounds(): Rect = coords[0]?.takeIf { it.isAttached }?.boundsInRoot() ?: Rect.Zero
     val swipe = remember { Animatable(0f) }
     val threshold = with(density) { 64.dp.toPx() }
     val key = "msg-${m.id}"
@@ -1152,7 +1163,7 @@ private fun MessageRow(
         if (com.abtin.tglass.DebugLaunch.autoMenuMessageId == m.id) {
             kotlinx.coroutines.delay(1500)
             com.abtin.tglass.DebugLaunch.autoMenuMessageId = null
-            onLongPress(bounds[0])
+            onLongPress(currentBounds())
         }
     }
 
@@ -1234,9 +1245,9 @@ private fun MessageRow(
             if (m.outgoing) Spacer(Modifier.weight(1f))
             val bubble: @Composable () -> Unit = { Box(
                 Modifier
-                    .onGloballyPositioned { bounds[0] = it.boundsInRoot() }
+                    .onGloballyPositioned { coords[0] = it }
                     .graphicsLayer { alpha = if (menu.activeKey == key) 0f else 1f }
-                    .messageLongPress(enabled = !selecting) { onLongPress(bounds[0]) }
+                    .messageLongPress(enabled = !selecting) { onLongPress(currentBounds()) }
                     .pointerInput(selecting) {
                         if (!selecting) detectTapGestures(onDoubleTap = { Haptics.tap(view); onReact("👍") })
                     }

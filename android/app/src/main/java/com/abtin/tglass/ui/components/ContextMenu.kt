@@ -33,7 +33,9 @@ import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -131,6 +133,13 @@ class ContextMenuState {
     var backdrop by mutableStateOf<Backdrop?>(null)
         internal set
 
+    /**
+     * How many overlays (menu, alert/sheet, banner, account menu) currently refract [backdrop]. The app content is only
+     * recorded into it while this is above 0 (see [RequireRootBackdrop]); recording the whole UI on every frame for
+     * nothing is pure overhead.
+     */
+    var backdropDemand by mutableIntStateOf(0)
+
     /** The item that is currently "lifted"; lists hide it so only the sharp copy is visible. */
     val activeKey: Any? get() = request?.key
 
@@ -171,17 +180,41 @@ fun ContextMenuHost(state: ContextMenuState, content: @Composable () -> Unit) {
     // The whole screen is recorded (unblurred) so the menu and reaction bar can be real refracting glass.
     val rootBackdrop = rememberLayerBackdrop()
     LaunchedEffect(rootBackdrop) { state.backdrop = rootBackdrop }
+    // Recorded only while something refracts it (read directly so it is on in the very frame an overlay appears).
+    val recordRoot = state.backdropDemand > 0 || state.request != null || LocalActionSheet.current.visible
     Box(Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxSize().then(if (blur > 0.5.dp) Modifier.blur(blur) else Modifier)) {
-            Box(Modifier.fillMaxSize().layerBackdrop(rootBackdrop)) { content() }
+            Box(Modifier.fillMaxSize().then(if (recordRoot) Modifier.layerBackdrop(rootBackdrop) else Modifier)) { content() }
         }
         val req = state.request
         if (req != null) ContextMenuOverlay(req, state, rootBackdrop)
     }
 }
 
+/**
+ * Call from any overlay that draws glass over [ContextMenuState.backdrop] while [active]; keeps the app content recorded
+ * for it (plus a short grace period so exit animations still have something to refract).
+ */
+@Composable
+fun RequireRootBackdrop(active: Boolean) {
+    val menu = LocalContextMenu.current
+    var held by remember { mutableStateOf(active) }
+    LaunchedEffect(active) {
+        if (active) held = true else {
+            kotlinx.coroutines.delay(500)
+            held = false
+        }
+    }
+    val h = held
+    DisposableEffect(h) {
+        if (h) menu.backdropDemand++
+        onDispose { if (h) menu.backdropDemand-- }
+    }
+}
+
 @Composable
 private fun ContextMenuOverlay(req: ContextMenuRequest, state: ContextMenuState, rootBackdrop: Backdrop) {
+    RequireRootBackdrop(state.visible)
     val c = TgTheme.colors
     val view = LocalView.current
     val progress = remember(req) { Animatable(0f) }

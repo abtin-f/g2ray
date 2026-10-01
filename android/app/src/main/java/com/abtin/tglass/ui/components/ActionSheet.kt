@@ -102,6 +102,7 @@ val LocalActionSheet = staticCompositionLocalOf<ActionSheetState> { error("Actio
 @Composable
 fun ActionSheetHost(state: ActionSheetState) {
     val r = state.request
+    RequireRootBackdrop(state.visible)
     BackHandler(enabled = state.visible) { state.dismiss() }
     AnimatedVisibility(state.visible, enter = fadeIn(tween(200)), exit = fadeOut(tween(180))) {
         Box(
