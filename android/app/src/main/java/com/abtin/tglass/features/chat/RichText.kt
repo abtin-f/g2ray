@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.toArgb
 import com.abtin.tglass.core.emoji.CustomEmojiSpan
 import com.abtin.tglass.core.emoji.appendWithAppleEmoji
-import com.abtin.tglass.core.emoji.appleEmojiKey
+import com.abtin.tglass.core.emoji.appleEmojiKeyFor
 import com.abtin.tglass.data.Entity
 import com.abtin.tglass.data.EntityType
 import com.abtin.tglass.features.main.LocalRepository
@@ -72,7 +72,7 @@ fun rememberRichText(
 ): AnnotatedString {
     val handler = LocalLinkHandler.current
     val all = remember(text, entities) { entities.ifEmpty { detectEntities(text) } }
-    val emojiKey = appleEmojiKey()
+    val emojiKey = appleEmojiKeyFor(text)
     // Premium emoji: drawn inline (Apple fallback until getCustomEmojiStickers answers); tap opens the emoji pack.
     val custom = remember(all) {
         all.filter { it.type == EntityType.CustomEmoji && it.customEmojiId != 0L }.map { CustomEmojiSpan(it.start, it.end, it.customEmojiId) }

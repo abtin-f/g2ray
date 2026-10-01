@@ -188,8 +188,10 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
     val archiveRowPx = with(density) { com.abtin.tglass.core.design.LocalAppSettings.current.chatListSize.row.dp.toPx() }
     val archiveRowMax = rememberUpdatedState(archiveRowPx)
     var archivePx by remember { mutableFloatStateOf(0f) }
+    val allChats = repo.chats
+    val archived = remember(allChats) { allChats.filter { it.archived } }
     val archiveRevealable = rememberUpdatedState(
-        ArchivePrefs.hidden && folder == 0 && !editing && !searching && repo.chats.any { it.archived }
+        ArchivePrefs.hidden && folder == 0 && !editing && !searching && archived.isNotEmpty()
     )
     LaunchedEffect(archiveRevealable.value) { if (!archiveRevealable.value) archivePx = 0f }
     val view = androidx.compose.ui.platform.LocalView.current
@@ -255,12 +257,11 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
         }
     }
 
-    val all = repo.chats.filter { !it.archived }
+    val all = remember(allChats) { allChats.filter { !it.archived } }
     val folders = repo.folders
     if (folder >= folders.size) folder = 0
     // Every list (main, archive, each folder) has its own pinned chats and order, like Telegram.
     val chats = repo.chatsInFolder(folder)
-    val archived = repo.chats.filter { it.archived }
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val headerHeight = 56.dp
@@ -546,14 +547,15 @@ fun ChatListItem(
     val menu = LocalContextMenu.current
     val nav = LocalNavigator.current
     val sheet = LocalActionSheet.current
-    val bounds = remember { arrayOf(Rect.Zero) }
+    // Only the coordinates are kept per frame; the bounds are computed when the menu actually opens.
+    val coords = remember { arrayOfNulls<androidx.compose.ui.layout.LayoutCoordinates>(1) }
     val key = "chat-${chat.id}"
     val (leading, trailing) = chatSwipeActions(chat, repo, onDelete, folderIndex)
     val screenWidth = LocalConfiguration.current.screenWidthDp.dp
 
     Box(
         modifier
-            .onGloballyPositioned { bounds[0] = it.boundsInRoot() }
+            .onGloballyPositioned { coords[0] = it }
             .graphicsLayer { alpha = if (menu.activeKey == key) 0f else 1f }
     ) {
         SwipeableRow(leading, trailing, enabled = !editing) {
@@ -568,7 +570,7 @@ fun ChatListItem(
                     menu.show(
                         ContextMenuRequest(
                             key = key,
-                            anchor = bounds[0],
+                            anchor = coords[0]?.takeIf { it.isAttached }?.boundsInRoot() ?: Rect.Zero,
                             alignEnd = false,
                             previewSize = (screenWidth - 24.dp) to 420.dp,
                             actions = listOfNotNull(
@@ -615,7 +617,8 @@ private fun ArchiveItem(
 ) {
     val c = TgTheme.colors
     val menu = LocalContextMenu.current
-    val bounds = remember { arrayOf(Rect.Zero) }
+    // Only the coordinates are kept per frame; the bounds are computed when the menu actually opens.
+    val coords = remember { arrayOfNulls<androidx.compose.ui.layout.LayoutCoordinates>(1) }
     val key = "archive-row"
     val anyUnread = archived.any { it.unread > 0 || it.markedUnread }
     val trailing = listOf(
@@ -624,7 +627,7 @@ private fun ArchiveItem(
     )
     Box(
         modifier
-            .onGloballyPositioned { bounds[0] = it.boundsInRoot() }
+            .onGloballyPositioned { coords[0] = it }
             .graphicsLayer { alpha = if (menu.activeKey == key) 0f else 1f }
     ) {
         SwipeableRow(leading = emptyList(), trailing = trailing) {
@@ -632,7 +635,7 @@ private fun ArchiveItem(
                 menu.show(
                     ContextMenuRequest(
                         key = key,
-                        anchor = bounds[0],
+                        anchor = coords[0]?.takeIf { it.isAttached }?.boundsInRoot() ?: Rect.Zero,
                         alignEnd = false,
                         actions = listOfNotNull(
                             if (hidden) MenuAction("Pin to Top", TgIcons.CtxPin, onClick = onPin)

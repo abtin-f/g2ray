@@ -223,16 +223,23 @@ fun IOSNavHost(navigator: Navigator, content: @Composable (Route) -> Unit) {
                             if (isTop) {
                                 val o = entry.offset.value
                                 if (entry.modal) translationY = o * h else translationX = o * w
+                                // The page edge shadow only exists while the page is sliding (at rest it lies off screen;
+                                // a full-screen shadow layer was being kept and redrawn for nothing).
+                                if (!entry.modal && o > 0f && stack.size > 1) {
+                                    shadowElevation = 12.dp.toPx()
+                                    ambientShadowColor = Color.Black.copy(0.15f)
+                                    spotShadowColor = Color.Black.copy(0.2f)
+                                }
                             } else {
                                 val topEntry = visible.last()
                                 val progress = 1f - topEntry.offset.value
                                 if (!topEntry.modal) translationX = -0.3f * w * progress
+                                // Completely covered by the opaque screen on top (no transition running): don't draw it at
+                                // all. Its blur / lens / Lottie work is otherwise replayed by the render thread on every
+                                // frame of the screen above, for pixels nobody can see. It stays composed (state is kept).
+                                if (topEntry.offset.value == 0f) alpha = 0f
                             }
                         }
-                        .then(
-                            if (isTop && !entry.modal && stack.size > 1) Modifier.shadow(12.dp, clip = false, ambientColor = Color.Black.copy(0.15f), spotColor = Color.Black.copy(0.2f))
-                            else Modifier
-                        )
                         .drawWithContent {
                             drawContent()
                             if (!isTop) {

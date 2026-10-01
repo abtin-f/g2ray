@@ -54,9 +54,15 @@ fun rememberFileImage(path: String?, maxPx: Int): ImageBitmap? {
     return state.value
 }
 
+/** Decoded minithumbnails by file id: a row scrolling back into view must not decode its JPEG on the main thread again. */
+private val miniCache = LruCache<Int, ImageBitmap>(400)
+
 @Composable
-private fun rememberMini(bytes: ByteArray?): ImageBitmap? = remember(bytes) {
-    bytes?.let { runCatching { BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() }.getOrNull() }
+private fun rememberMini(fileId: Int, bytes: ByteArray?): ImageBitmap? = remember(fileId, bytes) {
+    if (bytes == null) null
+    else (if (fileId > 0) miniCache.get(fileId) else null) ?: runCatching {
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+    }.getOrNull()?.also { if (fileId > 0) miniCache.put(fileId, it) }
 }
 
 /**
@@ -70,7 +76,7 @@ fun TgImage(image: ImageRef?, modifier: Modifier = Modifier, maxPx: Int = 1280, 
     val path = repo.filePath(image)
     LaunchedEffect(image.fileId, path) { if (path == null) repo.requestImage(image) }
     val full = rememberFileImage(path, maxPx)
-    val mini = rememberMini(image.mini)
+    val mini = rememberMini(image.fileId, image.mini)
     // Starts at 1 when the bitmap was already cached, so revisited images don't flash.
     val alpha by animateFloatAsState(if (full != null) 1f else 0f, tween(220), label = "imageFade")
     Box(modifier) {

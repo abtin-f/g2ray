@@ -116,6 +116,9 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // TDLib's native library is ~tens of MB: load it on a background thread while the UI is being set up, instead
+        // of inside the first composition (where creating the repository would otherwise block the first frame).
+        Thread({ runCatching { System.loadLibrary("tdjsonjava") } }, "tglass-preload").start()
         com.abtin.tglass.core.CrashReports.install(this)
         com.abtin.tglass.core.CrashReports.startWatchdog()
         enableEdgeToEdge()
@@ -269,6 +272,7 @@ class MainActivity : ComponentActivity() {
                         }
                         // Settings → Passcode Lock: covers everything while the app is locked.
                         if (DebugLaunch.screen == null) com.abtin.tglass.features.settings.PasscodeLockHost()
+                        if (settings.perfOverlay) com.abtin.tglass.core.perf.PerfOverlay()
                     }
                 }
             }

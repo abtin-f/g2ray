@@ -3,6 +3,13 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+// Strong skipping is the default of this Compose compiler; the stability file additionally makes collections and the
+// app's immutable data models compare by equals() (see compose_compiler_config.conf), so rows are not recomposed
+// just because the repository rebuilt an equal list.
+composeCompiler {
+    stabilityConfigurationFiles.add(layout.projectDirectory.file("compose_compiler_config.conf"))
+}
+
 android {
     namespace = "com.abtin.tglass"
     compileSdk {
@@ -79,6 +86,8 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.icons.extended)
+    // Installs the baseline profile (src/main/baseline-prof.txt + the libraries' own profiles) on first launch.
+    implementation(libs.androidx.profileinstaller)
     implementation(libs.kyant.backdrop)
     implementation(libs.kyant.shapes)
     implementation(libs.lottie.compose)

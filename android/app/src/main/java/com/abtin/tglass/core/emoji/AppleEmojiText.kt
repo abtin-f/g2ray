@@ -135,6 +135,23 @@ fun appleEmojiKey(): Int {
     return if (AppleEmoji.active) AppleEmoji.revision else -1
 }
 
+/**
+ * Like [appleEmojiKey] but only for [text]: changes when the style is switched or when an emoji *of this text* that was
+ * still downloading becomes available. The global [appleEmojiKey] changes whenever any emoji anywhere lands on disk,
+ * which re-annotated every visible text (every bubble and chat row) over and over while emoji were first downloaded.
+ */
+@Composable
+fun appleEmojiKeyFor(text: String): Int {
+    val context = LocalContext.current
+    remember { AppleEmoji.init(context); 0 }
+    val active = AppleEmoji.active
+    if (!active) return -1
+    val missing = remember(text) { AppleEmoji.find(text).map { it.name }.filter { !AppleEmoji.isOnDisk(it) }.distinct() }
+    var ready = 0
+    for (n in missing) if (AppleEmoji.readyState(n).value) ready++
+    return ready
+}
+
 /** Whether Apple emoji are in use (loads the index on first call); unlike [appleEmojiKey] it ignores new downloads. */
 @Composable
 fun appleEmojiActive(): Boolean {
@@ -146,7 +163,7 @@ fun appleEmojiActive(): Boolean {
 /** [text] with inline Apple emoji (see [appendWithAppleEmoji]) and the [custom] premium emoji in it. */
 @Composable
 fun rememberAppleEmojiText(text: String, custom: List<CustomEmojiSpan> = emptyList()): AnnotatedString {
-    val key = appleEmojiKey()
+    val key = appleEmojiKeyFor(text)
     return remember(text, key, custom) { buildAnnotatedString { appendWithAppleEmoji(text, custom = custom) } }
 }
 

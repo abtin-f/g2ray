@@ -40,7 +40,9 @@ class InteractiveHighlight(
     val pressProgress: Float get() = pressProgressAnimation.value
     val offset: Offset get() = positionAnimation.value - startPosition
 
-    private val shader =
+    // Lazy: compiling the AGSL program costs ~1 ms, and every glass button used to do it when it first appeared
+    // (screens with several buttons stalled their first frame). Now it is only built when a press actually needs it.
+    private val shader: RuntimeShader? by lazy(LazyThreadSafetyMode.NONE) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             RuntimeShader(
                 """
@@ -58,17 +60,19 @@ half4 main(float2 coord) {
         } else {
             null
         }
+    }
 
     val modifier: Modifier =
         Modifier.drawWithContent {
             val progress = pressProgressAnimation.value
             if (progress > 0f) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && shader != null) {
+                val sh = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) shader else null
+                if (sh != null) {
                     drawRect(
                         Color.White.copy(0.08f * progress),
                         blendMode = BlendMode.Plus
                     )
-                    shader.apply {
+                    sh.apply {
                         val position = position(size, positionAnimation.value)
                         setFloatUniform("size", size.width, size.height)
                         setColorUniform("color", Color.White.copy(0.15f * progress).toArgb())
@@ -80,7 +84,7 @@ half4 main(float2 coord) {
                         )
                     }
                     drawRect(
-                        ShaderBrush(shader),
+                        ShaderBrush(sh),
                         blendMode = BlendMode.Plus
                     )
                 } else {

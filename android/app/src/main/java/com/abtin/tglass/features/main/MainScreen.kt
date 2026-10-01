@@ -121,7 +121,8 @@ fun MainScreen() {
                 exit = slideOutVertically { it } + fadeOut(),
                 modifier = Modifier.align(Alignment.BottomCenter),
             ) {
-                val unread = repo.chats.filter { !it.archived && !it.muted }.sumOf { it.unread }
+                // Read only where the badge is drawn, so unread-count changes don't recompose the whole tab bar.
+                val unread by remember(repo) { androidx.compose.runtime.derivedStateOf { repo.chats.filter { !it.archived && !it.muted }.sumOf { it.unread } } }
                 // Telegram-iOS TabBarComponent: 64pt capsule (56 + 2×4), max width 500, then an 8pt gap and a 64pt search circle.
                 Row(
                     Modifier

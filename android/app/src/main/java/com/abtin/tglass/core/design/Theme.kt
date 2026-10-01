@@ -478,6 +478,9 @@ class AppSettings(context: Context) {
         private set
     var animations by mutableStateOf(prefs.getBoolean("anim", true))
         private set
+    /** Draws frame rate / slowest frame in a corner (Settings → Power Saving → Performance Overlay). */
+    var perfOverlay by mutableStateOf(prefs.getBoolean("perfOverlay", false))
+        private set
     var textScale by mutableFloatStateOf(prefs.getFloat("textScale", 1f))
         private set
     var bubbleRadius by mutableFloatStateOf(prefs.getFloat("bubbleRadius", 16f))
@@ -636,6 +639,7 @@ class AppSettings(context: Context) {
 
     fun updateGlass(v: GlassLevel) { glassLevel = v; prefs.edit().putInt("glass", v.ordinal).apply() }
     fun updateAnimations(v: Boolean) { animations = v; prefs.edit().putBoolean("anim", v).apply() }
+    fun updatePerfOverlay(v: Boolean) { perfOverlay = v; prefs.edit().putBoolean("perfOverlay", v).apply() }
     fun updateTextScale(v: Float) { textScale = v; prefs.edit().putFloat("textScale", v).apply() }
     fun updateBubbleRadius(v: Float) { bubbleRadius = v; prefs.edit().putFloat("bubbleRadius", v).apply() }
     fun updateLoggedIn(v: Boolean) { loggedIn = v; prefs.edit().putBoolean("loggedIn", v).apply() }

@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.isSpecified
 import com.abtin.tglass.core.design.GlassLevel
 import com.abtin.tglass.core.design.LocalAppSettings
 import com.abtin.tglass.core.design.TgTheme
@@ -51,8 +52,14 @@ fun Modifier.glass(
     backdrop: Backdrop? = LocalBackdrop.current,
     surface: Color = TgTheme.colors.glassSurface,
     blurRadius: Dp = 8.dp,
-    lensHeight: Dp = 16.dp,
-    lensAmount: Dp = 24.dp,
+    /**
+     * Lens refraction. Left unspecified, refraction is only applied to small controls (buttons, small pills): the
+     * AGSL lens shader runs on every pixel of the element on every frame the backdrop changes, so large surfaces
+     * (composer, search fields, bars, cards) get blur + vibrancy only. Pass explicit values to force refraction
+     * (menus, alerts, banners: hero surfaces that sit over a static backdrop).
+     */
+    lensHeight: Dp = Dp.Unspecified,
+    lensAmount: Dp = Dp.Unspecified,
     shadow: Boolean = true,
     layerBlock: (GraphicsLayerScope.() -> Unit)? = null,
 ): Modifier {
@@ -68,13 +75,19 @@ fun Modifier.glass(
             .background(fill)
     }
     val full = level == GlassLevel.Full
+    val forceLens = lensHeight.isSpecified
+    val lensH = if (lensHeight.isSpecified) lensHeight else 16.dp
+    val lensA = if (lensAmount.isSpecified) lensAmount else 24.dp
     return this.drawBackdrop(
         backdrop = backdrop,
         shape = { shape },
         effects = {
             vibrancy()
-            blur((if (full) blurRadius else blurRadius * 2f).toPx())
-            if (full) lens(lensHeight.toPx(), lensAmount.toPx())
+            blur((if (full) blurRadius else blurRadius * 1.5f).toPx())
+            // `size` is in px; the lens is only worth its per-pixel cost on small controls (<= ~8000 dp^2).
+            if (full && (forceLens || size.width * size.height <= SmallGlassAreaDp2 * density * density)) {
+                lens(lensH.toPx(), lensA.toPx())
+            }
         },
         highlight = { Highlight.Default },
         shadow = if (shadow) ({ Shadow(radius = 16.dp, color = Color.Black.copy(alpha = 0.08f)) }) else null,
@@ -82,6 +95,9 @@ fun Modifier.glass(
         onDrawSurface = { drawRect(surface) },
     )
 }
+
+/** Largest element area (dp^2) that still gets lens refraction when the caller did not ask for it explicitly. */
+private const val SmallGlassAreaDp2 = 8000f
 
 /** Circular liquid-glass button with the press "gel" highlight used across Telegram iOS 26. */
 @Composable

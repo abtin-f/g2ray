@@ -5,7 +5,13 @@ import android.graphics.PorterDuffColorFilter
 import androidx.annotation.RawRes
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -16,6 +22,7 @@ import com.abtin.tglass.core.design.LocalAppSettings
 import com.airbnb.lottie.LottieProperty
 import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.RenderMode
 import com.airbnb.lottie.compose.LottieConstants
 import com.airbnb.lottie.compose.animateLottieCompositionAsState
 import com.airbnb.lottie.compose.rememberLottieAnimatable
@@ -74,7 +81,8 @@ fun LottieIcon(
             anim.snapTo(c, if (restAtEnd) 1f else 0f)
         }
     }
-    val tintFilter = PorterDuffColorFilter(tint.toArgb(), PorterDuff.Mode.SRC_ATOP)
+    // Remembered: a new filter instance on every recomposition would make Lottie re-apply its dynamic properties.
+    val tintFilter = remember(tint) { PorterDuffColorFilter(tint.toArgb(), PorterDuff.Mode.SRC_ATOP) }
     val props = rememberLottieDynamicProperties(
         rememberLottieDynamicProperty(LottieProperty.COLOR_FILTER, tintFilter, "**"),
     )
@@ -83,6 +91,7 @@ fun LottieIcon(
         progress = { anim.progress },
         modifier = modifier.size(size),
         dynamicProperties = props,
+        renderMode = RenderMode.HARDWARE,
     )
 }
 
@@ -92,7 +101,7 @@ fun LottieLoop(@RawRes res: Int, size: Dp, modifier: Modifier = Modifier, iterat
     val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(res))
     val animations = LocalAppSettings.current.animations
     val progress by animateLottieCompositionAsState(composition, iterations = iterations, isPlaying = animations)
-    LottieAnimation(composition = composition, progress = { progress }, modifier = modifier.size(size))
+    LottieAnimation(composition = composition, progress = { progress }, modifier = modifier.size(size), renderMode = RenderMode.HARDWARE)
 }
 
 /** Decompressed Telegram animated stickers (.tgs = gzipped Lottie JSON), keyed by file path. */
@@ -122,6 +131,36 @@ fun TgsSticker(path: String?, modifier: Modifier, placeholder: @Composable () ->
         androidx.compose.foundation.layout.Box(modifier, contentAlignment = androidx.compose.ui.Alignment.Center) { placeholder() }
         return
     }
-    val progress by animateLottieCompositionAsState(composition, iterations = if (animate) LottieConstants.IterateForever else 1, isPlaying = true)
-    LottieAnimation(composition, { progress }, modifier)
+    // At most a handful of stickers loop at once (the oldest on screen win); the rest rest on their first frame.
+    val token = remember { Any() }
+    DisposableEffect(token) {
+        LottieBudget.active.add(token)
+        onDispose { LottieBudget.active.remove(token) }
+    }
+    val allowed by remember(token) { derivedStateOf { LottieBudget.active.indexOf(token) in 0 until LottieBudget.MaxLoops } }
+    val progress = remember { mutableFloatStateOf(0f) }
+    // Own player at ~30 fps (the frame is only drawn, never recomposed): half the work of a 60 fps loop, same look.
+    LaunchedEffect(composition, animate, allowed) {
+        val c = composition ?: return@LaunchedEffect
+        if (!animate || !allowed) return@LaunchedEffect
+        val durationNs = (c.duration * 1_000_000f).coerceAtLeast(1f)
+        var start = -1L
+        var last = 0L
+        while (true) {
+            withFrameNanos { now ->
+                if (start < 0) start = now - (progress.floatValue * durationNs).toLong()
+                if (now - last >= 32_000_000L) {
+                    last = now
+                    progress.floatValue = (((now - start) % durationNs.toLong()).toFloat() / durationNs).coerceIn(0f, 1f)
+                }
+            }
+        }
+    }
+    LottieAnimation(composition, { progress.floatValue }, modifier, renderMode = RenderMode.HARDWARE)
+}
+
+/** Which animated stickers may loop right now (registration order = priority). */
+private object LottieBudget {
+    const val MaxLoops = 6
+    val active = mutableStateListOf<Any>()
 }
