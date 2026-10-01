@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -427,7 +428,8 @@ fun MessageBubble(
     val contentW: Dp = when {
         isAlbumGrid -> albumW + 4.dp
         album.size > 1 -> minOf(contentMax, 300.dp)
-        content is MessageContent.Photo -> mediaSize(content.aspect, mediaMax).first + 4.dp
+        // A picture with a caption: the bubble grows to the text (up to the max width) and the picture fills it, like Telegram.
+        content is MessageContent.Photo -> if (content.caption != null) contentMax else mediaSize(content.aspect, mediaMax).first + 4.dp
         content is MessageContent.Location -> minOf(mediaMax, 260.dp) + 4.dp
         else -> contentMax
     }
@@ -503,7 +505,7 @@ fun MessageBubble(
                 modifier = Modifier.fillMaxWidth().padding(start = 11.dp, end = 11.dp, top = textTop, bottom = 6.dp),
                 maxTextWidth = textMax,
             )
-            content is MessageContent.Photo -> PhotoBody(m, content, colors, mediaMax, radius, small, hasHeader, showMeta, onMediaClick)
+            content is MessageContent.Photo -> PhotoBody(m, content, colors, mediaMax, radius, small, hasHeader, showMeta, onMediaClick, fillWidth = content.caption != null, textMax = contentMax - 20.dp)
             content is MessageContent.Voice -> VoiceMessageBody(m, content, colors, showMeta)
             content is MessageContent.File -> FileBody(m, content, colors, showMeta)
             content is MessageContent.Location -> LocationBody(m, content, colors, mediaMax, radius, hasHeader, showMeta)
@@ -805,6 +807,7 @@ private fun MediaTile(p: MessageContent.Photo, modifier: Modifier, onClick: () -
 private fun PhotoBody(
     m: Message, p: MessageContent.Photo, colors: BubbleColors, maxMedia: Dp, radius: Dp, small: Dp,
     topFlat: Boolean, showMeta: Boolean, onClick: () -> Unit,
+    fillWidth: Boolean = false, textMax: Dp = Dp.Unspecified,
 ) {
     val size = mediaSize(p.aspect, maxMedia)
     val r = (radius - 2.dp).coerceAtLeast(4.dp)
@@ -813,7 +816,12 @@ private fun PhotoBody(
     Box(Modifier.padding(start = 2.dp, end = 2.dp, top = if (topFlat) 4.dp else 2.dp, bottom = if (p.caption == null && showMeta) 2.dp else 0.dp)) {
         MediaTile(
             p,
-            Modifier.width(size.first).height(size.second).clip(RoundedCornerShape(topR, topR, bottomR, bottomR)),
+            (if (fillWidth) {
+                // Fills the bubble (whose width the caption decides); tall pictures are cropped at ~1.15x the media width.
+                val a = (if (p.aspect.isNaN() || p.aspect <= 0f) 1f else p.aspect.coerceIn(0.4f, 3f)).coerceAtLeast(1f / 1.15f)
+                Modifier.fillMaxWidth().aspectRatio(a)
+            } else Modifier.width(size.first).height(size.second))
+                .clip(RoundedCornerShape(topR, topR, bottomR, bottomR)),
             onClick,
         )
         if (p.caption == null && showMeta) {
@@ -825,7 +833,7 @@ private fun PhotoBody(
             richFor(m, p.caption, p.captionEntities, colors), bodyStyle(colors),
             meta = { if (showMeta) MetaRow(m, colors.meta) },
             modifier = Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, top = 5.dp, bottom = 6.dp),
-            maxTextWidth = size.first - 16.dp,
+            maxTextWidth = if (fillWidth && textMax != Dp.Unspecified) textMax else size.first - 16.dp,
         )
     }
 }
