@@ -275,7 +275,7 @@ data class Session(val device: String, val app: String, val location: String, va
 
 /** Details shown on a profile page (bio / description, public link, members). */
 @Immutable
-data class ChatInfo(val about: String? = null, val link: String? = null, val memberCount: Int = 0, val members: List<Member> = emptyList())
+data class ChatInfo(val about: String? = null, val link: String? = null, val memberCount: Int = 0, val members: List<Member> = emptyList(), val aboutEntities: List<Entity> = emptyList())
 
 @Immutable
 data class Member(val userId: Long, val role: String? = null)

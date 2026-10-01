@@ -842,7 +842,7 @@ class DemoRepository(private val scope: CoroutineScope) : TelegramRepository {
 
     private val userList = listOf(
         me,
-        User(1, "Sara", "Ahmadi", "sara_a", "+98 912 111 2233", "Designer • Coffee lover ☕️", online = true, hasStory = true),
+        User(1, "Sara", "Ahmadi", "sara_a", "+98 912 111 2233", "Designer • Coffee lover ☕️\nPortfolio: https://sara-design.com · @designdaily · #uidesign", online = true, hasStory = true),
         User(2, "Reza", "Karimi", "rezak", "+98 935 222 3344", "Android dev", lastSeen = "last seen 5 minutes ago", hasStory = true),
         User(3, "Mina", "Rahimi", "mina", "+98 901 333 4455", lastSeen = "last seen at 11:24", hasStory = true, storySeen = true),
         User(4, "Ali", "Moradi", null, "+98 912 444 5566", online = true),
@@ -861,10 +861,10 @@ class DemoRepository(private val scope: CoroutineScope) : TelegramRepository {
         Chat(100, ChatType.Saved, "Saved Messages", peerUserId = 0, pinned = true),
         Chat(101, ChatType.Private, "Sara Ahmadi", peerUserId = 1, pinned = true, unread = 3, typing = null),
         Chat(102, ChatType.Group, "Android Devs 🇮🇷", members = 1284, unread = 42, mentions = 1, folder = "Work",
-            description = "Everything Kotlin, Compose and Android.", username = "androiddevs_ir"),
+            description = "Everything Kotlin, Compose and Android. Rules: https://t.me/androiddevs_ir/1 · admin @rezak · #android", username = "androiddevs_ir"),
         Chat(103, ChatType.Private, "Reza Karimi", peerUserId = 2, draft = "See you tomorrow at 10?", folder = "Work"),
         Chat(104, ChatType.Channel, "Telegram News", members = 9_870_000, unread = 2, muted = true, verified = true,
-            description = "The official Telegram channel.", username = "telegram"),
+            description = "The official Telegram channel. News and updates: https://telegram.org/blog · support@telegram.org", username = "telegram"),
         Chat(105, ChatType.Private, "Mina Rahimi", peerUserId = 3),
         Chat(106, ChatType.Group, "Family 👨‍👩‍👧", members = 8, unread = 5, muted = true, folder = "Personal"),
         Chat(107, ChatType.Private, "Ali Moradi", peerUserId = 4, folder = "Personal"),

@@ -1452,6 +1452,7 @@ class TdRepository(context: Context) : TelegramRepository {
                     val full = client.getUserFullInfo(t.userId)
                     ChatInfo(
                         about = if (full is TdlResult.Success) full.result.bio?.text?.ifBlank { null } else null,
+                        aboutEntities = if (full is TdlResult.Success) full.result.bio?.let { entities(it) }.orEmpty() else emptyList(),
                         link = rawUsers[t.userId]?.usernames?.activeUsernames?.firstOrNull(),
                     )
                 }

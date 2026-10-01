@@ -686,7 +686,7 @@ private fun showGift(sheet: com.abtin.tglass.ui.components.ActionSheetState, g: 
     sheet.show(SheetRequest(title = g.title ?: "Gift", message = lines.joinToString("\n").ifBlank { null }, actions = emptyList(), cancel = "Close"))
 }
 
-private data class InfoLine(val label: String, val value: String, val accent: Boolean = false, val userText: Boolean = false, val kind: String = "")
+private data class InfoLine(val label: String, val value: String, val accent: Boolean = false, val userText: Boolean = false, val kind: String = "", val entities: List<com.abtin.tglass.data.Entity> = emptyList())
 
 /** Personal channel card + the rounded info card (phone, username, bio, location, birthday / link, description). */
 @Composable
@@ -718,7 +718,7 @@ private fun ProfileInfoBlock(
                 if (user.phone.isNotBlank()) add(InfoLine("phone", user.phone, kind = "phone"))
                 user.username?.let { add(InfoLine("username", "@$it", accent = true, kind = "username")) }
                 val bio = info?.about ?: user.bio
-                if (!bio.isNullOrBlank()) add(InfoLine("bio", bio, userText = true))
+                if (!bio.isNullOrBlank()) add(InfoLine("bio", bio, userText = true, entities = info?.takeIf { it.about != null }?.aboutEntities.orEmpty()))
                 details?.botDescription?.takeIf { it != bio }?.let { add(InfoLine("info", it, userText = true)) }
                 details?.businessAddress?.let { add(InfoLine("location", it, userText = true, kind = "location")) }
                 details?.businessHours?.let { add(InfoLine("business hours", it)) }
@@ -734,7 +734,9 @@ private fun ProfileInfoBlock(
                 rows.forEachIndexed { i, r ->
                     val divider = i != rows.lastIndex
                     when (r.kind) {
-                        "phone" -> InfoRow(r.label, r.value, palette, divider, onClick = {
+                        "phone" -> InfoRow(r.label, r.value, palette, divider, onLongClick = {
+                            copyText(context, "phone", r.value); toast.show("Phone number copied")
+                        }, onClick = {
                             sheet.show(SheetRequest(title = r.value, actions = listOfNotNull(
                                 user?.let { u -> SheetAction("Telegram Call") { com.abtin.tglass.features.calls.requestCall(context, repo, nav, sheet, toast, u.id, video = false) } },
                                 SheetAction("Copy Phone Number") { copyText(context, "phone", r.value); toast.show("Phone number copied") },
@@ -743,6 +745,7 @@ private fun ProfileInfoBlock(
                         "username", "link" -> InfoRow(
                             r.label, r.value, palette, divider, accent = r.accent,
                             trailing = { publicLink?.let { l -> QrButton(palette) { onQr(l) } } },
+                            onLongClick = { copyText(context, "username", r.value); toast.show("Copied") },
                             onClick = { publicLink?.let { l -> copyText(context, "link", l); toast.show("Link copied") } },
                         )
                         "location" -> InfoRow(r.label, r.value, palette, divider, userText = true, trailing = { MiniMap() }, onClick = {
@@ -751,7 +754,7 @@ private fun ProfileInfoBlock(
                         "birthday" -> InfoRow(r.label, r.value, palette, divider, onLongClick = {
                             copyText(context, r.label, r.value); toast.show("Copied")
                         })
-                        else -> InfoRow(r.label, r.value, palette, divider, userText = r.userText, onLongClick = {
+                        else -> InfoRow(r.label, r.value, palette, divider, userText = r.userText, linkify = r.userText, entities = r.entities, onLongClick = {
                             copyText(context, r.label, r.value); toast.show("Copied")
                         })
                     }

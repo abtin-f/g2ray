@@ -83,12 +83,15 @@ internal fun InfoRow(
     trailing: (@Composable () -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
     onClick: (() -> Unit)? = null,
+    /** Bio / description: links, @usernames, #hashtags, emails and numbers are blue and tappable; long press copies. */
+    linkify: Boolean = false,
+    entities: List<com.abtin.tglass.data.Entity> = emptyList(),
 ) {
     Box(Modifier.fillMaxWidth()) {
         Row(
             Modifier
                 .fillMaxWidth()
-                .then(if (onClick != null || onLongClick != null) Modifier.iosClickable(onLongClick = onLongClick, onClick = onClick ?: {}) else Modifier)
+                .then(if (!linkify && (onClick != null || onLongClick != null)) Modifier.iosClickable(onLongClick = onLongClick, onClick = onClick ?: {}) else Modifier)
                 .heightIn(min = 58.dp)
                 .padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -101,7 +104,11 @@ internal fun InfoRow(
                         Spacer(Modifier.width(4.dp))
                     }
                     val style = if (userText) TgTheme.type.body.copy(textDirection = TextDirection.Content) else TgTheme.type.body
-                    T(value, style, if (accent) palette.cardAccent else palette.cardText)
+                    if (linkify) {
+                        com.abtin.tglass.ui.components.LinkifiedText(value, style, palette.cardText, palette.cardAccent, entities = entities)
+                    } else {
+                        T(value, style, if (accent) palette.cardAccent else palette.cardText)
+                    }
                 }
             }
             if (trailing != null) {
