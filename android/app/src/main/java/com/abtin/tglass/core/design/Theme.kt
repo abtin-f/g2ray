@@ -321,6 +321,42 @@ fun themeAccent(theme: ColorTheme, index: Int): Color {
 @Immutable
 data class WallpaperOption(val colors: List<Color>, val solid: Boolean = false)
 
+/**
+ * The user's own chat background for the day or night side (Settings -> Appearance -> Chat Background):
+ * a photo (file name inside filesDir/wallpapers), or one/two colors (a gradient rotated by [rotation] degrees).
+ * Neither = the theme's wallpaper. "Motion" (parallax) from iOS is not implemented.
+ */
+@Immutable
+data class UserBackground(
+    val photo: String? = null,
+    val blur: Boolean = false,
+    /** 0..1 black overlay. */
+    val dim: Float = 0f,
+    /** ARGB ints, 0, 1 or 2 entries. */
+    val colors: List<Int> = emptyList(),
+    val rotation: Int = 0,
+) {
+    val isCustom: Boolean get() = photo != null || colors.isNotEmpty()
+
+    fun serialize(): String = "${photo ?: ""}|$blur|$dim|${colors.joinToString(",")}|$rotation"
+
+    companion object {
+        fun parse(s: String?): UserBackground {
+            if (s.isNullOrEmpty()) return UserBackground()
+            return runCatching {
+                val p = s.split("|")
+                UserBackground(
+                    photo = p[0].ifEmpty { null },
+                    blur = p[1].toBoolean(),
+                    dim = p[2].toFloat().coerceIn(0f, 1f),
+                    colors = p[3].split(",").filter { it.isNotEmpty() }.map { it.toInt() }.take(2),
+                    rotation = p[4].toInt(),
+                )
+            }.getOrDefault(UserBackground())
+        }
+    }
+}
+
 private fun gradient(vararg c: Long) = WallpaperOption(rgb(*c).let { if (it.size == 3) it + it[1] else it })
 private fun solid(c: Long) = WallpaperOption(List(4) { Color(0xFF000000 or c) }, solid = true)
 
@@ -488,6 +524,11 @@ class AppSettings(context: Context) {
     /** Night wallpaper: index into [NightWallpapers]. */
     var wallpaperNightIndex by mutableIntStateOf(prefs.getInt("wallpaperNight", 0))
         private set
+    /** Custom chat background of the day themes / night themes (see [UserBackground]). */
+    var bgDay by mutableStateOf(UserBackground.parse(prefs.getString("bgDay", null)))
+        private set
+    var bgNight by mutableStateOf(UserBackground.parse(prefs.getString("bgNight", null)))
+        private set
     var loggedIn by mutableStateOf(prefs.getBoolean("loggedIn", false))
         private set
     /** Local sample data instead of a real account. */
@@ -616,6 +657,11 @@ class AppSettings(context: Context) {
     fun updateAccent(theme: ColorTheme, index: Int) { accents[theme.ordinal] = index; prefs.edit().putInt("accent_${theme.name}", index).apply() }
     fun updateWallpaper(v: Int) { wallpaperIndex = v; prefs.edit().putInt("wallpaper", v).apply() }
     fun updateWallpaperNight(v: Int) { wallpaperNightIndex = v; prefs.edit().putInt("wallpaperNight", v).apply() }
+    fun backgroundFor(dark: Boolean): UserBackground = if (dark) bgNight else bgDay
+    fun updateBackground(dark: Boolean, v: UserBackground) {
+        if (dark) { bgNight = v; prefs.edit().putString("bgNight", v.serialize()).apply() }
+        else { bgDay = v; prefs.edit().putString("bgDay", v.serialize()).apply() }
+    }
     fun updateWallpaperPattern(v: Boolean) { wallpaperPattern = v; prefs.edit().putBoolean("pattern", v).apply() }
     fun updatePatternIntensity(v: Float) { patternIntensity = v; prefs.edit().putFloat("patternIntensity", v).apply() }
     fun updateLargeEmoji(v: Boolean) { largeEmoji = v; prefs.edit().putBoolean("largeEmoji", v).apply() }

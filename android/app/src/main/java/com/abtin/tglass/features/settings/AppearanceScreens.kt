@@ -32,6 +32,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.toArgb
+import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
@@ -93,11 +95,15 @@ internal fun ChatPreview(
     corners: Float? = null,
     colors: TgColors? = null,
     minHeight: Int = 170,
+    /** Draw this background instead of the saved one (the Chat Background editor). */
+    background: com.abtin.tglass.core.design.UserBackground? = null,
 ) {
     val s = LocalAppSettings.current
     val body: @Composable () -> Unit = {
         Box(modifier.fillMaxWidth().heightIn(min = minHeight.dp).clip(RoundedRectangle(26.dp))) {
-            Box(Modifier.matchParentSize()) { ChatWallpaper() }
+            Box(Modifier.matchParentSize()) {
+                if (background != null) com.abtin.tglass.features.chat.WallpaperBackground(background) else ChatWallpaper()
+            }
             ProvideTextScale(scale ?: s.textScale) {
                 Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     MessageBubble(BubbleDemo.incoming, BubbleGroup(false, false, false, false), null, 1, null, null, false, 260.dp, radiusOverride = corners ?: s.bubbleRadius)
@@ -152,7 +158,7 @@ internal fun LazyListScope.appearancePage() {
                 }
             }
             Separator(startPadding = 16.dp)
-            Cell("Chat Wallpaper", onClick = { nav.push(Route.SettingsPage(Page.Wallpaper)) })
+            Cell("Chat Background", onClick = { nav.push(Route.SettingsPage(Page.Wallpaper)) })
             Cell("Your Color", divider = false, trailing = {
                 Box(Modifier.size(22.dp).clip(CircleShape).background(NameColors.color(repo.myNameColorId, c.isDark)))
                 Spacer(Modifier.width(8.dp))
@@ -364,14 +370,47 @@ internal fun LazyListScope.wallpaperPage() {
         val spec = s.themeSpec(theme)
         val colors = remember(spec) { buildColors(spec) }
         val list = if (night) NightWallpapers else DayWallpapers
-        val selected = if (night) s.wallpaperNightIndex else s.wallpaperIndex
-        fun pick(i: Int) = if (night) s.updateWallpaperNight(i) else s.updateWallpaper(i)
+        val custom = s.backgroundFor(night).isCustom
+        val selected = if (custom) -1 else if (night) s.wallpaperNightIndex else s.wallpaperIndex
+        val context = LocalContext.current
+        val toast = LocalToast.current
+        val nav = LocalNavigator.current
+        val scope = androidx.compose.runtime.rememberCoroutineScope()
+        fun pick(i: Int) {
+            if (night) s.updateWallpaperNight(i) else s.updateWallpaper(i)
+            if (custom) clearCustomBackground(context, s, night)
+        }
         val c = TgTheme.colors
+        val photoPicker = androidx.activity.compose.rememberLauncherForActivityResult(
+            androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia(),
+        ) { uri ->
+            if (uri != null) scope.launch {
+                val name = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { com.abtin.tglass.features.chat.WallpaperStore.import(context, uri) }
+                if (name == null) toast.error("Can't use this photo")
+                else {
+                    pruneWallpaperFiles(context, s, name)
+                    WallpaperDraft.open(night, com.abtin.tglass.core.design.UserBackground(photo = name, dim = if (night) 0.25f else 0f))
+                    nav.push(Route.SettingsPage(Page.WallpaperEditor))
+                }
+            }
+        }
 
         Box(Modifier.padding(horizontal = 16.dp).padding(bottom = 14.dp)) {
             SegmentedControl(listOf("Day Themes", "Night Themes"), if (night) 1 else 0, { night = it == 1 }, Modifier.fillMaxWidth())
         }
         Section { Box(Modifier.padding(10.dp)) { ChatPreview(colors = colors, minHeight = 200) } }
+        Spacer(Modifier.height(24.dp))
+        Section(footer = "Pick a photo from your library or a color or gradient of your own. It is used for the ${if (night) "night" else "day"} themes.") {
+            Cell("Choose from Photos", titleColor = c.accent, chevron = false, onClick = {
+                photoPicker.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
+            })
+            Cell("Set a Color", titleColor = c.accent, chevron = false, divider = false, onClick = {
+                val cur = s.backgroundFor(night)
+                val start = if (cur.colors.isNotEmpty()) cur else com.abtin.tglass.core.design.UserBackground(colors = listOf(colors.wallpaper.first().toArgb()))
+                WallpaperDraft.open(night, start.copy(photo = null))
+                nav.push(Route.SettingsPage(Page.WallpaperEditor))
+            })
+        }
         Spacer(Modifier.height(24.dp))
         Section(header = "Pattern", footer = "The doodle pattern is drawn over gradient wallpapers.") {
             Cell("Show Pattern", chevron = false, trailing = { IOSSwitch(s.wallpaperPattern, { s.updateWallpaperPattern(it) }) })
@@ -394,7 +433,7 @@ internal fun LazyListScope.wallpaperPage() {
         Spacer(Modifier.height(24.dp))
         Section {
             Cell("Reset to Default", titleColor = c.accent, chevron = false, divider = false, onClick = {
-                pick(0); s.updateWallpaperPattern(true); s.updatePatternIntensity(0.5f)
+                pick(0); clearCustomBackground(context, s, night); s.updateWallpaperPattern(true); s.updatePatternIntensity(0.5f)
             })
         }
     }

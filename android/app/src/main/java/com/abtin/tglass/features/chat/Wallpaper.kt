@@ -4,32 +4,52 @@ import android.graphics.Bitmap
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import com.abtin.tglass.core.design.LocalAppSettings
 import com.abtin.tglass.core.design.TgTheme
+import com.abtin.tglass.core.design.UserBackground
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.withContext
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.random.Random
@@ -88,10 +108,90 @@ private fun renderGradient(pixels: IntArray, colors: List<Color>, pos: List<Offs
     }
 }
 
+
 private class Doodle(val x: Float, val y: Float, val kind: Int, val size: Float, val angle: Float)
 
+private val Doodles: List<Doodle> by lazy {
+    val r = Random(7)
+    List(110) { Doodle(r.nextFloat(), r.nextFloat(), r.nextInt(6), 0.55f + r.nextFloat() * 0.55f, r.nextFloat() * 360f) }
+}
+
+/** The wallpaper of the current theme: the user's own background for this day/night side, else the animated default. */
 @Composable
 fun ChatWallpaper(modifier: Modifier = Modifier, phase: Int = 0) {
+    val dark = TgTheme.colors.isDark
+    val bg = LocalAppSettings.current.backgroundFor(dark)
+    WallpaperBackground(bg, modifier, phase)
+}
+
+/** Draws [bg]: photo, color/gradient, or (when neither) the theme's animated gradient with doodles. */
+@Composable
+fun WallpaperBackground(bg: UserBackground, modifier: Modifier = Modifier, phase: Int = 0) {
+    val photo = bg.photo
+    when {
+        photo != null -> PhotoWallpaper(photo, bg.blur, bg.dim, modifier)
+        bg.colors.isNotEmpty() -> ColorWallpaper(bg.colors, bg.rotation, bg.dim, modifier)
+        else -> DefaultWallpaper(modifier, phase)
+    }
+}
+
+@Composable
+private fun PhotoWallpaper(photo: String, blur: Boolean, dim: Float, modifier: Modifier) {
+    val context = LocalContext.current
+    val fallback = TgTheme.colors.wallpaper.first()
+    val image by produceState<ImageBitmap?>(null, photo, blur) { value = WallpaperStore.load(context, photo, blur) }
+    Box(
+        modifier.fillMaxSize().drawBehind {
+            val img = image
+            if (img == null) {
+                drawRect(fallback)
+            } else {
+                // ContentScale.Crop by hand: one drawImage of the centered source window.
+                val s = max(size.width / img.width, size.height / img.height)
+                val sw = (size.width / s).roundToInt().coerceIn(1, img.width)
+                val sh = (size.height / s).roundToInt().coerceIn(1, img.height)
+                drawImage(
+                    img,
+                    srcOffset = IntOffset((img.width - sw) / 2, (img.height - sh) / 2),
+                    srcSize = IntSize(sw, sh),
+                    dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt()),
+                    filterQuality = FilterQuality.Medium,
+                )
+                if (dim > 0f) drawRect(Color.Black.copy(alpha = dim))
+            }
+        },
+    )
+}
+
+@Composable
+private fun ColorWallpaper(colors: List<Int>, rotation: Int, dim: Float, modifier: Modifier) {
+    Box(
+        modifier.fillMaxSize().drawWithCache {
+            val list = colors.map { Color(it) }
+            val brush: Brush = if (list.size < 2 || list[0] == list[1]) SolidColor(list[0]) else {
+                // Rotation 0 = top to bottom, then clockwise.
+                val rad = Math.toRadians((rotation + 90).toDouble())
+                val dx = cos(rad).toFloat()
+                val dy = sin(rad).toFloat()
+                val half = (abs(dx) * size.width + abs(dy) * size.height) / 2f
+                val cx = size.width / 2f
+                val cy = size.height / 2f
+                Brush.linearGradient(list, Offset(cx - dx * half, cy - dy * half), Offset(cx + dx * half, cy + dy * half))
+            }
+            onDrawBehind {
+                drawRect(brush)
+                if (dim > 0f) drawRect(Color.Black.copy(alpha = dim))
+            }
+        },
+    )
+}
+
+/**
+ * The default Telegram gradient + doodles. The static doodles are rendered once per size into a bitmap; the gradient
+ * (a 48x84 bitmap) is regenerated on a background thread while it animates. A frame is two drawImage calls.
+ */
+@Composable
+private fun DefaultWallpaper(modifier: Modifier, phase: Int) {
     val c = TgTheme.colors
     val animations = LocalAppSettings.current.animations
     val anim = remember { Animatable(phase.toFloat()) }
@@ -99,43 +199,52 @@ fun ChatWallpaper(modifier: Modifier = Modifier, phase: Int = 0) {
         if (animations) anim.animateTo(phase.toFloat(), tween(500, easing = CubicBezierEasing(0.33f, 0f, 0.2f, 1f)))
         else anim.snapTo(phase.toFloat())
     }
-    val bitmap = remember { Bitmap.createBitmap(GW, GH, Bitmap.Config.ARGB_8888) }
-    val image = remember(bitmap) { bitmap.asImageBitmap() }
-    val pixels = remember { IntArray(GW * GH) }
-    val cache = remember { floatArrayOf(Float.NaN) }
-    val cachedColors = remember { arrayOfNulls<List<Color>>(1) }
-    val doodles = remember {
-        val r = Random(7)
-        List(110) { Doodle(r.nextFloat(), r.nextFloat(), r.nextInt(6), 0.55f + r.nextFloat() * 0.55f, r.nextFloat() * 360f) }
-    }
-    Canvas(modifier.fillMaxSize()) {
-        val f = anim.value
-        if (f != cache[0] || cachedColors[0] != c.wallpaper) {
-            val a = floor(f).toInt()
-            val t = f - a
-            val p0 = positions(a)
-            val p1 = positions(a + 1)
-            val pos = List(4) { i -> Offset(p0[i].x + (p1[i].x - p0[i].x) * t, p0[i].y + (p1[i].y - p0[i].y) * t) }
-            renderGradient(pixels, c.wallpaper, pos)
-            bitmap.setPixels(pixels, 0, GW, 0, 0, GW, GH)
-            cache[0] = f
-            cachedColors[0] = c.wallpaper
+    val colors = c.wallpaper
+    var gradient by remember { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(colors) {
+        snapshotFlow { anim.value }.conflate().collect { f ->
+            gradient = withContext(Dispatchers.Default) { renderGradientBitmap(colors, f) }
         }
-        drawImage(
-            image,
-            srcOffset = IntOffset.Zero,
-            srcSize = IntSize(GW, GH),
-            dstOffset = IntOffset.Zero,
-            dstSize = IntSize(size.width.toInt(), size.height.toInt()),
-            filterQuality = FilterQuality.High,
-        )
-        val unit = 24f * density
-        doodles.forEach { d ->
-            translate(d.x * size.width, d.y * size.height) {
-                rotate(d.angle, Offset.Zero) { drawDoodle(d.kind, unit * d.size, c.wallpaperPattern) }
+    }
+    val patternColor = c.wallpaperPattern
+    val fallback = colors.first()
+    Box(
+        modifier.fillMaxSize().drawWithCache {
+            val w = size.width.roundToInt()
+            val h = size.height.roundToInt()
+            val pattern = if (patternColor.alpha > 0f && w > 0 && h > 0) renderPattern(this, layoutDirection, w, h, patternColor) else null
+            onDrawBehind {
+                val g = gradient
+                if (g != null) drawImage(g, srcSize = IntSize(GW, GH), dstSize = IntSize(w, h), filterQuality = FilterQuality.High)
+                else drawRect(fallback)
+                if (pattern != null) drawImage(pattern)
+            }
+        },
+    )
+}
+
+private fun renderGradientBitmap(colors: List<Color>, f: Float): ImageBitmap {
+    val a = floor(f).toInt()
+    val t = f - a
+    val p0 = positions(a)
+    val p1 = positions(a + 1)
+    val pos = List(4) { i -> Offset(p0[i].x + (p1[i].x - p0[i].x) * t, p0[i].y + (p1[i].y - p0[i].y) * t) }
+    val pixels = IntArray(GW * GH)
+    renderGradient(pixels, colors, pos)
+    return Bitmap.createBitmap(pixels, GW, GH, Bitmap.Config.ARGB_8888).asImageBitmap()
+}
+
+private fun renderPattern(density: Density, direction: LayoutDirection, w: Int, h: Int, color: Color): ImageBitmap {
+    val bmp = ImageBitmap(w, h)
+    CanvasDrawScope().draw(density, direction, Canvas(bmp), Size(w.toFloat(), h.toFloat())) {
+        val unit = 24f * this.density
+        Doodles.forEach { d ->
+            translate(d.x * w, d.y * h) {
+                rotate(d.angle, Offset.Zero) { drawDoodle(d.kind, unit * d.size, color) }
             }
         }
     }
+    return bmp
 }
 
 private fun DrawScope.drawDoodle(kind: Int, s: Float, color: Color) {
@@ -176,6 +285,3 @@ private fun DrawScope.drawDoodle(kind: Int, s: Float, color: Color) {
         }
     }
 }
-
-@Suppress("unused")
-private fun Color.argb() = toArgb()

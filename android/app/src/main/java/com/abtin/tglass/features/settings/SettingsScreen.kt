@@ -126,7 +126,8 @@ enum class Page(val title: String) {
     QrCode("QR Code"),
     TextSize("Text Size"),
     MessageCorners("Message Corners"),
-    Wallpaper("Chat Wallpaper"),
+    Wallpaper("Chat Background"),
+    WallpaperEditor("Chat Background"),
     AutoNight("Auto-Night Mode"),
     NameColor("Your Color"),
     Username("Username"),
@@ -292,6 +293,7 @@ fun SettingsPageScreen(page: Page) {
                 Page.TextSize -> textSizePage()
                 Page.MessageCorners -> messageCornersPage()
                 Page.Wallpaper -> wallpaperPage()
+                Page.WallpaperEditor -> wallpaperEditorPage()
                 Page.AutoNight -> autoNightPage()
                 Page.NameColor -> nameColorPage()
                 Page.PersonalChannel -> personalChannelPage()

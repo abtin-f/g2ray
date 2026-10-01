@@ -35,6 +35,7 @@ import androidx.compose.material.icons.rounded.VolumeOff
 import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -46,7 +47,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -112,6 +117,12 @@ fun ChatRow(
     val size = com.abtin.tglass.core.design.LocalAppSettings.current.chatListSize
     val last = repo.lastMessage(chat.id)
     val bg = if (chat.pinned) c.pinnedRow else c.background
+    // Formatted once per timestamp, not on every recomposition.
+    val time = remember(last?.date) { last?.let { formatListDate(it.date) } }
+    val dateStyle = TgTheme.type.subheadline.copy(fontSize = size.previewSp.sp)
+    // The row layout never mirrors (avatar left, time right) even when the phone language is RTL;
+    // the texts themselves follow their own script (TextDirection.Content).
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
     Box(modifier.fillMaxWidth().background(bg)) {
         Row(
             Modifier
@@ -134,17 +145,20 @@ fun ChatRow(
             ChatAvatar(chat, repo, size.avatar.dp, showStory = true)
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f).fillMaxHeight().padding(top = if (size == com.abtin.tglass.core.design.ChatListSize.Compact) 6.dp else 8.dp, bottom = 5.dp)) {
+                // Top line (ChatListItem): [name verified mute .......... status-check time]
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    com.abtin.tglass.core.emoji.EmojiText(chat.title, TgTheme.type.headline.copy(fontSize = size.titleSp.sp, lineHeight = (size.titleSp + 4f).sp), c.text, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
-                    if (chat.verified) {
-                        Spacer(Modifier.width(3.dp))
-                        VerifiedBadge(16.dp)
+                    Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                        com.abtin.tglass.core.emoji.EmojiText(chat.title, TgTheme.type.headline.copy(fontSize = size.titleSp.sp, lineHeight = (size.titleSp + 4f).sp, textDirection = TextDirection.Content), c.text, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                        if (chat.verified) {
+                            Spacer(Modifier.width(3.dp))
+                            VerifiedBadge(16.dp)
+                        }
+                        if (chat.muted) {
+                            Spacer(Modifier.width(2.dp))
+                            Icon(TgIcons.IcMutedPeer, c.secondaryText.copy(alpha = 0.8f), 16.dp)
+                        }
                     }
-                    if (chat.muted) {
-                        Spacer(Modifier.width(2.dp))
-                        Icon(TgIcons.IcMutedPeer, c.secondaryText.copy(alpha = 0.8f), 16.dp)
-                    }
-                    Spacer(Modifier.weight(1f))
+                    Spacer(Modifier.width(6.dp))
                     if (last != null && last.outgoing && chat.type != ChatType.Saved) {
                         val (icon, tint) = when (last.status) {
                             MessageStatus.Sending -> IosIcons.Clock to c.secondaryText
@@ -155,16 +169,17 @@ fun ChatRow(
                         Icon(icon, tint, 17.dp)
                         Spacer(Modifier.width(3.dp))
                     }
-                    if (last != null) T(formatListDate(last.date), TgTheme.type.subheadline.copy(fontSize = (size.previewSp - 0.5f).sp), c.secondaryText, maxLines = 1)
+                    if (time != null) T(time, dateStyle, c.secondaryText, maxLines = 1)
                 }
                 Spacer(Modifier.height(1.dp))
+                // Second line: preview (2 lines) with the badges at the trailing edge, level with its first line.
                 Row(Modifier.weight(1f)) {
                     Column(Modifier.weight(1f)) {
-                        ChatPreviewText(chat, repo)
+                        ChatPreviewText(chat, repo, last)
                     }
-                    Column(Modifier.padding(start = 6.dp, top = 3.dp), horizontalAlignment = Alignment.End) {
+                    Row(Modifier.padding(start = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                         when {
-                            chat.mentions > 0 -> Row {
+                            chat.mentions > 0 -> {
                                 Badge(0, mention = true)
                                 Spacer(Modifier.width(4.dp))
                                 Badge(chat.unread, muted = chat.muted)
@@ -179,15 +194,15 @@ fun ChatRow(
         }
         Separator(Modifier.align(Alignment.BottomStart), startPadding = (14 + size.avatar + 10 + if (editing) 34 else 0).dp)
     }
+    }
 }
 
 @Composable
-private fun ChatPreviewText(chat: Chat, repo: TelegramRepository) {
+private fun ChatPreviewText(chat: Chat, repo: TelegramRepository, last: com.abtin.tglass.data.Message?) {
     val c = TgTheme.colors
-    val last = repo.lastMessage(chat.id)
     // Tight lines so the title + two preview lines fit the row (Telegram-iOS ChatListItem).
     val size = com.abtin.tglass.core.design.LocalAppSettings.current.chatListSize
-    val style = TgTheme.type.subheadline.copy(fontSize = size.previewSp.sp, lineHeight = (size.previewSp * 1.2f).sp)
+    val style = TgTheme.type.subheadline.copy(fontSize = size.previewSp.sp, lineHeight = (size.previewSp * 1.2f).sp, textDirection = TextDirection.Content)
     when {
         chat.typing != null -> TypingText(chat.typing, style, c.accent, Modifier.padding(top = 2.dp))
         chat.draft != null -> Row {
