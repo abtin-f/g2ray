@@ -1,0 +1,1288 @@
+package com.abtin.tglass.data
+
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.snapshots.SnapshotStateList
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+
+/**
+ * The UI talks only to this interface (spec §61). [DemoRepository] backs it with local sample data,
+ * [com.abtin.tglass.data.td.TdRepository] with a real account through TDLib.
+ */
+interface TelegramRepository {
+    /** True when backed by a real Telegram account. */
+    val isLive: Boolean get() = false
+
+    /** "Connecting…", "Updating…" etc. while the connection is not ready; null when online. */
+    val connectionStatus: String? get() = null
+
+    /** Chat that holds Saved Messages. */
+    val savedChatId: Long get() = 100
+
+    val me: User
+    val users: Map<Long, User>
+    val chats: List<Chat>
+    val calls: List<CallRecord>
+    val stories: List<Story>
+    val sessions: List<Session>
+    val folders: List<String>
+
+    fun chat(id: Long): Chat?
+    fun user(id: Long): User? = users[id]
+    fun messages(chatId: Long): List<Message>
+    fun lastMessage(chatId: Long): Message? = messages(chatId).lastOrNull()
+
+    fun sendText(chatId: Long, text: String, replyTo: Long?)
+    fun sendContent(chatId: Long, content: MessageContent, replyTo: Long? = null)
+    fun editText(chatId: Long, messageId: Long, text: String)
+    fun deleteMessages(chatId: Long, ids: Set<Long>, forEveryone: Boolean = false)
+    fun toggleReaction(chatId: Long, messageId: Long, emoji: String)
+    fun togglePinMessage(chatId: Long, messageId: Long)
+    fun vote(chatId: Long, messageId: Long, option: Int)
+    fun openChat(chatId: Long)
+    /** Makes sure [chat] knows [chatId] (e.g. Saved Messages before it ever reached the chat list). */
+    fun ensureChat(chatId: Long) {}
+    fun setDraft(chatId: Long, draft: String?)
+
+    fun togglePin(chatId: Long)
+    fun toggleMute(chatId: Long)
+    fun toggleRead(chatId: Long)
+    fun toggleArchive(chatId: Long)
+    fun deleteChat(chatId: Long)
+    fun privateChatWith(userId: Long): Long
+    fun markStorySeen(userId: Long)
+    fun terminateSession(session: Session)
+    fun terminateOtherSessions()
+
+    /** People shown on the Contacts tab and in New Message. */
+    val contacts: List<User>
+        get() = users.values.filter { it.id != me.id && it.id != 10L }
+
+    /** Whether [chat] belongs to the folder at [index] of [folders] (0 = All Chats). */
+    fun isInFolder(chat: Chat, index: Int): Boolean = when (folders.getOrNull(index)) {
+        "Personal" -> chat.folder == "Personal" || chat.type == ChatType.Private
+        "Work" -> chat.folder == "Work"
+        "Unread" -> chat.unread > 0 || chat.markedUnread
+        else -> true
+    }
+
+    /** Profile photo of a user or chat (keyed by user id / chat id), if it has one. */
+    fun avatar(peerId: Long): ImageRef? = null
+
+    /** Local path of a downloaded file, or null while it is not available yet. */
+    fun filePath(image: ImageRef): String? = image.path
+
+    /** Starts downloading the file behind [image]; [filePath] turns non-null once it is done. */
+    fun requestImage(image: ImageRef) {}
+
+    /** Tells the server the user played a message's media (marks a video/voice message as viewed). */
+    fun openMessageContent(chatId: Long, messageId: Long) {}
+
+    /** Download progress 0..1 of a file started with [requestImage]. */
+    fun fileProgress(image: ImageRef): Float = if (filePath(image) != null) 1f else 0f
+
+    /** Sends picked photos/videos; several at once are grouped into an album where supported. */
+    fun sendMedia(chatId: Long, items: List<MessageContent>, replyTo: Long?) {
+        items.forEachIndexed { i, it -> sendContent(chatId, it, if (i == 0) replyTo else null) }
+    }
+
+    /** Loads older messages of a chat when the user scrolls to the top of the history. */
+    fun loadOlderMessages(chatId: Long) {}
+
+    fun closeChat(chatId: Long) {}
+
+    /** Profile details; null until [loadChatInfo] delivered them (the demo builds them locally). */
+    fun chatInfo(chatId: Long): ChatInfo? {
+        val chat = chat(chatId) ?: return null
+        val user = chat.peerUserId?.let { user(it) }
+        val members = if (chat.type == ChatType.Group) {
+            users.values.filter { it.id != me.id }.take(8).mapIndexed { i, u -> Member(u.id, if (i == 0) "owner" else if (i < 3) "admin" else null) }
+        } else emptyList()
+        return ChatInfo(about = user?.bio ?: chat.description, link = user?.username ?: chat.username, memberCount = chat.members, members = members)
+    }
+
+    fun loadChatInfo(chatId: Long) {}
+
+    /** Messages of one shared-media kind, newest first. */
+    fun sharedMedia(chatId: Long, kind: MediaKind): List<Message> = messages(chatId).asReversed().filter { m ->
+        when (kind) {
+            MediaKind.Media -> (m.content as? MessageContent.Photo)?.loop == false
+            MediaKind.Gifs -> (m.content as? MessageContent.Photo)?.loop == true
+            MediaKind.Files -> m.content is MessageContent.File
+            MediaKind.Links -> m.content is MessageContent.Link
+            MediaKind.Voice -> m.content is MessageContent.Voice || m.content is MessageContent.VideoNote
+        }
+    }
+
+    fun loadSharedMedia(chatId: Long, kind: MediaKind) {}
+
+    /** The account's installed sticker sets, recent stickers and saved GIFs (empty in the demo). */
+    val stickerPacks: List<StickerPack> get() = emptyList()
+    val recentStickers: List<StickerItem> get() = emptyList()
+    val savedGifs: List<GifItem> get() = emptyList()
+    fun loadStickers() {}
+    fun sendSticker(chatId: Long, sticker: StickerItem, replyTo: Long?) {}
+    fun sendGif(chatId: Long, gif: GifItem, replyTo: Long?) {}
+
+    /** Server-side search (public usernames and all messages). The demo has no server, so nothing. */
+    fun searchGlobal(query: String, onResult: (GlobalResults) -> Unit) {}
+
+    /** A message from the loaded history or from shared media. */
+    fun findMessage(chatId: Long, messageId: Long): Message? =
+        messages(chatId).firstOrNull { it.id == messageId }
+            ?: MediaKind.entries.firstNotNullOfOrNull { k -> sharedMedia(chatId, k).firstOrNull { it.id == messageId } }
+
+    /** Fetches a single message (e.g. the original of a reply) so [findMessage] can return it. */
+    fun requestMessage(chatId: Long, messageId: Long) {}
+
+    /** Loads the history around [messageId] (search results, old pins); [onLoaded] runs when it is in [messages]. */
+    fun loadAround(chatId: Long, messageId: Long, onLoaded: () -> Unit) = onLoaded()
+
+    /** The chat's pinned message (latest one). */
+    fun pinnedMessage(chatId: Long): Message? = messages(chatId).lastOrNull { it.pinned }
+
+    /** Id of the last message the user has read; newer incoming ones are unread. Null when nothing is unread. */
+    fun readAnchor(chatId: Long): Long? {
+        val chat = chat(chatId) ?: return null
+        if (chat.unread <= 0) return null
+        val incoming = messages(chatId).filter { !it.outgoing }
+        return incoming.dropLast(chat.unread).lastOrNull()?.id ?: 0L
+    }
+
+    /** Tells the other side "typing…" (throttled by the implementation). */
+    fun sendTyping(chatId: Long) {}
+
+    /** Messages of a chat containing [query], newest first. */
+    fun searchInChat(chatId: Long, query: String, onResult: (List<Message>) -> Unit) {
+        onResult(messages(chatId).filter { it.preview.contains(query, ignoreCase = true) }.asReversed())
+    }
+
+    /** Finds the chat behind a public @username (null if there is none). */
+    fun resolveUsername(username: String, onResult: (Long?) -> Unit) {
+        val name = username.removePrefix("@")
+        val id = chats.firstOrNull { it.username.equals(name, true) }?.id
+            ?: users.values.firstOrNull { it.username.equals(name, true) }?.let { privateChatWith(it.id) }
+        onResult(id)
+    }
+
+    fun forward(fromChatId: Long, messageIds: List<Long>, toChatId: Long) {
+        messageIds.mapNotNull { id -> messages(fromChatId).firstOrNull { it.id == id } }.forEach { sendContent(toChatId, it.content) }
+    }
+
+    fun joinChat(chatId: Long) {}
+
+    /** Saves name and bio; [onDone] gets an error message or null. */
+    fun updateProfile(firstName: String, lastName: String, bio: String, onDone: (String?) -> Unit) = onDone(null)
+    fun updateUsername(username: String, onDone: (String?) -> Unit) = onDone(null)
+    fun updateProfilePhoto(path: String, onDone: (String?) -> Unit) = onDone(null)
+    /** Removes the current profile photo; [onDone] gets an error message or null. */
+    fun deleteProfilePhoto(onDone: (String?) -> Unit) = onDone(null)
+
+    fun privacy(key: PrivacyKey): PrivacyValue? = when (key) {
+        PrivacyKey.PhoneNumber -> PrivacyValue.Contacts
+        else -> PrivacyValue.Everybody
+    }
+    fun loadPrivacy() {}
+    fun setPrivacy(key: PrivacyKey, value: PrivacyValue) {}
+
+    fun logOut() {}
+
+    // ---- Proxy ----
+
+    /** Saved proxies (live: TDLib's list). */
+    val proxies: List<ProxyItem> get() = emptyList()
+    fun loadProxies() {}
+    /** Adds ([id] null) or edits a proxy; [onDone] gets an error message or null. */
+    fun saveProxy(id: Int?, proxy: ProxyItem, enable: Boolean, onDone: (String?) -> Unit) = onDone("Proxies need a real account")
+    fun enableProxy(id: Int) {}
+    fun disableProxy() {}
+    fun removeProxy(id: Int) {}
+    /** Measures the round trip of every saved proxy (results arrive in [proxies]). */
+    fun pingProxies() {}
+    // ---- end Proxy ----
+
+    // ---- Stories ----
+
+    /** People shown in the stories strip, in Telegram's order (unseen first). The current user is not included. */
+    val storyUsers: List<User>
+        get() = users.values.filter { it.hasStory && it.id != me.id }.sortedBy { it.storySeen }
+
+    /** Active stories of one user, oldest first. Live stories may still be placeholders (`loaded == false`) until [loadStories]. */
+    fun storiesOf(userId: Long): List<Story> = stories.filter { it.userId == userId }
+
+    /** Fetches the full stories (media, caption) of [userId]; [storiesOf] updates when they arrive. */
+    fun loadStories(userId: Long) {}
+
+    /** The viewer started showing [story]: marks it as viewed. */
+    fun openStory(story: Story) = markStorySeen(story.userId)
+
+    /** The viewer stopped showing [story]. */
+    fun closeStory(story: Story) {}
+
+    // ---- Groups & channels, mute durations ----
+
+    /** Mutes notifications of a chat for [seconds] ([MUTE_FOREVER] = forever); 0 unmutes. */
+    fun muteFor(chatId: Long, seconds: Int) {
+        val chat = chat(chatId) ?: return
+        if ((seconds > 0) != chat.muted) toggleMute(chatId)
+    }
+
+    /** Creates a group with [userIds] and an optional photo; [onDone] gets the new chat id or an error message. */
+    fun createGroup(title: String, userIds: List<Long>, photoPath: String?, onDone: (chatId: Long?, error: String?) -> Unit) =
+        onDone(null, "Not available in the demo")
+
+    /** Creates a channel; [onDone] gets the new chat id or an error message. */
+    fun createChannel(title: String, description: String, photoPath: String?, onDone: (chatId: Long?, error: String?) -> Unit) =
+        onDone(null, "Not available in the demo")
+
+    /** Changes the title and description of a group/channel; [onDone] gets an error message or null. */
+    fun editChat(chatId: Long, title: String, description: String, onDone: (String?) -> Unit) = onDone(null)
+
+    /** Sets (or with a null [path] removes) the photo of a group/channel. */
+    fun updateChatPhoto(chatId: Long, path: String?, onDone: (String?) -> Unit) = onDone(null)
+
+    /** Adds users to a group/channel; [onDone] gets an error message (e.g. privacy restrictions) or null. */
+    fun addMembers(chatId: Long, userIds: List<Long>, onDone: (String?) -> Unit) = onDone(null)
+
+    /** Removes a member from a group. */
+    fun removeMember(chatId: Long, userId: Long, onDone: (String?) -> Unit) = onDone(null)
+
+    /** Deletes a group/channel for all members (owner only). */
+    fun deleteChatForAll(chatId: Long, onDone: (String?) -> Unit) {
+        deleteChat(chatId)
+        onDone(null)
+    }
+
+    companion object {
+        /** Anything over a year counts as "forever" for Telegram. */
+        const val MUTE_FOREVER = Int.MAX_VALUE
+    }
+    // ---- Polls, contacts, folders ----
+    // Polls and shared contacts go through sendContent (MessageContent.Poll / MessageContent.Contact).
+
+    /** Folders editable in Settings → Chat Folders. Empty in the demo, which shows static samples instead. */
+    val editableFolders: List<FolderSummary> get() = emptyList()
+
+    /** Loads a folder's settings for the editor; [onResult] gets null if it could not be loaded. */
+    fun loadFolder(folderId: Int, onResult: (FolderDraft?) -> Unit) = onResult(null)
+
+    /** Creates a folder ([folderId] null) or saves changes to one; [onDone] gets an error message or null. */
+    fun saveFolder(folderId: Int?, draft: FolderDraft, onDone: (String?) -> Unit) = onDone(null)
+
+    /** Deletes a folder (its chats stay where they are); [onDone] gets an error message or null. */
+    fun deleteFolder(folderId: Int, onDone: (String?) -> Unit) = onDone(null)
+    // ---- end Polls, contacts, folders ----
+
+    // ---- Contacts, media, calls ----
+
+    /**
+     * Adds a phone contact. [onDone] gets the Telegram user id of the person (null when the number is not on
+     * Telegram) or an error message. The demo adds a local sample user.
+     */
+    fun addContact(firstName: String, lastName: String, phone: String, onDone: (userId: Long?, error: String?) -> Unit) {
+        val map = users as? MutableMap<Long, User>
+        if (map == null) {
+            onDone(null, "Not available in the demo")
+            return
+        }
+        val id = (users.keys.maxOrNull() ?: 0L) + 1
+        map[id] = User(id, firstName.trim(), lastName.trim(), phone = phone.trim(), lastSeen = "last seen recently")
+        onDone(id, null)
+    }
+
+    /** Removes a user from the contacts; [onDone] gets an error message or null. */
+    fun removeContact(userId: Long, onDone: (String?) -> Unit) = onDone("Not available in the demo")
+
+    /** Sort key for "sort by last seen": higher = seen more recently (online users first). */
+    fun lastSeenOrder(userId: Long): Long = if (user(userId)?.online == true) Long.MAX_VALUE else 0L
+
+    /** Deletes entries from the call history (the call messages themselves, for the current user only). */
+    fun deleteCallRecords(records: List<CallRecord>) {}
+    // ---- end Contacts, media, calls ----
+
+    // ---- Chat features (bot keyboards, blocking, clear history, reports, captions, silent send) ----
+
+    /** Loads what the chat screen needs besides messages: bot reply keyboard, block state, delete/report permissions, member counts. */
+    fun loadChatExtras(chatId: Long) {}
+
+    /** Inline keyboard a bot attached under a message, or null. */
+    fun inlineKeyboard(chatId: Long, messageId: Long): InlineKeyboard? = null
+
+    /** Presses a callback button of [messageId]; [onAnswer] gets the bot's answer, or null if it failed / the bot didn't answer. */
+    fun pressCallbackButton(chatId: Long, messageId: Long, data: ByteArray, onAnswer: (BotAnswer?) -> Unit) = onAnswer(null)
+
+    /** Custom reply keyboard a bot currently shows in this chat, or null. */
+    fun replyKeyboard(chatId: Long): ReplyKeyboard? = null
+
+    /** The bot chat's "Start" button: sends /start. */
+    fun startBot(chatId: Long) = sendText(chatId, "/start", null)
+
+    /** Whether the user behind a private / bot chat is blocked. */
+    fun isBlocked(chatId: Long): Boolean = ChatFeatureDemo.blocked[chatId] == true
+
+    /** Blocks or unblocks the user behind a private / bot chat; [onDone] gets an error message or null. */
+    fun setBlocked(chatId: Long, blocked: Boolean, onDone: (String?) -> Unit = {}) {
+        if (blocked) ChatFeatureDemo.blocked[chatId] = true else ChatFeatureDemo.blocked.remove(chatId)
+        onDone(null)
+    }
+
+    /** Which "Clear History" variants the chat allows. */
+    fun clearHistoryOptions(chatId: Long): ClearHistoryOptions = ClearHistoryOptions(forMe = true, forEveryone = false)
+
+    /** Deletes the whole history of a chat (for the other side too when [forEveryone]). */
+    fun clearHistory(chatId: Long, forEveryone: Boolean) = deleteMessages(chatId, messages(chatId).map { it.id }.toSet(), forEveryone)
+
+    /** Whether the chat can be reported to Telegram's moderators. */
+    fun canReportSpam(chatId: Long): Boolean = false
+
+    /** Reports the chat as spam; [onDone] gets an error message or null. */
+    fun reportSpam(chatId: Long, onDone: (String?) -> Unit) = onDone(null)
+
+    /** Changes the caption of a photo / video / file message (empty removes it). */
+    fun editCaption(chatId: Long, messageId: Long, caption: String) = editText(chatId, messageId, caption)
+
+    /** Sends a text message without a notification sound on the recipient's side. */
+    fun sendTextSilently(chatId: Long, text: String, replyTo: Long?) = sendText(chatId, text, replyTo)
+
+    /** Members currently online in a group (null when unknown). */
+    fun onlineMemberCount(chatId: Long): Int? = null
+
+    /** Local state behind the demo defaults above. */
+    object ChatFeatureDemo {
+        val blocked = mutableStateMapOf<Long, Boolean>()
+    }
+    // ---- end Chat features ----
+
+    // ---- Settings (real) ----
+    // Demo defaults keep their state in [DemoSettings]; the live repository talks to TDLib.
+
+    /** Blocked users and chats; null until [loadBlocked] delivered them. */
+    val blockedPeers: List<BlockedPeer>? get() = DemoSettings.blocked
+    /** Total number of blocked senders (may exceed [blockedPeers] while not all are loaded). */
+    val blockedCount: Int? get() = blockedPeers?.size
+    fun loadBlocked() {}
+    /** Removes [peer] from the block list; [onDone] gets an error message or null. */
+    fun unblock(peer: BlockedPeer, onDone: (String?) -> Unit) {
+        DemoSettings.blocked.remove(peer)
+        onDone(null)
+    }
+
+    /** 2-step verification state; null until [loadPasswordInfo] delivered it. */
+    val passwordInfo: PasswordInfo? get() = DemoSettings.password
+    fun loadPasswordInfo() {}
+    /**
+     * Sets, changes ([oldPassword] = current one) or removes ([newPassword] empty) the 2-step verification password.
+     * A non-null [recoveryEmail] also changes the recovery email (it then needs [confirmRecoveryEmail]).
+     */
+    fun setPassword(oldPassword: String, newPassword: String, hint: String, recoveryEmail: String?, onDone: (String?) -> Unit) {
+        if (DemoSettings.password.hasPassword && oldPassword != DemoSettings.passwordValue) {
+            onDone("Invalid password. Please try again.")
+            return
+        }
+        DemoSettings.passwordValue = newPassword
+        DemoSettings.password = if (newPassword.isEmpty()) PasswordInfo(false)
+        else PasswordInfo(true, hint, hasRecoveryEmail = !recoveryEmail.isNullOrBlank() || DemoSettings.password.hasRecoveryEmail)
+        onDone(null)
+    }
+    /** Changes the recovery email of an existing password (it then needs [confirmRecoveryEmail]). */
+    fun setRecoveryEmail(password: String, email: String, onDone: (String?) -> Unit) {
+        if (password != DemoSettings.passwordValue) {
+            onDone("Invalid password. Please try again.")
+            return
+        }
+        DemoSettings.password = DemoSettings.password.copy(hasRecoveryEmail = true)
+        onDone(null)
+    }
+    /** Confirms a new recovery email with the code sent to it. */
+    fun confirmRecoveryEmail(code: String, onDone: (String?) -> Unit) = onDone(null)
+    fun resendRecoveryEmailCode(onDone: (String?) -> Unit) = onDone(null)
+
+    /** Days of inactivity after which the account is deleted; null until [loadAccountTtl]. */
+    val accountTtlDays: Int? get() = DemoSettings.accountTtlDays
+    fun loadAccountTtl() {}
+    fun setAccountTtl(days: Int) { DemoSettings.accountTtlDays = days }
+
+    /** Storage used on this device; null until [loadStorage]. */
+    val storageInfo: StorageInfo? get() = DemoSettings.storage
+    fun loadStorage() {}
+    /** Deletes cached media; [onDone] gets the freed bytes (or null) and an error message (or null). */
+    fun clearCache(onDone: (freed: Long?, error: String?) -> Unit) {
+        val s = DemoSettings.storage
+        DemoSettings.storage = s.copy(filesSize = 0, fileCount = 0)
+        onDone(s.filesSize, null)
+    }
+
+    /** Network usage statistics; null until [loadDataUsage]. */
+    val dataUsage: DataUsage? get() = DemoSettings.dataUsage
+    fun loadDataUsage() {}
+    fun resetDataUsage() {
+        DemoSettings.dataUsage = DataUsage(System.currentTimeMillis(), emptyList(), emptyList(), emptyList())
+    }
+
+    /** Sends the automatic download settings of one network to Telegram (they are also kept locally by the UI). */
+    fun applyAutoDownload(network: DownloadNetwork, value: AutoDownload) {}
+
+    /** Default notification settings of a chat type; null until [loadScopeNotifications]. */
+    fun scopeNotifications(kind: NotifyScope): ScopeNotifications? = DemoSettings.scopes[kind]
+    fun loadScopeNotifications() {}
+    fun setScopeNotifications(kind: NotifyScope, value: ScopeNotifications) { DemoSettings.scopes[kind] = value }
+
+    /** Opens (creating if needed) the chat with Telegram support; [onResult] gets its chat id or null. */
+    fun openSupportChat(onResult: (Long?) -> Unit) {
+        val support = users.values.firstOrNull { it.username == "telegram" }
+        onResult(support?.let { privateChatWith(it.id) })
+    }
+
+    /** The user's public t.me link (username, or a temporary link when there is none). */
+    fun loadMyLink(onResult: (String?) -> Unit) = onResult(me.username?.let { "https://t.me/$it" })
+    // ---- end Settings (real) ----
+
+    // ---- Edit Profile & Appearance ----
+    /** Own birthday; null when not set (or not loaded yet, see [loadProfileExtras]). */
+    val myBirthdate: ProfileBirthdate? get() = DemoProfile.birthdate
+    /** Channel shown on the own profile; null when none. */
+    val myPersonalChannel: PersonalChannel? get() = DemoProfile.personalChannel
+    /** Own name color (accent color id 0–6). */
+    val myNameColorId: Int get() = DemoProfile.nameColor
+    /** Loads birthday, personal channel and name color of the own account. */
+    fun loadProfileExtras() {}
+    fun setBirthdate(value: ProfileBirthdate?, onDone: (String?) -> Unit) { DemoProfile.birthdate = value; onDone(null) }
+    /** Channels the user owns that can be shown on the profile. */
+    fun loadPersonalChannelCandidates(onResult: (List<PersonalChannel>) -> Unit) =
+        onResult(chats.filter { it.type == ChatType.Channel }.map { PersonalChannel(it.id, it.title) })
+    /** [chatId] null removes the personal channel. */
+    fun setPersonalChannel(chatId: Long?, onDone: (String?) -> Unit) {
+        DemoProfile.personalChannel = chatId?.let { id -> chat(id)?.let { PersonalChannel(id, it.title) } }
+        onDone(null)
+    }
+    fun setNameColor(colorId: Int, onDone: (String?) -> Unit) { DemoProfile.nameColor = colorId; onDone(null) }
+    /** Checks whether [username] can be taken by the own account. */
+    fun checkUsername(username: String, onResult: (UsernameCheck) -> Unit) {
+        localUsernameCheck(username)?.let { onResult(it); return }
+        val taken = username.equals(me.username, true).not() &&
+            (users.values.any { it.username.equals(username, true) } || chats.any { it.username.equals(username, true) })
+        onResult(if (taken) UsernameCheck.Taken else UsernameCheck.Available)
+    }
+    // ---- end Edit Profile & Appearance ----
+
+    // ---- Profile ----
+
+    /** Extra details of a profile page (birthday, profile music, personal channel, business, emoji status); null until loaded. */
+    fun profileDetails(chatId: Long): ProfileDetails? {
+        val chat = chat(chatId) ?: return null
+        val userId = chat.peerUserId
+        if (chat.type != ChatType.Private || userId == null) return ProfileDetails()
+        return ProfileDetails(
+            birthday = if (userId % 2L == 1L) "March 14" else null,
+            music = ProfileMusic("Dance of the Knights", "Symphony Orchestra", 263),
+            giftCount = ProfileDemo.gifts.size,
+            commonGroupCount = commonGroups(userId).size,
+            emojiStatusEmoji = if (user(userId)?.premium == true || userId % 3L == 1L) "🐶" else null,
+            // Some demo people have a profile color, like premium users on Telegram.
+            profileColorId = if (userId % 3L == 1L) (userId % 16L).toInt() else -1,
+        )
+    }
+
+    fun loadProfileDetails(chatId: Long) {}
+
+    /** Profile photos, newest first. The demo only has the current avatar (if any); the viewer then shows the initials. */
+    fun profilePhotos(chatId: Long): List<ProfilePhotoItem> =
+        avatar(chat(chatId)?.peerUserId ?: chatId)?.let { listOf(ProfilePhotoItem(0, it, it)) } ?: emptyList()
+
+    fun loadProfilePhotos(chatId: Long) {}
+
+    /** Gifts displayed on the profile of a user or channel. */
+    fun profileGifts(chatId: Long): List<ProfileGift> = when (chat(chatId)?.type) {
+        ChatType.Private, ChatType.Channel -> ProfileDemo.gifts
+        else -> emptyList()
+    }
+
+    fun loadProfileGifts(chatId: Long) {}
+
+    /** How many messages of [kind] the chat has; null while unknown. */
+    fun sharedCount(chatId: Long, kind: SharedKind): Int? = when (kind) {
+        SharedKind.Media -> sharedMedia(chatId, MediaKind.Media).size
+        SharedKind.Files -> sharedMedia(chatId, MediaKind.Files).count { (it.content as? MessageContent.File)?.music != true }
+        SharedKind.Links -> sharedMedia(chatId, MediaKind.Links).size
+        SharedKind.Music -> sharedMusic(chatId).size
+        SharedKind.Voice -> sharedMedia(chatId, MediaKind.Voice).size
+        SharedKind.Gifs -> sharedMedia(chatId, MediaKind.Gifs).size
+    }
+
+    fun loadSharedCounts(chatId: Long) {}
+
+    /** Music files (audio messages) of a chat, newest first. */
+    fun sharedMusic(chatId: Long): List<Message> =
+        messages(chatId).asReversed().filter { (it.content as? MessageContent.File)?.music == true }
+
+    fun loadSharedMusic(chatId: Long) {}
+
+    /** Chat ids of the groups the user shares with [userId]. */
+    fun commonGroups(userId: Long): List<Long> = chats.filter { it.type == ChatType.Group }.take(2).map { it.id }
+
+    fun loadCommonGroups(userId: Long) {}
+
+    fun isContact(userId: Long): Boolean = contacts.any { it.id == userId }
+
+    /** Adds [userId] to the contacts, or renames an existing contact. [onDone] gets an error message or null. */
+    fun saveContact(userId: Long, firstName: String, lastName: String, sharePhone: Boolean, onDone: (String?) -> Unit) {
+        val u = user(userId)
+        if (u == null) {
+            onDone("User not found")
+            return
+        }
+        val rename = {
+            @Suppress("UNCHECKED_CAST")
+            (users as? MutableMap<Long, User>)?.put(userId, u.copy(firstName = firstName.trim(), lastName = lastName.trim()))
+            onDone(null)
+        }
+        if (!isContact(userId) && u.phone.isNotBlank()) {
+            addContact(firstName, lastName, u.phone) { _, error -> if (error != null) onDone(error) else rename() }
+        } else rename()
+    }
+    // ---- end Profile ----
+
+    // ---- Chat bubbles & links ----
+    /** Resolves a Telegram link (t.me/…, telegram.me/…, tg://…) to what the app should open. */
+    fun resolveLink(url: String, onResult: (ResolvedLink) -> Unit) {
+        val link = TelegramLinks.parse(url) ?: return onResult(ResolvedLink(external = true))
+        when {
+            link.username != null -> resolveUsername(link.username) { id ->
+                onResult(if (id != null) ResolvedLink(chatId = id, messageId = link.messageId) else ResolvedLink(error = "No one uses @${link.username}"))
+            }
+            link.invite != null -> onResult(ResolvedLink(error = "Invite links need a real account"))
+            link.phone != null -> {
+                val digits = link.phone.filter { it.isDigit() }
+                val u = users.values.firstOrNull { it.phone.filter { ch -> ch.isDigit() } == digits }
+                onResult(if (u != null) ResolvedLink(chatId = privateChatWith(u.id)) else ResolvedLink(error = "No Telegram account with this number"))
+            }
+            else -> onResult(ResolvedLink(error = "This message isn't available"))
+        }
+    }
+
+    /** Joins the chat behind an invite link; [onDone] gets the chat id or an error. */
+    fun joinByInviteLink(link: String, onDone: (chatId: Long?, error: String?) -> Unit) = onDone(null, "Invite links need a real account")
+
+    /** The discussion group linked to a channel (its comments), or null. */
+    fun loadDiscussionChat(chatId: Long, onResult: (Long?) -> Unit) = onResult(null)
+    // ---- end Chat bubbles & links ----
+    // ---- Composer ----
+    /** GIF search for the emoji panel (Telegram's @gif inline bot). The demo has no server, so nothing is found. */
+    fun searchGifs(chatId: Long, query: String, onResult: (List<GifItem>) -> Unit) = onResult(emptyList())
+    // ---- end Composer ----
+
+    // ---- Message menu ----
+
+    /** Reactions offered for a message (emoji only); [onResult] gets null when they could not be loaded. */
+    fun loadAvailableReactions(chatId: Long, messageId: Long, onResult: (AvailableReactionsInfo?) -> Unit) =
+        onResult(AvailableReactionsInfo(top = TopReactions, all = (TopReactions + FreeReactions).distinct()))
+
+    /** What the user may do with a message; null = unknown (the menu then uses its own rules). */
+    fun loadMessageCaps(chatId: Long, messageId: Long, onResult: (MessageCaps?) -> Unit) = onResult(null)
+
+    /** t.me link to a message (public or private); null when the message has none. */
+    fun loadMessageLink(chatId: Long, messageId: Long, onResult: (String?) -> Unit) =
+        onResult(chat(chatId)?.username?.let { "https://t.me/$it/$messageId" })
+
+    /**
+     * Reports messages to Telegram's moderators. Call with [optionId] null first; when the result is
+     * [ReportStep.Options] call again with the chosen [ReportChoice.id].
+     */
+    fun reportMessages(chatId: Long, messageIds: List<Long>, optionId: ByteArray?, onResult: (ReportStep) -> Unit) {
+        if (optionId == null) onResult(
+            ReportStep.Options(
+                "Report",
+                listOf("Spam", "Violence", "Child Abuse", "Illegal Drugs", "Personal Details", "Other")
+                    .mapIndexed { i, t -> ReportChoice(byteArrayOf(i.toByte()), t) },
+            )
+        ) else onResult(ReportStep.Done)
+    }
+    // ---- end Message menu ----
+
+    // ---- Chat polls, audio & search ----
+
+    /** Votes in a poll; several [optionIds] for multiple-answer polls (the demo votes for the first one). */
+    fun votePoll(chatId: Long, messageId: Long, optionIds: List<Int>) {
+        optionIds.firstOrNull()?.let { vote(chatId, messageId, it) }
+    }
+
+    /** Takes the user's vote back (Retract Vote). */
+    fun retractPollVote(chatId: Long, messageId: Long) {}
+
+    /** Closes a poll the user created (Stop Poll); [onDone] gets an error message or null. */
+    fun stopPoll(chatId: Long, messageId: Long, onDone: (String?) -> Unit) = onDone(null)
+
+    /** Voters of one option of a public poll, [offset] for paging; [onResult] gets null when they could not be loaded. */
+    fun pollVoters(chatId: Long, messageId: Long, option: Int, offset: Int, onResult: (PollVotersPage?) -> Unit) {
+        val p = findMessage(chatId, messageId)?.content as? MessageContent.Poll
+        val count = p?.votes?.getOrNull(option) ?: 0
+        val people = users.keys.filter { it != me.id && it != 10L }
+        val ids = if (people.isEmpty()) emptyList() else List(minOf(count, people.size)) { i -> people[(i + option * 3) % people.size] }.distinct()
+        onResult(PollVotersPage(if (offset == 0) ids else emptyList(), count))
+    }
+
+    /** In-chat search: one page of messages containing [query], newest first, from [fromMessageId] (0 = newest). */
+    fun searchChatPage(chatId: Long, query: String, fromMessageId: Long, onResult: (ChatSearchPage) -> Unit) {
+        searchInChat(chatId, query) { found ->
+            val page = if (fromMessageId == 0L) found else found.filter { it.id < fromMessageId }
+            onResult(ChatSearchPage(page, if (fromMessageId == 0L) found.size else page.size, 0L))
+        }
+    }
+
+    /**
+     * Makes sure [messageId] is in [messages] (loading the history around it when needed) before a jump;
+     * [onLoaded] gets false when the message could not be found.
+     */
+    fun loadAroundMessage(chatId: Long, messageId: Long, onLoaded: (Boolean) -> Unit) {
+        loadAround(chatId, messageId) { onLoaded(messages(chatId).any { it.id == messageId }) }
+    }
+
+    /** The message the voice/music player should play after [messageId] in the same chat (Telegram's auto-advance). */
+    fun nextAudioMessage(chatId: Long, messageId: Long, music: Boolean): Message? =
+        messages(chatId).firstOrNull { m ->
+            m.id > messageId && when (val c = m.content) {
+                is MessageContent.Voice -> !music
+                is MessageContent.File -> music && c.music
+                else -> false
+            }
+        }
+    // ---- end Chat polls, audio & search ----
+
+    // ---- History gaps & profile posts ----
+
+    /**
+     * Ids of loaded messages right after which newer history is not loaded yet (left by jumping to an old message,
+     * e.g. a search result). The chat loads it with [loadNewerMessages] while the user scrolls down.
+     */
+    fun historyGaps(chatId: Long): Set<Long> = emptySet()
+
+    /** Loads the history right after [afterMessageId] (an entry of [historyGaps]); the gap closes or moves up. */
+    fun loadNewerMessages(chatId: Long, afterMessageId: Long) {}
+
+    /** Makes sure the chat's newest messages are loaded (scroll-to-bottom after a jump), then calls [onLoaded]. */
+    fun loadLatestMessages(chatId: Long, onLoaded: () -> Unit) = onLoaded()
+
+    /** Stories of the profile's Posts tab: pinned ones first, then the others newest first. Empty hides the tab. */
+    fun profileStories(chatId: Long): List<Story> {
+        val chat = chat(chatId) ?: return emptyList()
+        if (chat.type != ChatType.Private && chat.type != ChatType.Channel) return emptyList()
+        val owner = chat.peerUserId ?: chatId
+        val own = stories.filter { it.userId == owner }
+        if (own.isEmpty() && owner % 2L != 0L) return emptyList()
+        val looks = listOf(
+            "🏖" to listOf(0xFF4FACFE, 0xFF00F2FE), "🎸" to listOf(0xFFFA709A, 0xFFFEE140), "🍕" to listOf(0xFFF6D365, 0xFFFDA085),
+            "🚲" to listOf(0xFF43E97B, 0xFF38F9D7), "🌃" to listOf(0xFF30CFD0, 0xFF330867), "🐕" to listOf(0xFFA18CD1, 0xFFFBC2EB),
+            "📚" to listOf(0xFFFF9A9E, 0xFFFECFEF),
+        )
+        val posts = looks.mapIndexed { i, (e, colors) ->
+            Story(owner, e, colors, "Post ${i + 1}", chatId = owner, id = 0, pinned = i < 2)
+        }
+        return posts.take(2) + own + posts.drop(2)
+    }
+
+    fun loadProfileStories(chatId: Long) {}
+    // ---- end History gaps & profile posts ----
+
+    // ---- Custom emoji ----
+
+    /** A custom (premium) emoji once [loadCustomEmoji] brought it (observed state); null while loading / unknown. */
+    fun customEmoji(id: Long): StickerItem? = null
+
+    /** Fetches custom emoji by id (batched into getCustomEmojiStickers calls); [customEmoji] turns non-null. */
+    fun loadCustomEmoji(ids: Collection<Long>) {}
+
+    /** A sticker / custom-emoji set for the Add Stickers sheet; [onResult] gets null when it can't be loaded. */
+    fun loadStickerSet(setId: Long, onResult: (StickerSetInfo?) -> Unit) {
+        // Demo: a made-up pack drawn with Apple emoji.
+        val emoji = listOf("🥳", "😎", "🤩", "😂", "😍", "🙏", "👍", "🔥", "💯", "🎉", "😭", "🤯", "🥰", "😴", "🤔", "👻", "🐱", "🐶", "🦊", "🐼")
+        onResult(
+            StickerSetInfo(
+                id = setId, title = "Party Animals", name = "PartyAnimals", installed = demoInstalledSets.contains(setId), emoji = false,
+                stickers = emoji.map { e -> StickerItem(0, e, null, null, 512, 512, setId = setId) },
+            )
+        )
+    }
+
+    /** Installs or removes a sticker / emoji set (changeStickerSet); [onDone] gets an error or null. */
+    fun setStickerSetInstalled(setId: Long, installed: Boolean, onDone: (String?) -> Unit) {
+        if (installed) demoInstalledSets.add(setId) else demoInstalledSets.remove(setId)
+        onDone(null)
+    }
+
+    /** Adds a GIF (animation file id) to Saved GIFs; [onDone] gets an error or null. */
+    fun saveGif(fileId: Int, onDone: (String?) -> Unit) = onDone(null)
+
+    /** Removes a GIF from Saved GIFs; [onDone] gets an error or null. */
+    fun removeSavedGif(fileId: Int, onDone: (String?) -> Unit) = onDone(null)
+    // ---- end Custom emoji ----
+
+    // ---- Accounts & Settings v2 ----
+    /** Accounts signed in on this device, in the order they were added (demo: just [me]). */
+    val accounts: List<AccountInfo> get() = listOf(AccountInfo(0, me.id, me.name, me.phone, null, active = true))
+    /** Whether "Add Account" is available (live TDLib only). */
+    val canAddAccount: Boolean get() = false
+    /** True while a new account is signing in (the login screens then offer "Cancel"). */
+    val addingAccount: Boolean get() = false
+    /** Starts a fresh TDLib database for a new account; the login flow follows its auth state. */
+    fun addAccount() {}
+    /** Makes the account in [slot] the active one (restarts TDLib on its database). */
+    fun switchAccount(slot: Int) {}
+    /** Abandons signing in a new account and returns to the previous one. */
+    fun cancelAddAccount() {}
+    // ---- end Accounts & Settings v2 ----
+
+    // ---- Bubbles v2 ----
+    /**
+     * Title + small photo of the chat a forwarded message comes from (forward header). Live loads an unknown chat on
+     * the first call and returns it once it arrived; the demo only knows its own chats (null otherwise).
+     */
+    fun originChat(chatId: Long): OriginChat? = chat(chatId)?.let { OriginChat(it.title, avatar(chatId)) }
+
+    /** Stops downloading the file behind [image] (the X of the download ring); [fileProgress] goes back to 0. */
+    fun cancelDownload(image: ImageRef) {}
+
+    /** Resolves where the comments of channel post [messageId] live; [onResult] gets null when there are none. */
+    fun loadCommentsTarget(chatId: Long, messageId: Long, onResult: (CommentsTarget?) -> Unit) = onResult(null)
+    // ---- end Bubbles v2 ----
+
+    // ---- Folder pins ----
+    /**
+     * Chats of the folder tab at [index] of [folders] (0 = All Chats, the main list) in that list's own order. Every
+     * chat list has its own pinned chats (Telegram): [Chat.pinned] of the returned chats tells whether the chat is
+     * pinned in *this* list, pinned chats come first.
+     */
+    fun chatsInFolder(index: Int): List<Chat> = chats.filter { !it.archived && isInFolder(it, index) }
+
+    /**
+     * Pins or unpins [chatId] in the list of the folder tab at [index]. 0 = the main list (the archive for an
+     * archived chat), like [togglePin].
+     */
+    fun togglePinInFolder(chatId: Long, index: Int) = togglePin(chatId)
+
+    /**
+     * The account being switched to while TDLib restarts on its database (the UI cross-fades to it meanwhile);
+     * null when no switch is running. Goes back to null when the switch finished or failed.
+     */
+    val switchingAccount: AccountInfo? get() = null
+    // ---- end Folder pins ----
+
+    // ---- Profile media grid ----
+    /** Drops deleted messages from the cached shared-media lists of [chatId] (the demo derives them from the history). */
+    fun forgetSharedMessages(chatId: Long, ids: Set<Long>) {}
+    // ---- end Profile media grid ----
+
+    // ---- Message info & reaction effects ----
+    /**
+     * Who saw a message (Telegram iOS "Read at 14:32" / "N Seen"): read date in private chats, viewers in small groups.
+     * [onResult] gets null when nothing can be shown (the menu row stays hidden).
+     */
+    fun loadMessageSeenInfo(chatId: Long, messageId: Long, onResult: (MessageSeenInfo?) -> Unit) {
+        val m = findMessage(chatId, messageId)
+        val chat = chat(chatId)
+        if (m == null || chat == null || !m.outgoing) return onResult(null)
+        when (chat.type) {
+            ChatType.Private -> onResult(if (m.status == MessageStatus.Read) MessageSeenInfo(readAt = m.date + 95_000L) else null)
+            ChatType.Group -> onResult(
+                MessageSeenInfo(
+                    viewers = users.values.filter { it.id != me.id }.take(4).mapIndexed { i, u -> MessageViewerInfo(u.id, m.date + (40L + i * 70L) * 1000L) }
+                )
+            )
+            else -> onResult(null)
+        }
+    }
+
+    /**
+     * People who put reactions on a message ([emoji] null = all reactions), [limit] per page from [offset] ("" = first).
+     * [onResult] gets null when the list is not available.
+     */
+    fun loadAddedReactions(chatId: Long, messageId: Long, emoji: String?, offset: String, limit: Int, onResult: (AddedReactionsPage?) -> Unit) {
+        val m = findMessage(chatId, messageId)
+        if (m == null || m.reactions.isEmpty()) return onResult(null)
+        val pool = users.values.filter { it.id != me.id }.ifEmpty { return onResult(null) }
+        var n = 0
+        val all = m.reactions.filter { emoji == null || sameEmoji(it.emoji, emoji) }.flatMap { r ->
+            val who = mutableListOf<AddedReactionInfo>()
+            if (r.chosen) who += AddedReactionInfo(me.id, r.emoji, m.date + 30_000L, outgoing = true)
+            repeat(minOf(r.count - if (r.chosen) 1 else 0, 5)) { i -> who += AddedReactionInfo(pool[(n++) % pool.size].id, r.emoji, m.date + (60L + i * 45L) * 1000L) }
+            who
+        }
+        val from = offset.toIntOrNull() ?: 0
+        val page = all.drop(from).take(limit)
+        val total = m.reactions.filter { emoji == null || sameEmoji(it.emoji, emoji) }.sumOf { it.count }
+        onResult(AddedReactionsPage(page, total, if (from + page.size < all.size) (from + page.size).toString() else ""))
+    }
+
+    /** Telegram's TGS animations of an emoji reaction once [loadReactionAnimations] fetched them (observed state); null otherwise. */
+    fun reactionAnimations(emoji: String): ReactionAnimations? = null
+
+    /** Fetches the animations of these reactions (TDLib getEmojiReaction); [reactionAnimations] turns non-null. */
+    fun loadReactionAnimations(emojis: Collection<String>) {}
+    // ---- end Message info & reaction effects ----
+
+    // ---- Text formatting ----
+    /** Sends text with formatting entities (bold, italic, ..., links); demo ignores the formatting. */
+    fun sendFormattedText(chatId: Long, text: String, entities: List<Entity>, replyTo: Long?) = sendText(chatId, text, replyTo)
+    // ---- end Text formatting ----
+}
+
+/** "❤" and "❤️" are the same reaction. */
+private fun sameEmoji(a: String, b: String) = a.replace("\uFE0F", "") == b.replace("\uFE0F", "")
+
+/** Sticker sets "installed" in the demo (the demo has no server). */
+private val demoInstalledSets = HashSet<Long>()
+
+class DemoRepository(private val scope: CoroutineScope) : TelegramRepository {
+
+    private val now = System.currentTimeMillis()
+    private fun ago(minutes: Long) = now - minutes * 60_000
+
+    override val me = User(0, "Abtin", "", "abtin", "+98 912 000 0000", "Building my own Telegram ✨", online = true, premium = true)
+
+    private val userList = listOf(
+        me,
+        User(1, "Sara", "Ahmadi", "sara_a", "+98 912 111 2233", "Designer • Coffee lover ☕️\nPortfolio: https://sara-design.com · @designdaily · #uidesign", online = true, hasStory = true),
+        User(2, "Reza", "Karimi", "rezak", "+98 935 222 3344", "Android dev", lastSeen = "last seen 5 minutes ago", hasStory = true),
+        User(3, "Mina", "Rahimi", "mina", "+98 901 333 4455", lastSeen = "last seen at 11:24", hasStory = true, storySeen = true),
+        User(4, "Ali", "Moradi", null, "+98 912 444 5566", online = true),
+        User(5, "Niloofar", "", "nilo", "+98 919 555 6677", "🌸", lastSeen = "last seen yesterday at 22:10", hasStory = true),
+        User(6, "Pavel", "Durov", "durov", "+42 000 0000", "Founder", lastSeen = "last seen recently", verified = true, premium = true),
+        User(7, "Kian", "Tehrani", "kian", "+98 930 777 8899", lastSeen = "last seen within a week"),
+        User(8, "Donya", "Farahani", null, "+98 912 888 9900", online = true, hasStory = true),
+        User(9, "Behnam", "", "behnam", "+98 912 999 0011", lastSeen = "last seen a long time ago"),
+        User(10, "Telegram", "", "telegram", "42777", "Official notifications", verified = true),
+        User(11, "Hamid", "Soleimani", "hamid", "+98 912 121 2121", lastSeen = "last seen 2 hours ago"),
+        User(12, "Elham", "Jafari", null, "+98 912 131 3131", lastSeen = "last seen recently"),
+    )
+    override val users: Map<Long, User> = mutableStateMapOf<Long, User>().apply { userList.forEach { put(it.id, it) } }
+
+    private val chatList: SnapshotStateList<Chat> = mutableStateListOf(
+        Chat(100, ChatType.Saved, "Saved Messages", peerUserId = 0, pinned = true),
+        Chat(101, ChatType.Private, "Sara Ahmadi", peerUserId = 1, pinned = true, unread = 3, typing = null),
+        Chat(102, ChatType.Group, "Android Devs 🇮🇷", members = 1284, unread = 42, mentions = 1, folder = "Work",
+            description = "Everything Kotlin, Compose and Android. Rules: https://t.me/androiddevs_ir/1 · admin @rezak · #android", username = "androiddevs_ir"),
+        Chat(103, ChatType.Private, "Reza Karimi", peerUserId = 2, draft = "See you tomorrow at 10?", folder = "Work"),
+        Chat(104, ChatType.Channel, "Telegram News", members = 9_870_000, unread = 2, muted = true, verified = true,
+            description = "The official Telegram channel. News and updates: https://telegram.org/blog · support@telegram.org", username = "telegram"),
+        Chat(105, ChatType.Private, "Mina Rahimi", peerUserId = 3),
+        Chat(106, ChatType.Group, "Family 👨‍👩‍👧", members = 8, unread = 5, muted = true, folder = "Personal"),
+        Chat(107, ChatType.Private, "Ali Moradi", peerUserId = 4, folder = "Personal"),
+        Chat(108, ChatType.Bot, "BotFather", verified = true, description = "BotFather is the one bot to rule them all.", username = "BotFather"),
+        Chat(109, ChatType.Private, "Niloofar", peerUserId = 5, markedUnread = true),
+        Chat(110, ChatType.Private, "Pavel Durov", peerUserId = 6, verified = true),
+        Chat(111, ChatType.Channel, "Design Daily", members = 48_200, description = "UI/UX inspiration every day.", username = "designdaily"),
+        Chat(112, ChatType.Private, "Kian Tehrani", peerUserId = 7, archived = true),
+        Chat(113, ChatType.Group, "Old University Friends", members = 23, archived = true, muted = true),
+        Chat(114, ChatType.Private, "Telegram", peerUserId = 10, verified = true),
+        Chat(115, ChatType.Private, "Donya Farahani", peerUserId = 8),
+    )
+    override val chats: List<Chat> get() = chatList
+
+    private val messageStore = mutableStateMapOf<Long, SnapshotStateList<Message>>()
+    private var nextId = 10_000L
+
+    override val calls: SnapshotStateList<CallRecord> = mutableStateListOf(
+        CallRecord(1, 1, ago(35), outgoing = true, missed = false, video = false, durationSec = 312),
+        CallRecord(2, 2, ago(160), outgoing = false, missed = true, video = false, durationSec = 0),
+        CallRecord(3, 4, ago(60 * 5), outgoing = false, missed = false, video = true, durationSec = 1240),
+        CallRecord(4, 3, ago(60 * 26), outgoing = true, missed = false, video = false, durationSec = 65),
+        CallRecord(5, 5, ago(60 * 30), outgoing = false, missed = true, video = true, durationSec = 0),
+        CallRecord(6, 8, ago(60 * 50), outgoing = true, missed = false, video = false, durationSec = 1802),
+        CallRecord(7, 1, ago(60 * 75), outgoing = false, missed = false, video = false, durationSec = 94),
+        CallRecord(8, 9, ago(60 * 24 * 4), outgoing = true, missed = true, video = false, durationSec = 0),
+    )
+
+    override val stories: List<Story> = listOf(
+        Story(1, "🏔", listOf(0xFF4FACFE, 0xFF00F2FE), "Weekend in Darband", ago(120)),
+        Story(2, "💻", listOf(0xFF434343, 0xFF000000), "New Compose release!", ago(300)),
+        Story(3, "🌅", listOf(0xFFFA709A, 0xFFFEE140), "Sunset vibes", ago(500)),
+        Story(5, "🌸", listOf(0xFFA18CD1, 0xFFFBC2EB), "Spring is here", ago(700)),
+        Story(8, "☕️", listOf(0xFFF6D365, 0xFFFDA085), "Morning coffee", ago(900)),
+    )
+
+    override val sessions: List<Session> get() = sessionList
+    private val sessionList = mutableStateListOf(
+        Session("Pixel 9 Pro", "TGlass 0.1.0", "Tehran, Iran", "online", current = true),
+        Session("MacBook Pro", "Telegram macOS 11.3", "Tehran, Iran", "10:42"),
+        Session("iPhone 16 Pro", "Telegram iOS 12.1", "Karaj, Iran", "yesterday"),
+        Session("Chrome 139, Windows", "Telegram Web A 3.2", "Isfahan, Iran", "Sep 12"),
+    )
+
+    override val folders = listOf("All Chats", "Personal", "Work", "Unread")
+
+    init {
+        seedMessages()
+    }
+
+    private fun msg(chatId: Long, sender: Long, minutesAgo: Long, content: MessageContent, reactions: List<Reaction> = emptyList(), reply: Long? = null, views: Int? = null, status: MessageStatus = MessageStatus.Read): Message =
+        Message(nextId++, chatId, sender, ago(minutesAgo), content, outgoing = sender == 0L, status = status, reactions = reactions, replyToId = reply, views = views)
+
+    private fun text(s: String) = MessageContent.Text(s)
+
+    private fun wave(n: Int, seed: Int) = List(n) { i -> (0.2f + 0.8f * (((i * 37 + seed * 11) % 23) / 23f)) }
+
+    private fun seedMessages() {
+        fun put(chatId: Long, list: List<Message>) {
+            messageStore[chatId] = mutableStateListOf<Message>().apply { addAll(list) }
+        }
+        put(100, listOf(
+            msg(100, 0, 60 * 30, text("Ideas for the app:\n• iOS 26 Liquid Glass tab bar\n• Blurred context menu on long press\n• Swipe back everywhere")),
+            msg(100, 0, 60 * 29, MessageContent.Link("https://github.com/Kyant0/AndroidLiquidGlass", "github.com", "Kyant0/AndroidLiquidGlass", "Compose Multiplatform Liquid Glass effect")),
+            msg(100, 0, 60 * 2, MessageContent.File("Telegram_iOS_Exact_UI_UX_Design_Spec.md", "38 KB")),
+        ))
+        val s1 = msg(101, 1, 180, text("Hey! Did you see the new Telegram update? 😍"))
+        put(101, listOf(
+            msg(101, 1, 60 * 25, text("Good morning ☀️")),
+            msg(101, 0, 60 * 25 - 2, text("Morning! How was the trip?")),
+            msg(101, 1, 60 * 25 - 4, MessageContent.Photo(3, 1.33f, "Darband was beautiful 🏔", "🏔"), listOf(Reaction("❤️", 1, true))),
+            msg(101, 1, 60 * 25 - 5, text("We should go together next time")),
+            msg(101, 1, 60 * 25 - 5, MessageContent.Photo(11, 1.5f, null, "🌄")).copy(albumId = 501),
+            msg(101, 1, 60 * 25 - 5, MessageContent.Photo(12, 0.8f, null, "🌲")).copy(albumId = 501),
+            msg(101, 1, 60 * 25 - 5, MessageContent.Photo(13, 1.0f, null, "🏕")).copy(albumId = 501),
+            msg(101, 0, 60 * 24, text("Definitely! Let me know when")),
+            s1,
+            msg(101, 0, 178, text("Yes!! The Liquid Glass design is insane"), reply = s1.id),
+            msg(101, 0, 177, text("I'm building my own client that looks exactly like it, for Android 🤓")),
+            msg(101, 1, 150, MessageContent.Voice(14, wave(40, 3))),
+            msg(101, 1, 149, text("Send me the APK when it's ready!"), listOf(Reaction("🔥", 2, false), Reaction("👍", 1, true))),
+            msg(101, 1, 12, MessageContent.Sticker("🥳")),
+            msg(101, 1, 11, text("Also, are we still on for dinner tonight?")),
+        ))
+        put(102, listOf(
+            msg(102, 2, 400, text("Anyone tried Compose 1.10 yet?")),
+            msg(102, 11, 390, text("Yes, the new shared element APIs are great")),
+            msg(102, 12, 385, text("Performance is much better on low-end devices too"), listOf(Reaction("👍", 12, false), Reaction("🔥", 4, false))),
+            msg(102, 0, 300, text("Here's a Liquid Glass tab bar I built with the backdrop library")),
+            msg(102, 0, 299, MessageContent.Photo(5, 0.75f, null, "📱")),
+            msg(102, 2, 200, text("Wow, that looks exactly like iOS 26 🤯"), listOf(Reaction("😍", 7, false))),
+            msg(102, 11, 100, MessageContent.Poll("Which architecture do you use?", listOf("MVVM", "MVI", "Clean + MVVM", "Just vibes"), listOf(34, 21, 48, 12))),
+            msg(102, 9, 20, text("@abtin can you share the repo?")),
+            msg(102, 12, 3, text("Meetup is on Friday at 18:00, don't forget!")),
+        ))
+        put(103, listOf(
+            msg(103, 2, 60 * 3, text("The build is green now ✅")),
+            msg(103, 0, 60 * 3 - 1, text("Great, thanks Reza!")),
+            msg(103, 2, 60 * 2, text("Want to review the PR together?")),
+        ))
+        put(104, listOf(
+            msg(104, -1, 60 * 48, MessageContent.Photo(1, 1.6f, "Telegram now fully supports Liquid Glass on iOS — transparent elements and refraction effects throughout the app.", "✨"), listOf(Reaction("❤️", 18_400, false), Reaction("🔥", 9_200, false), Reaction("👍", 5_100, false)), views = 2_400_000),
+            msg(104, -1, 60 * 6, text("You can control interface effects in Settings → Power Saving."), listOf(Reaction("👍", 3_900, false)), views = 1_200_000),
+            msg(104, -1, 30, text("New in this update: AI summaries for long posts, comments in video chats and threads for bots."), listOf(Reaction("🎉", 7_700, false), Reaction("❤️", 2_300, false)), views = 860_000).copy(comments = 214),
+        ))
+        put(105, listOf(
+            msg(105, 3, 60 * 20, text("Can you send me the files from the meeting?")),
+            msg(105, 0, 60 * 19, MessageContent.File("Meeting_Notes.pdf", "1.2 MB")),
+            msg(105, 3, 60 * 19 - 1, text("Thank you! 🙏")),
+        ))
+        put(106, listOf(
+            msg(106, 5, 90, text("Dinner at grandma's on Friday 🍲")),
+            msg(106, 4, 80, text("I'll bring dessert")),
+            msg(106, 5, 70, MessageContent.Location("Grandma's house", "Vanak Sq, Tehran")),
+        ))
+        put(107, listOf(
+            msg(107, 4, 60 * 50, text("Here's my number")),
+            msg(107, 4, 60 * 50 - 1, MessageContent.Contact("Ali Moradi", "+98 912 444 5566")),
+            msg(107, 0, 60 * 49, text("Saved 👌")),
+        ))
+        put(108, listOf(
+            msg(108, -2, 60 * 72, text("I can help you create and manage Telegram bots.\n\n/newbot - create a new bot\n/mybots - edit your bots")),
+        ))
+        put(109, listOf(msg(109, 5, 60 * 5, text("Happy birthday!! 🎂🎉"))))
+        put(110, listOf(msg(110, 6, 60 * 24 * 3, text("Thanks for building on Telegram."))))
+        put(111, listOf(
+            msg(111, -1, 60 * 10, MessageContent.Photo(7, 1.0f, "Glassmorphism done right.", "🧊"), listOf(Reaction("😍", 540, false)), views = 22_000),
+        ))
+        put(112, listOf(msg(112, 7, 60 * 24 * 9, text("Long time no see!"))))
+        put(113, listOf(msg(113, 9, 60 * 24 * 12, text("Reunion next month?"))))
+        put(114, listOf(msg(114, 10, 60 * 24 * 20, text("Login code: 12345. Do not give this code to anyone, even if they say they are from Telegram!"))))
+        put(115, listOf(msg(115, 8, 60 * 24 * 6, text("See you soon 👋"))))
+    }
+
+    override fun chat(id: Long) = chatList.firstOrNull { it.id == id }
+
+    override fun messages(chatId: Long): List<Message> = messageStore[chatId] ?: emptyList()
+
+    private fun list(chatId: Long) = messageStore.getOrPut(chatId) { mutableStateListOf() }
+
+    private fun updateChat(chatId: Long, f: (Chat) -> Chat) {
+        val i = chatList.indexOfFirst { it.id == chatId }
+        if (i >= 0) chatList[i] = f(chatList[i])
+    }
+
+    private fun updateMessage(chatId: Long, messageId: Long, f: (Message) -> Message) {
+        val l = messageStore[chatId] ?: return
+        val i = l.indexOfFirst { it.id == messageId }
+        if (i >= 0) l[i] = f(l[i])
+    }
+
+    private fun bumpToTop(chatId: Long) {
+        val i = chatList.indexOfFirst { it.id == chatId }
+        if (i > 0) {
+            val c = chatList.removeAt(i)
+            chatList.add(if (c.pinned) 0 else chatList.count { it.pinned }, c)
+        }
+    }
+
+    override fun sendText(chatId: Long, text: String, replyTo: Long?) {
+        sendContent(chatId, MessageContent.Text(text), replyTo)
+    }
+
+    override fun sendContent(chatId: Long, content: MessageContent, replyTo: Long?) {
+        val m = Message(nextId++, chatId, 0, System.currentTimeMillis(), content, outgoing = true, status = MessageStatus.Sending, replyToId = replyTo)
+        list(chatId).add(m)
+        updateChat(chatId) { it.copy(draft = null, archived = false) }
+        bumpToTop(chatId)
+        scope.launch {
+            delay(450)
+            updateMessage(chatId, m.id) { it.copy(status = MessageStatus.Sent) }
+            val chat = chat(chatId) ?: return@launch
+            if (chat.type != ChatType.Private || chat.peerUserId == null || chat.peerUserId == 0L) return@launch
+            delay(900)
+            updateMessage(chatId, m.id) { it.copy(status = MessageStatus.Read) }
+            updateChat(chatId) { it.copy(typing = "typing") }
+            delay(1600)
+            updateChat(chatId) { it.copy(typing = null) }
+            val reply = autoReplies[(m.id % autoReplies.size).toInt()]
+            list(chatId).add(Message(nextId++, chatId, chat.peerUserId, System.currentTimeMillis(), MessageContent.Text(reply), outgoing = false))
+        }
+    }
+
+    private val autoReplies = listOf("Haha nice 😄", "Sounds good!", "Wait, really? 😮", "👍", "Let me check and get back to you", "Love it ❤️", "Okay, see you then!")
+
+    override fun editText(chatId: Long, messageId: Long, text: String) = updateMessage(chatId, messageId) {
+        val c = it.content
+        val newContent = when (c) {
+            is MessageContent.Photo -> c.copy(caption = text.ifBlank { null })
+            is MessageContent.File -> c.copy(caption = text.ifBlank { null })
+            else -> MessageContent.Text(text)
+        }
+        it.copy(content = newContent, edited = true)
+    }
+
+    override fun deleteMessages(chatId: Long, ids: Set<Long>, forEveryone: Boolean) {
+        messageStore[chatId]?.removeAll { it.id in ids }
+    }
+
+    override fun toggleReaction(chatId: Long, messageId: Long, emoji: String) = updateMessage(chatId, messageId) { m ->
+        val existing = m.reactions.firstOrNull { it.emoji == emoji }
+        val others = m.reactions.map { r -> if (r.chosen && r.emoji != emoji) r.copy(count = r.count - 1, chosen = false) else r }.filter { it.count > 0 }
+        val reactions = when {
+            existing == null -> others + Reaction(emoji, 1, true)
+            existing.chosen -> others.mapNotNull { if (it.emoji == emoji) it.copy(count = it.count - 1, chosen = false).takeIf { r -> r.count > 0 } else it }
+            else -> others.map { if (it.emoji == emoji) it.copy(count = it.count + 1, chosen = true) else it }
+        }
+        m.copy(reactions = reactions)
+    }
+
+    override fun togglePinMessage(chatId: Long, messageId: Long) = updateMessage(chatId, messageId) { it.copy(pinned = !it.pinned) }
+
+    override fun vote(chatId: Long, messageId: Long, option: Int) = updateMessage(chatId, messageId) { m ->
+        val p = m.content as? MessageContent.Poll ?: return@updateMessage m
+        if (p.voted != null) return@updateMessage m
+        m.copy(content = p.copy(voted = option, votes = p.votes.mapIndexed { i, v -> if (i == option) v + 1 else v }))
+    }
+
+    override fun openChat(chatId: Long) = updateChat(chatId) { it.copy(unread = 0, mentions = 0, markedUnread = false) }
+
+    override fun setDraft(chatId: Long, draft: String?) = updateChat(chatId) { it.copy(draft = draft?.takeIf { d -> d.isNotBlank() }) }
+
+    override fun togglePin(chatId: Long) {
+        val i = chatList.indexOfFirst { it.id == chatId }
+        if (i < 0) return
+        val c = chatList.removeAt(i)
+        val updated = c.copy(pinned = !c.pinned)
+        chatList.add(if (updated.pinned) 0 else chatList.count { it.pinned }, updated)
+    }
+
+    override fun toggleMute(chatId: Long) = updateChat(chatId) { it.copy(muted = !it.muted) }
+
+    override fun toggleRead(chatId: Long) = updateChat(chatId) {
+        if (it.unread > 0 || it.markedUnread) it.copy(unread = 0, mentions = 0, markedUnread = false) else it.copy(markedUnread = true)
+    }
+
+    override fun toggleArchive(chatId: Long) = updateChat(chatId) { it.copy(archived = !it.archived, pinned = false) }
+
+    override fun deleteChat(chatId: Long) {
+        chatList.removeAll { it.id == chatId }
+        messageStore.remove(chatId)
+    }
+
+    override fun privateChatWith(userId: Long): Long {
+        chatList.firstOrNull { it.peerUserId == userId && it.type != ChatType.Group }?.let { return it.id }
+        if (userId == 0L) return 100
+        val u = users[userId] ?: return 100
+        val id = 1_000 + userId
+        chatList.add(chatList.count { it.pinned }, Chat(id, ChatType.Private, u.name, peerUserId = userId))
+        return id
+    }
+
+    override fun markStorySeen(userId: Long) {
+        val u = users[userId] ?: return
+        (users as MutableMap<Long, User>)[userId] = u.copy(storySeen = true)
+    }
+
+    override fun terminateSession(session: Session) {
+        sessionList.remove(session)
+    }
+
+    override fun terminateOtherSessions() {
+        sessionList.removeAll { !it.current }
+    }
+
+    // ---- Groups & channels (demo: everything happens locally) ----
+
+    /** Member lists of groups the user created or changed in the demo (others use the generated default). */
+    private val demoMembers = mutableStateMapOf<Long, List<Member>>()
+    private val demoPhotos = mutableStateMapOf<Long, String>()
+    private val demoAbout = mutableStateMapOf<Long, String>()
+    private var nextChatId = 5_000L
+
+    override fun avatar(peerId: Long): ImageRef? = demoPhotos[peerId]?.let { ImageRef(0, it) }
+
+    override fun chatInfo(chatId: Long): ChatInfo? {
+        val base = super.chatInfo(chatId) ?: return null
+        val members = demoMembers[chatId]
+        val about = demoAbout[chatId]
+        if (members == null && about == null) return base
+        return base.copy(
+            about = about ?: base.about,
+            members = members ?: base.members,
+            memberCount = if (members != null) maxOf(chat(chatId)?.members ?: 0, members.size) else base.memberCount,
+        )
+    }
+
+    override fun muteFor(chatId: Long, seconds: Int) = updateChat(chatId) { it.copy(muted = seconds > 0) }
+
+    private fun createLocal(type: ChatType, title: String, description: String?, members: List<Member>, photoPath: String?, service: String): Long {
+        val id = nextChatId++
+        chatList.add(chatList.count { it.pinned }, Chat(id, type, title.trim(), members = members.size, description = description?.ifBlank { null }, rights = ChatRights.Owner, canPost = type == ChatType.Channel))
+        if (type == ChatType.Group) demoMembers[id] = members
+        if (photoPath != null) demoPhotos[id] = photoPath
+        list(id).add(Message(nextId++, id, 0, System.currentTimeMillis(), MessageContent.Service(service), outgoing = true))
+        return id
+    }
+
+    override fun createGroup(title: String, userIds: List<Long>, photoPath: String?, onDone: (chatId: Long?, error: String?) -> Unit) {
+        val members = listOf(Member(me.id, "owner")) + userIds.map { Member(it) }
+        onDone(createLocal(ChatType.Group, title, null, members, photoPath, "You created the group \"${title.trim()}\""), null)
+    }
+
+    override fun createChannel(title: String, description: String, photoPath: String?, onDone: (chatId: Long?, error: String?) -> Unit) {
+        onDone(createLocal(ChatType.Channel, title, description, listOf(Member(me.id, "owner")), photoPath, "Channel created"), null)
+    }
+
+    override fun editChat(chatId: Long, title: String, description: String, onDone: (String?) -> Unit) {
+        updateChat(chatId) { it.copy(title = title.trim().ifBlank { it.title }, description = description.trim().ifBlank { null }) }
+        demoAbout[chatId] = description.trim()
+        onDone(null)
+    }
+
+    override fun updateChatPhoto(chatId: Long, path: String?, onDone: (String?) -> Unit) {
+        if (path == null) demoPhotos.remove(chatId) else demoPhotos[chatId] = path
+        onDone(null)
+    }
+
+    override fun addMembers(chatId: Long, userIds: List<Long>, onDone: (String?) -> Unit) {
+        val current = demoMembers[chatId] ?: super.chatInfo(chatId)?.members.orEmpty()
+        val added = userIds.filter { id -> current.none { it.userId == id } }
+        demoMembers[chatId] = current + added.map { Member(it) }
+        updateChat(chatId) { it.copy(members = it.members + added.size) }
+        onDone(null)
+    }
+
+    override fun removeMember(chatId: Long, userId: Long, onDone: (String?) -> Unit) {
+        val current = demoMembers[chatId] ?: super.chatInfo(chatId)?.members.orEmpty()
+        demoMembers[chatId] = current.filter { it.userId != userId }
+        updateChat(chatId) { it.copy(members = (it.members - 1).coerceAtLeast(0)) }
+        onDone(null)
+    }
+
+    // ---- Contacts, media, calls (demo) ----
+    private val removedContacts = mutableStateListOf<Long>()
+
+    override val contacts: List<User>
+        get() = users.values.filter { it.id != me.id && it.id != 10L && it.id !in removedContacts }
+
+    override fun removeContact(userId: Long, onDone: (String?) -> Unit) {
+        if (userId !in removedContacts) removedContacts.add(userId)
+        onDone(null)
+    }
+
+    override fun addContact(firstName: String, lastName: String, phone: String, onDone: (userId: Long?, error: String?) -> Unit) {
+        // Re-adding someone who was removed brings them back instead of creating a duplicate.
+        val digits = phone.filter { it.isDigit() }
+        val existing = users.values.firstOrNull { digits.isNotEmpty() && it.phone.filter { ch -> ch.isDigit() } == digits }
+        if (existing != null) {
+            removedContacts.remove(existing.id)
+            onDone(existing.id, null)
+        } else super.addContact(firstName, lastName, phone, onDone)
+    }
+
+    override fun deleteCallRecords(records: List<CallRecord>) {
+        val ids = records.map { it.id }.toSet()
+        calls.removeAll { it.id in ids }
+    }
+    // ---- end Contacts, media, calls (demo) ----
+
+    // ---- Chat polls, audio & search (demo) ----
+    override fun votePoll(chatId: Long, messageId: Long, optionIds: List<Int>) = updateMessage(chatId, messageId) { m ->
+        val p = m.content as? MessageContent.Poll ?: return@updateMessage m
+        if (p.chosen.isNotEmpty() || p.closed || optionIds.isEmpty()) return@updateMessage m
+        val chosen = optionIds.distinct().sorted()
+        val votes = p.votes.mapIndexed { i, v -> if (i in chosen) v + 1 else v }
+        val quizAnswer = if (p.quiz) (p.correctOption ?: 0) else null
+        m.copy(
+            content = p.copy(
+                voted = chosen.first(), chosen = chosen, votes = votes, percents = emptyList(),
+                totalVoters = p.voterCount + 1, correctOption = quizAnswer ?: p.correctOption,
+                canGetVoters = !p.anonymous,
+            )
+        )
+    }
+
+    override fun retractPollVote(chatId: Long, messageId: Long) = updateMessage(chatId, messageId) { m ->
+        val p = m.content as? MessageContent.Poll ?: return@updateMessage m
+        if (p.chosen.isEmpty() || p.closed) return@updateMessage m
+        val votes = p.votes.mapIndexed { i, v -> if (i in p.chosen) (v - 1).coerceAtLeast(0) else v }
+        m.copy(content = p.copy(voted = null, chosen = emptyList(), votes = votes, percents = emptyList(), totalVoters = (p.voterCount - 1).coerceAtLeast(0)))
+    }
+
+    override fun stopPoll(chatId: Long, messageId: Long, onDone: (String?) -> Unit) {
+        updateMessage(chatId, messageId) { m ->
+            val p = m.content as? MessageContent.Poll ?: return@updateMessage m
+            m.copy(content = p.copy(closed = true, correctOption = if (p.quiz) (p.correctOption ?: 0) else p.correctOption))
+        }
+        onDone(null)
+    }
+    // ---- end Chat polls, audio & search (demo) ----
+
+    // ---- Folder pins (demo) ----
+    /** Pinned chat ids per folder tab index (> 0), in pin order; the main list keeps using [Chat.pinned]. */
+    private val folderPins = mutableStateMapOf<Int, List<Long>>()
+
+    override fun chatsInFolder(index: Int): List<Chat> {
+        val base = chats.filter { !it.archived && isInFolder(it, index) }
+        if (index == 0) return base
+        val pins = folderPins[index].orEmpty()
+        val pinned = pins.mapNotNull { id -> base.firstOrNull { it.id == id } }.map { if (it.pinned) it else it.copy(pinned = true) }
+        val rest = base.filter { it.id !in pins }
+            .map { if (it.pinned) it.copy(pinned = false) else it }
+            .sortedByDescending { lastMessage(it.id)?.date ?: 0L }
+        return pinned + rest
+    }
+
+    override fun togglePinInFolder(chatId: Long, index: Int) {
+        if (index == 0) return togglePin(chatId)
+        val pins = folderPins[index].orEmpty()
+        folderPins[index] = if (chatId in pins) pins - chatId else listOf(chatId) + pins
+    }
+    // ---- end Folder pins (demo) ----
+}
+
+/** Sender label for a message in group chats. */
+fun TelegramRepository.senderName(m: Message): String = when {
+    m.outgoing -> "You"
+    m.senderId < 0 -> (chat(m.senderId) ?: chat(m.chatId))?.title ?: ""
+    else -> user(m.senderId)?.name ?: ""
+}

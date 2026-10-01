@@ -1,0 +1,13 @@
+component: TabBar (iOS 26)
+source: submodules/TelegramUI/Components/TabBarComponent/Sources/TabBarComponent.swift
+layout:
+  innerInset: 4
+  itemHeight: 56
+  barHeight: 64                          # 56 + 4*2
+  maxWidth: 500
+  shape: capsule (cornerRadius = height/2)
+  search_button: { size: 64, gap: 8, position: right of tabs }
+  selection_lens: { width: "max(itemWidth, itemHeight*1.2) + 8", liftable: true }
+title: { font: 10 semibold, bottomInset: 8 }
+badge: { font: 13 regular, insets: "0 5 1 5" }
+glass: { tint: panel, interactive: true }
