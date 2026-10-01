@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.Dp
 import com.abtin.tglass.R
 import com.abtin.tglass.core.design.LocalAppSettings
+import com.abtin.tglass.core.navigation.LocalScreenVisible
 import com.airbnb.lottie.LottieProperty
 import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
@@ -100,7 +101,9 @@ fun LottieIcon(
 fun LottieLoop(@RawRes res: Int, size: Dp, modifier: Modifier = Modifier, iterations: Int = LottieConstants.IterateForever) {
     val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(res))
     val animations = LocalAppSettings.current.animations
-    val progress by animateLottieCompositionAsState(composition, iterations = iterations, isPlaying = animations)
+    // Paused while a screen above completely covers this one.
+    val screenVisible by LocalScreenVisible.current
+    val progress by animateLottieCompositionAsState(composition, iterations = iterations, isPlaying = animations && screenVisible)
     LottieAnimation(composition = composition, progress = { progress }, modifier = modifier.size(size), renderMode = RenderMode.HARDWARE)
 }
 
@@ -133,8 +136,10 @@ fun TgsSticker(path: String?, modifier: Modifier, placeholder: @Composable () ->
     }
     // At most a handful of stickers loop at once (the oldest on screen win); the rest rest on their first frame.
     val token = remember { Any() }
-    DisposableEffect(token) {
-        LottieBudget.active.add(token)
+    // A covered screen's stickers neither loop nor hold a slot of the budget.
+    val screenVisible by LocalScreenVisible.current
+    DisposableEffect(token, screenVisible) {
+        if (screenVisible) LottieBudget.active.add(token)
         onDispose { LottieBudget.active.remove(token) }
     }
     val allowed by remember(token) { derivedStateOf { LottieBudget.active.indexOf(token) in 0 until LottieBudget.MaxLoops } }

@@ -50,6 +50,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -232,13 +233,16 @@ fun ActiveCallScreen(userId: Long, video: Boolean) {
     val shift by t.animateFloat(0f, 1f, infiniteRepeatable(tween(6000), RepeatMode.Reverse), label = "shift")
     val pulse by t.animateFloat(1f, 1.12f, infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "pulse")
     Box(
-        Modifier.fillMaxSize().background(
-            Brush.linearGradient(
-                listOf(Color(0xFF20A4D7), Color(0xFF3F8BEA), Color(0xFF8148EC)),
-                start = androidx.compose.ui.geometry.Offset(0f, 1000f * shift),
-                end = androidx.compose.ui.geometry.Offset(1200f, 2400f - 800f * shift),
+        // Gradient position read at draw time: the background animates without recomposing the call screen.
+        Modifier.fillMaxSize().drawBehind {
+            drawRect(
+                Brush.linearGradient(
+                    listOf(Color(0xFF20A4D7), Color(0xFF3F8BEA), Color(0xFF8148EC)),
+                    start = androidx.compose.ui.geometry.Offset(0f, 1000f * shift),
+                    end = androidx.compose.ui.geometry.Offset(1200f, 2400f - 800f * shift),
+                )
             )
-        )
+        }
     ) {
         Column(Modifier.fillMaxSize().statusBarsPadding().padding(top = 80.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Box(Modifier.graphicsLayer { val s = if (seconds < 0) pulse else 1f; scaleX = s; scaleY = s }) {

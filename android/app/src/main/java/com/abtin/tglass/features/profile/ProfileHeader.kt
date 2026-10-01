@@ -26,6 +26,9 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -37,7 +40,11 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
+import com.abtin.tglass.core.navigation.LocalScreenVisible
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.pointer.pointerInput
@@ -195,14 +202,18 @@ internal fun headerGeometry(width: Dp, statusTop: Dp, p: Float, pull: Dp, hasMus
 /**
  * The top list item: avatar (round → full-width photo), floating gifts, name with badges, status and the
  * music line. The action buttons are drawn by [ProfileActionsOverlay] outside the backdrop layer.
+ *
+ * [geo], [p] and [palette] are providers: they are read only in layout / graphicsLayer / draw lambdas (and the
+ * palette in the few text colors), so pulling the page down or expanding the photo re-lays-out and redraws this
+ * item without recomposing it.
  */
 @Composable
 internal fun ProfileHeaderItem(
-    geo: HeaderGeometry,
+    geo: () -> HeaderGeometry,
     width: Dp,
-    p: Float,
+    p: () -> Float,
     style: HeaderStyle,
-    palette: ProfilePalette,
+    palette: () -> ProfilePalette,
     name: String,
     seed: Long,
     photoPeer: Long,
@@ -220,23 +231,39 @@ internal fun ProfileHeaderItem(
     val repo = LocalRepository.current
     val (ga, gb) = if (saved) Color(0xFF72D5FD) to Color(0xFF2A9EF1) else avatarColors(seed)
     val small = if (saved) null else repo.avatar(photoPeer)
-    Box(Modifier.fillMaxWidth().height(geo.height)) {
+    val screenVisible by LocalScreenVisible.current
+    val avatarBrush = remember(ga, gb) { Brush.verticalGradient(listOf(ga, gb)) }
+    val showGifts by remember(style, gifts) { derivedStateOf { style == HeaderStyle.Colored && gifts.isNotEmpty() && p() < 1f } }
+    val showScrim by remember { derivedStateOf { p() > 0f } }
+    val pal = palette()
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .layout { measurable, constraints ->
+                val h = geo().height.roundToPx().coerceIn(constraints.minHeight, constraints.maxHeight)
+                val placeable = measurable.measure(constraints.copy(minHeight = h, maxHeight = h))
+                layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+            }
+    ) {
         // Floating gifts around the round avatar (colored profiles).
-        if (style == HeaderStyle.Colored && gifts.isNotEmpty() && p < 1f) {
-            val cx = width / 2
-            val cy = geo.avatarTop + geo.avatarHeight / 2
-            val spots = listOf(-118f to -18f, 104f to -54f, 122f to 26f, -98f to 58f, 60f to 70f)
+        if (showGifts) {
             val t = rememberInfiniteTransition(label = "gifts")
-            val bob by t.animateFloat(-1f, 1f, infiniteRepeatable(tween(2400), RepeatMode.Reverse), label = "bob")
-            gifts.take(spots.size).forEachIndexed { i, g ->
-                val (dx, dy) = spots[i]
+            // No running animation while another screen covers this one.
+            val bob = if (screenVisible) t.animateFloat(-1f, 1f, infiniteRepeatable(tween(2400), RepeatMode.Reverse), label = "bob") else null
+            gifts.take(GiftSpots.size).forEachIndexed { i, g ->
+                val (dx, dy) = GiftSpots[i]
                 Box(
                     Modifier
-                        .offset(x = cx + dx.dp - 18.dp, y = cy + dy.dp - 18.dp)
+                        .offset {
+                            val gm = geo()
+                            val cx = width / 2
+                            val cy = gm.avatarTop + gm.avatarHeight / 2
+                            IntOffset((cx + dx.dp - 18.dp).roundToPx(), (cy + dy.dp - 18.dp).roundToPx())
+                        }
                         .size(36.dp)
                         .graphicsLayer {
-                            alpha = (1f - p * 2f).coerceIn(0f, 1f)
-                            translationY = bob * (if (i % 2 == 0) 3f else -3f) * density
+                            alpha = (1f - p() * 2f).coerceIn(0f, 1f)
+                            translationY = (bob?.value ?: 0f) * (if (i % 2 == 0) 3f else -3f) * density
                         }
                         .drawBehind {
                             val glow = g.centerColor?.let { Color(it or 0xFF000000.toInt()) } ?: Color.White
@@ -246,39 +273,63 @@ internal fun ProfileHeaderItem(
                 ) { GiftGlyph(g, 30.dp) }
             }
         }
-        // Avatar / photo.
+        // Avatar / photo: position, size and corner radius follow the pull / expansion in layout + layer only.
         Box(
             Modifier
-                .offset(x = (width - geo.avatarWidth) / 2, y = geo.avatarTop)
-                .size(geo.avatarWidth, geo.avatarHeight)
-                .clip(RoundedCornerShape(geo.corner))
-                .background(Brush.verticalGradient(listOf(ga, gb)))
+                .offset {
+                    val gm = geo()
+                    IntOffset(((width - gm.avatarWidth) / 2).roundToPx(), gm.avatarTop.roundToPx())
+                }
+                .layout { measurable, _ ->
+                    val gm = geo()
+                    val w = gm.avatarWidth.roundToPx()
+                    val h = gm.avatarHeight.roundToPx()
+                    val placeable = measurable.measure(Constraints.fixed(w, h))
+                    layout(w, h) { placeable.place(0, 0) }
+                }
+                .graphicsLayer {
+                    shape = RoundedCornerShape(geo().corner)
+                    clip = true
+                }
+                .background(avatarBrush)
                 .pointerInput(Unit) { detectTapGestures { o -> onAvatarTap(o.x / size.width.coerceAtLeast(1)) } },
             contentAlignment = Alignment.Center,
         ) {
-            if (saved) Icon(TgIcons.SetSaved, Color.White, geo.avatarWidth.coerceAtMost(geo.avatarHeight) * 0.55f)
+            // Glyph / initials are laid out for the 100dp round avatar and scaled with it (no per-frame text relayout).
+            val glyphScale: GraphicsLayerScope.() -> Unit = {
+                val gm = geo()
+                val k = minOf(gm.avatarWidth.toPx(), gm.avatarHeight.toPx()) / 100.dp.toPx()
+                scaleX = k
+                scaleY = k
+            }
+            if (saved) Icon(TgIcons.SetSaved, Color.White, 55.dp, modifier = Modifier.graphicsLayer(glyphScale))
             else if (small == null && photo == null) {
-                val s = geo.avatarWidth.coerceAtMost(geo.avatarHeight)
-                T(initials(name), TgTheme.type.body.copy(fontSize = (s.value * 0.4f).sp, lineHeight = (s.value * 0.46f).sp), Color.White, weight = FontWeight.SemiBold)
+                T(
+                    initials(name), TgTheme.type.body.copy(fontSize = 40.sp, lineHeight = 46.sp), Color.White,
+                    weight = FontWeight.SemiBold, modifier = Modifier.graphicsLayer(glyphScale),
+                )
             }
             if (small != null) TgImage(small, Modifier.fillMaxSize(), maxPx = 320)
             if (photo != null && !saved) TgImage(photo, Modifier.fillMaxSize(), maxPx = 1280, contentScale = ContentScale.Crop)
-            if (p > 0f) {
+            if (showScrim) {
                 // Photo melts into the page and darkens under the name.
                 Box(
-                    Modifier.fillMaxSize().graphicsLayer { alpha = p }.background(
-                        Brush.verticalGradient(
-                            0f to Color.Black.copy(alpha = 0.18f),
-                            0.22f to Color.Transparent,
-                            0.55f to Color.Transparent,
-                            0.82f to palette.page.copy(alpha = 0.55f),
-                            1f to palette.page,
+                    Modifier.fillMaxSize().graphicsLayer { alpha = p() }.drawBehind {
+                        val page = palette().page
+                        drawRect(
+                            Brush.verticalGradient(
+                                0f to Color.Black.copy(alpha = 0.18f),
+                                0.22f to Color.Transparent,
+                                0.55f to Color.Transparent,
+                                0.82f to page.copy(alpha = 0.55f),
+                                1f to page,
+                            )
                         )
-                    )
+                    }
                 )
                 if (photoCount > 1) {
                     Row(
-                        Modifier.align(Alignment.TopCenter).padding(top = 6.dp, start = 10.dp, end = 10.dp).fillMaxWidth().graphicsLayer { alpha = p },
+                        Modifier.align(Alignment.TopCenter).padding(top = 6.dp, start = 10.dp, end = 10.dp).fillMaxWidth().graphicsLayer { alpha = p() },
                         horizontalArrangement = Arrangement.spacedBy(3.dp),
                     ) {
                         repeat(photoCount.coerceAtMost(12)) { i ->
@@ -293,12 +344,12 @@ internal fun ProfileHeaderItem(
         }
         // Name, badges and status.
         Column(
-            Modifier.fillMaxWidth().offset(y = geo.nameTop).padding(horizontal = 24.dp),
+            Modifier.fillMaxWidth().offset { IntOffset(0, geo().nameTop.roundToPx()) }.padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 com.abtin.tglass.core.emoji.EmojiText(
-                    name, TgTheme.type.title2.copy(fontSize = 26.sp, lineHeight = 31.sp), palette.title,
+                    name, TgTheme.type.title2.copy(fontSize = 26.sp, lineHeight = 31.sp), pal.title,
                     weight = FontWeight.SemiBold, maxLines = 1, align = TextAlign.Center,
                     modifier = Modifier.weight(1f, fill = false),
                 )
@@ -306,14 +357,16 @@ internal fun ProfileHeaderItem(
             }
             if (subtitle != null) {
                 Spacer(Modifier.height(2.dp))
-                T(subtitle, TgTheme.type.subheadline, if (online) palette.online else palette.subtitle, maxLines = 1)
+                T(subtitle, TgTheme.type.subheadline, if (online) pal.online else pal.subtitle, maxLines = 1)
             }
         }
         if (musicLine != null) {
-            Box(Modifier.fillMaxWidth().offset(y = geo.musicTop), contentAlignment = Alignment.TopCenter) { musicLine() }
+            Box(Modifier.fillMaxWidth().offset { IntOffset(0, geo().musicTop.roundToPx()) }, contentAlignment = Alignment.TopCenter) { musicLine() }
         }
     }
 }
+
+private val GiftSpots = listOf(-118f to -18f, 104f to -54f, 122f to 26f, -98f to 58f, 60f to 70f)
 
 /** Emoji status / verified / premium marks after the name. */
 @Composable
@@ -379,7 +432,8 @@ private fun profileIconSize(icon: Int): Dp = if (icon == com.abtin.tglass.ui.com
  * list's backdrop layer, so the glass may refract it — at [y] px from the top, fading by [alpha].
  */
 @Composable
-internal fun ProfileActionsOverlay(actions: List<ProfileAction>, palette: ProfilePalette, y: () -> Int, alpha: () -> Float, enabled: Boolean) {
+internal fun ProfileActionsOverlay(actions: List<ProfileAction>, paletteState: State<ProfilePalette>, y: () -> Int, alpha: () -> Float, enabled: Boolean) {
+    val palette = paletteState.value
     Row(
         Modifier
             .fillMaxWidth()

@@ -246,7 +246,6 @@ internal fun VoiceMessageBody(m: Message, v: MessageContent.Voice, colors: Bubbl
     val key = "${m.chatId}:${m.id}"
     val current = player.currentKey == key
     val playing = current && player.playing
-    val progress = if (current) player.progress else 0f
     val media = v.media
     val path = media?.let { repo.filePath(it) }
     // Tapped before the file was downloaded: start playing as soon as it arrives.
@@ -293,6 +292,8 @@ internal fun VoiceMessageBody(m: Message, v: MessageContent.Voice, colors: Bubbl
                 val minH = 2.dp.toPx()
                 val bars = ((size.width + (step - barW)) / step).toInt().coerceAtLeast(1)
                 val wave = v.waveform
+                // Read while drawing: the 20 Hz progress ticks redraw this canvas, they don't recompose the bubble.
+                val progress = if (current) player.progress else 0f
                 val played = progress * bars
                 for (i in 0 until bars) {
                     val amp = if (wave.isEmpty()) 0.25f else wave[(i * wave.size / bars).coerceIn(0, wave.lastIndex)]
@@ -309,7 +310,10 @@ internal fun VoiceMessageBody(m: Message, v: MessageContent.Voice, colors: Bubbl
             }
             Spacer(Modifier.height(4.dp))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                val secs = if (current && player.positionMs > 0) (player.positionMs / 1000).toInt() else v.seconds
+                // Whole seconds only: the text recomposes once a second, not on every position tick.
+                val secs by remember(current, v.seconds) {
+                    androidx.compose.runtime.derivedStateOf { if (current && player.positionMs > 0) (player.positionMs / 1000).toInt() else v.seconds }
+                }
                 T(formatDuration(secs), bubbleText().meta, colors.meta, maxLines = 1)
                 if (!v.listened && !current) {
                     // Not listened yet: Telegram's small dot next to the duration.

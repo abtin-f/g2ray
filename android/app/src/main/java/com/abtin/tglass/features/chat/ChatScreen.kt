@@ -719,12 +719,17 @@ fun ChatScreen(chatId: Long) {
                         bottom = with(density) { bottomHeight.toDp() } + 4.dp,
                     ),
                 ) {
-                    itemsIndexed(reversedItems, key = { _, it -> it.key }) { rIdx, item ->
+                    itemsIndexed(
+                        reversedItems,
+                        key = { _, it -> it.key },
+                        // Bubbles of the same kind reuse each other's compositions when scrolling.
+                        contentType = { _, it -> if (it.head.content is MessageContent.Service) "service" else it.head.content::class },
+                    ) { rIdx, item ->
                         val idx = items.size - 1 - rIdx
                         val prev = items.getOrNull(idx - 1)?.last
                         val group = groupForItems(items, idx, isGroup)
                         val m = item.head
-                        val ids = item.messages.map { it.id }
+                        val ids = remember(item) { item.messages.map { it.id } }
                         Column(Modifier.animateItem()) {
                             if (prev == null || !sameDay(prev.date, item.first.date)) ServicePill(formatDay(item.first.date))
                             if (firstUnreadId != null && item.contains(firstUnreadId)) UnreadDivider()
@@ -1180,7 +1185,7 @@ private fun MessageRow(
                     transformOrigin = TransformOrigin(if (m.outgoing) 1f else 0f, 1f)
                 }
             }
-            .background(if (highlighted) c.accent.copy(alpha = 0.18f) else if (selected) c.accent.copy(alpha = 0.10f) else Color.Transparent)
+            .then(if (highlighted) Modifier.background(c.accent.copy(alpha = 0.18f)) else if (selected) Modifier.background(c.accent.copy(alpha = 0.10f)) else Modifier)
             .pointerInput(selecting) {
                 if (selecting) return@pointerInput
                 var crossed = false

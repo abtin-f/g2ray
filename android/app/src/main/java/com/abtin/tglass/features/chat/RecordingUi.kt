@@ -219,8 +219,9 @@ internal fun VoiceDraft(voice: RecordedVoice, key: String) {
     val context = LocalContext.current
     val current = VoicePlayer.currentKey == key
     val playing = current && VoicePlayer.playing
-    val progress = if (current) VoicePlayer.progress else 0f
-    val shownSecs = if (current) (VoicePlayer.positionMs / 1000).toInt() else voice.seconds
+    val shownSecs by androidx.compose.runtime.remember(current, voice) {
+        androidx.compose.runtime.derivedStateOf { if (current) (VoicePlayer.positionMs / 1000).toInt() else voice.seconds }
+    }
     Row(
         Modifier.fillMaxWidth().height(ComposerHeight).padding(4.dp).clip(Capsule()).background(c.accent).padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -235,6 +236,7 @@ internal fun VoiceDraft(voice: RecordedVoice, key: String) {
         val wave = voice.waveform
         Canvas(Modifier.weight(1f).fillMaxHeight().padding(vertical = 7.dp)) {
             if (wave.isEmpty()) return@Canvas
+            val progress = if (current) VoicePlayer.progress else 0f
             val barW = 2.dp.toPx()
             val gap = 1.5.dp.toPx()
             val count = ((size.width + gap) / (barW + gap)).toInt().coerceAtLeast(1)

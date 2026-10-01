@@ -23,6 +23,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.abtin.tglass.core.design.TgTheme
+import com.abtin.tglass.core.navigation.LocalScreenVisible
 
 /** Telegram's verified badge: accent "flower" background with a white check. */
 @Composable
@@ -36,6 +37,14 @@ fun VerifiedBadge(size: Dp = 16.dp, color: Color = TgTheme.colors.accent, modifi
 /** Three bouncing dots used for "typing…" in the chat list and headers. */
 @Composable
 fun TypingDots(color: Color, dot: Dp = 4.dp, modifier: Modifier = Modifier) {
+    val screenVisible by LocalScreenVisible.current
+    if (!screenVisible) {
+        // Covered by another screen: same size, no running animation.
+        Row(modifier, horizontalArrangement = Arrangement.spacedBy(dot * 0.6f), verticalAlignment = Alignment.CenterVertically) {
+            repeat(3) { Box(Modifier.size(dot).clip(CircleShape).background(color)) }
+        }
+        return
+    }
     val t = rememberInfiniteTransition(label = "typing")
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(dot * 0.6f), verticalAlignment = Alignment.CenterVertically) {
         repeat(3) { i ->
@@ -69,10 +78,12 @@ fun TypingText(text: String, style: TextStyle, color: Color, modifier: Modifier 
 /** UIActivityIndicatorView: 8 rounded spokes whose opacity chases around the circle. */
 @Composable
 fun ActivityIndicator(size: Dp = 20.dp, color: Color = TgTheme.colors.secondaryText, modifier: Modifier = Modifier) {
+    val screenVisible by LocalScreenVisible.current
     val t = rememberInfiniteTransition(label = "spinner")
-    val step by t.animateFloat(0f, 8f, infiniteRepeatable(tween(800, easing = androidx.compose.animation.core.LinearEasing)), label = "spin")
+    // The animation is only created while visible; the step is read in the draw lambda (no recomposition per frame).
+    val step = if (screenVisible) t.animateFloat(0f, 8f, infiniteRepeatable(tween(800, easing = androidx.compose.animation.core.LinearEasing)), label = "spin") else null
     androidx.compose.foundation.Canvas(modifier.size(size)) {
-        val head = step.toInt()
+        val head = (step?.value ?: 0f).toInt()
         val w = this.size.minDimension
         val stroke = w * 0.09f
         for (i in 0 until 8) {
