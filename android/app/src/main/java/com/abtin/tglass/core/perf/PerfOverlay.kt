@@ -28,6 +28,11 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+/** Extra context for the overlay label (e.g. the selected main tab), set by screens with a SideEffect. */
+object PerfLabel {
+    var detail by mutableStateOf("")
+}
+
 /**
  * Optional frame-rate readout (Settings → Power Saving → Performance Overlay), off by default.
  *
@@ -37,7 +42,7 @@ import androidx.compose.ui.unit.sp
  * display's frame budget in that second.
  */
 @Composable
-fun PerfOverlay() {
+fun PerfOverlay(screen: () -> String = { "" }) {
     val view = LocalView.current
     var text by remember { mutableStateOf("-- fps") }
     DisposableEffect(view) {
@@ -73,7 +78,8 @@ fun PerfOverlay() {
     }
     Box(Modifier.fillMaxSize()) {
         BasicText(
-            text,
+            // The route label is read here only, so a screen change recomposes just this text.
+            screen().let { s -> val d = PerfLabel.detail; if (s.isEmpty()) text else if (d.isEmpty() || s != "Main") "$s\n$text" else "$s/$d\n$text" },
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .statusBarsPadding()

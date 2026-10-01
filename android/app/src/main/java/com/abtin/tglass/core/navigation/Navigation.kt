@@ -11,7 +11,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -161,6 +166,27 @@ class Navigator(initial: Route, private val scope: CoroutineScope) {
 
 val LocalNavigator = staticCompositionLocalOf<Navigator> { error("Navigator not provided") }
 
+private object AlwaysVisible : State<Boolean> {
+    override val value: Boolean get() = true
+}
+
+/**
+ * Whether the screen that provides it is actually visible (not completely covered by the screen above it).
+ * Screens under the top one stay composed (state is kept) but drawn with alpha 0, so anything that keeps
+ * animating or polling (Lottie loops, infinite transitions, clocks) should stop while this is false:
+ * `val visible = LocalScreenVisible.current.value` (flips only when the covering state changes).
+ */
+val LocalScreenVisible = staticCompositionLocalOf<State<Boolean>> { AlwaysVisible }
+
+/** Id of the route on top of the stack, for the performance overlay label (plain read, not observed). */
+fun Route.shortLabel(): String = when (this) {
+    is Route.Chat -> "Chat"
+    is Route.Profile -> "Profile"
+    is Route.UserProfile -> "UserProfile"
+    is Route.SettingsPage -> "Settings/" + page.name
+    else -> this::class.simpleName ?: "?"
+}
+
 /**
  * Renders the top two entries with the iOS parallax push transition and an interactive
  * swipe-from-left-edge back gesture.
@@ -249,9 +275,16 @@ fun IOSNavHost(navigator: Navigator, content: @Composable (Route) -> Unit) {
                             }
                         }
                 ) {
+                    // Visible = top screen, or the one below while the top one is still sliding in / out.
+                    val isTopState = rememberUpdatedState(isTop)
+                    val screenVisible = remember(entry) {
+                        derivedStateOf { isTopState.value || stack.lastOrNull()?.offset?.value != 0f }
+                    }
                     holder.SaveableStateProvider(entry.id) {
-                        Box(Modifier.fillMaxSize().background(TgTheme.colors.background)) {
-                            content(entry.route)
+                        CompositionLocalProvider(LocalScreenVisible provides screenVisible) {
+                            Box(Modifier.fillMaxSize().background(TgTheme.colors.background)) {
+                                content(entry.route)
+                            }
                         }
                     }
                 }

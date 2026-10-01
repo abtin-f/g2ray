@@ -25,6 +25,8 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -39,7 +41,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -93,12 +97,13 @@ internal fun ProfileTabBar(
     selected: Int,
     /** Pill position as a fractional tab index (animated by the screen; follows the finger while swiping). */
     position: () -> Float,
-    palette: ProfilePalette,
+    paletteState: State<ProfilePalette>,
     pinned: Boolean,
     giftIcons: List<ProfileGift>,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val palette = paletteState.value
     val density = LocalDensity.current
     val xs = remember(tabs) { mutableStateListOf<Float>().apply { repeat(tabs.size) { add(0f) } } }
     val ws = remember(tabs) { mutableStateListOf<Float>().apply { repeat(tabs.size) { add(0f) } } }
@@ -119,22 +124,25 @@ internal fun ProfileTabBar(
           // the middle like on iOS; when they don't fit this is just their width and the row scrolls.
           Box(Modifier.widthIn(min = with(density) { viewport.toDp() }), contentAlignment = Alignment.Center) {
             Box(Modifier.padding(horizontal = 4.dp), contentAlignment = Alignment.CenterStart) {
-                // Pill position: between the two tabs around the (animated, finger-driven) index.
-                val pos = position().coerceIn(0f, (tabs.size - 1).coerceAtLeast(0).toFloat())
-                val i0 = floor(pos).toInt().coerceIn(0, (tabs.size - 1).coerceAtLeast(0))
-                val i1 = (i0 + 1).coerceAtMost(tabs.size - 1)
-                val f = pos - i0
-                val px = (xs.getOrNull(i0) ?: 0f) * (1 - f) + (xs.getOrNull(i1) ?: 0f) * f
-                val pw = (ws.getOrNull(i0) ?: 0f) * (1 - f) + (ws.getOrNull(i1) ?: 0f) * f
-                // Liquid stretch: strongest halfway between two tabs.
-                val stretch = sin(f * PI).toFloat()
-                if (pw > 0f) {
+                // Pill position: between the two tabs around the (animated, finger-driven) index. Everything that
+                // moves per frame (offset, width, stretch) is read in layout / layer lambdas, so the pill never recomposes.
+                val ready by remember(tabs) { derivedStateOf { ws.isNotEmpty() && ws.all { it > 0f } } }
+                if (ready) {
                     Box(
                         Modifier
-                            .offset { IntOffset(px.toInt(), 0) }
-                            .width(with(density) { pw.toDp() })
-                            .height(36.dp)
+                            .offset {
+                                val g = pillGeometry(position(), tabs.size, xs, ws)
+                                IntOffset(g.x.toInt(), 0)
+                            }
+                            .layout { measurable, _ ->
+                                val g = pillGeometry(position(), tabs.size, xs, ws)
+                                val w = g.width.toInt().coerceAtLeast(1)
+                                val placeable = measurable.measure(Constraints.fixed(w, 36.dp.roundToPx()))
+                                layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+                            }
                             .graphicsLayer {
+                                // Liquid stretch: strongest halfway between two tabs.
+                                val stretch = pillGeometry(position(), tabs.size, xs, ws).stretch
                                 scaleX = 1f + 0.16f * stretch
                                 scaleY = 1f - 0.08f * stretch
                             }
@@ -167,9 +175,24 @@ internal fun ProfileTabBar(
     }
 }
 
+private class PillGeometry(val x: Float, val width: Float, val stretch: Float)
+
+/** Pill rectangle for the fractional tab index [position] (interpolated between the tabs around it). */
+private fun pillGeometry(position: Float, count: Int, xs: List<Float>, ws: List<Float>): PillGeometry {
+    val last = (count - 1).coerceAtLeast(0)
+    val pos = position.coerceIn(0f, last.toFloat())
+    val i0 = floor(pos).toInt().coerceIn(0, last)
+    val i1 = (i0 + 1).coerceAtMost(count - 1).coerceAtLeast(0)
+    val f = pos - i0
+    val px = (xs.getOrNull(i0) ?: 0f) * (1 - f) + (xs.getOrNull(i1) ?: 0f) * f
+    val pw = (ws.getOrNull(i0) ?: 0f) * (1 - f) + (ws.getOrNull(i1) ?: 0f) * f
+    return PillGeometry(px, pw, sin(f * PI).toFloat())
+}
+
 /** Placeholder text of an empty tab. */
-internal fun LazyListScope.emptyTab(key: String, title: String, palette: ProfilePalette, itemModifier: Modifier) {
+internal fun LazyListScope.emptyTab(key: String, title: String, paletteState: State<ProfilePalette>, itemModifier: Modifier) {
     item(key = key) {
+        val palette = paletteState.value
         Column(itemModifier.fillMaxWidth().padding(40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             T("No ${title.lowercase()} yet", TgTheme.type.headline, palette.title, align = TextAlign.Center)
             T("Shared ${title.lowercase()} will appear here.", TgTheme.type.subheadline, palette.subtitle, align = TextAlign.Center)

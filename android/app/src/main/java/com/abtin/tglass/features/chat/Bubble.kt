@@ -31,6 +31,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -134,7 +135,21 @@ class BubbleShape(
     private val groupedTop: Boolean,
     private val groupedBottom: Boolean,
 ) : Shape {
-    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline = with(density) {
+    // The tail path is built with path operations: remember the last result (clip and background ask for the same size).
+    private var cachedSize = Size.Unspecified
+    private var cachedDensity = 0f
+    private var cachedOutline: Outline? = null
+
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+        cachedOutline?.let { if (cachedSize == size && cachedDensity == density.density) return it }
+        return build(size, density).also {
+            cachedSize = size
+            cachedDensity = density.density
+            cachedOutline = it
+        }
+    }
+
+    private fun build(size: Size, density: Density): Outline = with(density) {
         val w = size.width
         val h = size.height
         val u = 1.dp.toPx() // Telegram geometry is in points
@@ -288,23 +303,54 @@ fun nameColor(seed: Long): Color {
     return list[i]
 }
 
+/** Per-bubble cache of the night gradient fill: the outline (path operations!) and the brush are rebuilt only when needed. */
+private class BubbleFillCache {
+    var shape: Shape? = null
+    var size = Size.Zero
+    var outline: Outline? = null
+    var step = Int.MIN_VALUE
+    var grad: List<Color>? = null
+    var screenH = 0f
+    var brush: Brush? = null
+}
+
+/** The screen-wide gradient changes by about one color level per this many pixels, so steps of it are invisible. */
+private const val GradientStepPx = 24f
+
 /**
  * Bubble background. Night outgoing bubbles use Telegram's screen-wide gradient: each bubble shows the part of
  * the #61BCF9 → #0088FF gradient behind its position, so bubbles darken towards the bottom of the screen.
- * The position is read only while drawing, so scrolling just redraws.
+ * The position is quantized (a step is ~1 color level, invisible), so while scrolling a bubble is redrawn every
+ * few frames instead of every frame, and neither the outline nor the gradient shader are rebuilt per draw.
  */
 @Composable
 private fun Modifier.bubbleFill(shape: Shape, colors: BubbleColors): Modifier {
     val grad = colors.gradient
     if (grad == null || grad.size < 2) return this.background(colors.fill, shape)
     val screenH = with(LocalDensity.current) { LocalConfiguration.current.screenHeightDp.dp.toPx() }
-    val y = remember { mutableFloatStateOf(0f) }
+    val step = remember { mutableIntStateOf(0) }
+    val cache = remember { BubbleFillCache() }
     return this
-        .onGloballyPositioned { y.floatValue = it.positionInRoot().y }
+        .onGloballyPositioned { step.intValue = (it.positionInRoot().y / GradientStepPx).roundToInt() }
         .drawBehind {
-            val top = y.floatValue
-            val brush = Brush.verticalGradient(grad, startY = -top, endY = screenH - top)
-            drawOutline(shape.createOutline(size, layoutDirection, this), brush)
+            val st = step.intValue
+            var brush = cache.brush
+            if (brush == null || cache.step != st || cache.grad !== grad || cache.screenH != screenH) {
+                val top = st * GradientStepPx
+                brush = Brush.verticalGradient(grad, startY = -top, endY = screenH - top)
+                cache.brush = brush
+                cache.step = st
+                cache.grad = grad
+                cache.screenH = screenH
+            }
+            var outline = cache.outline
+            if (outline == null || cache.shape !== shape || cache.size != size) {
+                outline = shape.createOutline(size, layoutDirection, this)
+                cache.outline = outline
+                cache.shape = shape
+                cache.size = size
+            }
+            drawOutline(outline, brush)
         }
 }
 
@@ -1018,6 +1064,8 @@ private fun FileBody(m: Message, f: MessageContent.File, colors: BubbleColors, s
     // Loading: tapped here, or TDLib is already fetching it (progress reported) — Telegram's ring + X either way.
     val downloading = ref != null && path == null && (pending || progress > 0f)
     val playing = f.music && player.currentKey == key && player.playing
+    // Whole seconds only, read when the "playing" caption is shown: no recomposition on every 50 ms position tick.
+    val playSecs by remember { androidx.compose.runtime.derivedStateOf { (player.positionMs / 1000).toInt() } }
     val text = bubbleText()
     Column {
         Row(Modifier.padding(start = 9.dp, end = 11.dp, top = 8.dp, bottom = if (f.caption != null) 2.dp else 7.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -1062,7 +1110,7 @@ private fun FileBody(m: Message, f: MessageContent.File, colors: BubbleColors, s
                     val info = when {
                         downloading && ref != null && ref.size > 0 -> progressBytes((ref.size * progress).toLong(), ref.size)
                         downloading -> "${(progress * 100).toInt()}% of ${f.size}"
-                        playing -> "${formatDuration((player.positionMs / 1000).toInt())} / ${formatDuration(f.duration)}"
+                        playing -> "${formatDuration(playSecs)} / ${formatDuration(f.duration)}"
                         f.music && f.duration > 0 -> "${formatDuration(f.duration)} · ${f.size}"
                         else -> f.size
                     }

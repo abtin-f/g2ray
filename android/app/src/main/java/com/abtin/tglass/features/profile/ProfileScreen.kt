@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -37,6 +38,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -169,7 +171,9 @@ fun ProfileScreen(chatId: Long) {
     LaunchedEffect(hasPhoto) {
         if (!hasPhoto) header.setExpanded(false)
     }
-    val p = header.expand.value.coerceIn(0f, 1f)
+    // Everything driven by the pull / expand gesture is read through these providers in layout, layer and draw
+    // lambdas (or a leaf composable), so a pull frame does not recompose this whole screen.
+    val pNow = remember(header) { { header.expand.value.coerceIn(0f, 1f) } }
     var photoIndex by remember { mutableIntStateOf(0) }
     var viewerOpen by remember { mutableStateOf(false) }
     var editOpen by remember { mutableStateOf(false) }
@@ -186,8 +190,12 @@ fun ProfileScreen(chatId: Long) {
         button = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.16f),
         buttonSolid = androidx.compose.ui.graphics.lerp(photoPage, androidx.compose.ui.graphics.Color.White, 0.18f),
     )
-    val palette = basePalette.lerpTo(photoPalette, p)
-    val tinted = baseStyle == HeaderStyle.Colored || p > 0.5f
+    val basePaletteS = rememberUpdatedState(basePalette)
+    val photoPaletteS = rememberUpdatedState(photoPalette)
+    val baseStyleS = rememberUpdatedState(baseStyle)
+    val paletteState = remember(header) { derivedStateOf { basePaletteS.value.lerpTo(photoPaletteS.value, header.expand.value.coerceIn(0f, 1f)) } }
+    val paletteNow = remember(paletteState) { { paletteState.value } }
+    val tintedState = remember(header) { derivedStateOf { baseStyleS.value == HeaderStyle.Colored || header.expand.value.coerceIn(0f, 1f) > 0.5f } }
 
     // ---- Actions ----
     fun openChat() {
@@ -387,7 +395,7 @@ fun ProfileScreen(chatId: Long) {
         BoxWithConstraints(
             Modifier
                 .fillMaxSize()
-                .background(palette.page)
+                .drawBehind { drawRect(paletteState.value.page) }
                 .pointerInput(Unit) {
                     // Safety net: when the finger lifts, spring back any pull-down overscroll.
                     awaitEachGesture {
@@ -401,10 +409,19 @@ fun ProfileScreen(chatId: Long) {
         ) {
             val width = maxWidth
             val widthPx = with(density) { width.toPx() }.coerceAtLeast(1f)
-            val pullDp = with(density) { header.pull.toDp() }
-            val geo = headerGeometry(width, statusTop, p, pullDp, music != null)
-            val buttonsTopPx = with(density) { geo.buttonsTop.toPx() }
-            val nameTopPx = with(density) { geo.nameTop.toPx() }.coerceAtLeast(1f)
+            val widthS = rememberUpdatedState(width)
+            val statusTopS = rememberUpdatedState(statusTop)
+            val densityS = rememberUpdatedState(density)
+            val hasMusicS = rememberUpdatedState(music != null)
+            val geoState = remember(header) {
+                derivedStateOf {
+                    headerGeometry(
+                        widthS.value, statusTopS.value, header.expand.value.coerceIn(0f, 1f),
+                        with(densityS.value) { header.pull.toDp() }, hasMusicS.value,
+                    )
+                }
+            }
+            val geoNow = remember(geoState) { { geoState.value } }
             val barBottomPx = with(density) { (statusTop + 52.dp).toPx() }
             val pinYPx = with(density) { (statusTop + 60.dp).toPx() }.roundToInt()
 
@@ -454,10 +471,11 @@ fun ProfileScreen(chatId: Long) {
                 }
 
             val musicLine: (@Composable () -> Unit)? = if (music != null) {
-                { MusicLine(music, player.currentKey == musicKey && player.playing, palette) { playMusic() } }
+                { MusicLine(music, player.currentKey == musicKey && player.playing, paletteState.value) { playMusic() } }
             } else null
-            val collapse by remember(nameTopPx) {
+            val collapse by remember {
                 derivedStateOf {
+                    val nameTopPx = with(densityS.value) { geoState.value.nameTop.toPx() }.coerceAtLeast(1f)
                     if (listState.firstVisibleItemIndex > 0) 1f else (listState.firstVisibleItemScrollOffset / nameTopPx).coerceIn(0f, 1f)
                 }
             }
@@ -468,32 +486,32 @@ fun ProfileScreen(chatId: Long) {
                     .mediaPinch(grid, currentTab == ProfileTab.Media)
                     .nestedScroll(header.connection)
                     .layerBackdrop(backdrop)
-                    .background(palette.page),
+                    .drawBehind { drawRect(paletteState.value.page) },
                 state = listState,
                 contentPadding = PaddingValues(bottom = navBottom + 40.dp),
             ) {
                 item(key = "header") {
                     val (sub, online) = profileSubtitle(chat, user, info, repo)
                     ProfileHeaderItem(
-                        geo = geo,
+                        geo = geoNow,
                         width = width,
-                        p = p,
+                        p = pNow,
                         style = baseStyle,
-                        palette = palette,
+                        palette = paletteNow,
                         name = name,
                         seed = chat.id,
                         photoPeer = photoPeer,
                         saved = isSaved,
                         subtitle = sub,
                         online = online,
-                        badges = { NameBadges(details, chat.verified || user?.verified == true, user?.premium == true, palette, tinted) },
+                        badges = { NameBadges(details, chat.verified || user?.verified == true, user?.premium == true, paletteState.value, tintedState.value) },
                         photo = (photos.getOrNull(photoIndex) ?: photos.firstOrNull())?.image,
                         photoCount = photos.size,
                         photoIndex = photoIndex,
                         gifts = gifts.filter { it.pinned }.ifEmpty { gifts },
                         musicLine = musicLine,
                         onAvatarTap = { xf ->
-                            if (p > 0.5f && photos.size > 1 && (xf < 0.3f || xf > 0.7f)) {
+                            if (pNow() > 0.5f && photos.size > 1 && (xf < 0.3f || xf > 0.7f)) {
                                 photoIndex = if (xf < 0.3f) (photoIndex - 1).coerceAtLeast(0) else (photoIndex + 1).coerceAtMost(photos.size - 1)
                             } else if (!isSaved) viewerOpen = true
                         },
@@ -501,7 +519,7 @@ fun ProfileScreen(chatId: Long) {
                 }
                 item(key = "info") {
                     ProfileInfoBlock(
-                        chat = chat, user = user, info = info, details = details, palette = palette,
+                        chat = chat, user = user, info = info, details = details, palette = paletteState.value,
                         publicLink = publicLink,
                         onQr = { qrLink = it },
                         onOpenChat = { id -> nav.push(Route.Chat(id)) },
@@ -517,7 +535,7 @@ fun ProfileScreen(chatId: Long) {
                         gifts = gifts,
                         posts = posts,
                         commonGroups = commonGroups,
-                        palette = palette,
+                        palette = paletteState,
                         itemModifier = itemModifier,
                         grid = grid,
                         onOpenMedia = { m -> nav.push(Route.Media(chat.id, m.id)) },
@@ -538,10 +556,9 @@ fun ProfileScreen(chatId: Long) {
                 item(key = "bottom") { Spacer(Modifier.height(24.dp)) }
             }
 
-            GlassTopBar(
-                title = null,
-                fade = palette.page,
-                center = { CollapsedTitle(name, chat.id, collapse, saved = isSaved, photoPeer = photoPeer) },
+            ProfileTopBar(
+                paletteState = paletteState,
+                center = { CollapsedTitle(name, chat.id, { collapse }, saved = isSaved, photoPeer = photoPeer) },
                 right = {
                     when {
                         grid.selecting -> GlassTextButton("Cancel", { grid.clear() }, bold = true)
@@ -553,16 +570,20 @@ fun ProfileScreen(chatId: Long) {
             )
 
             // Glass circle buttons: above the list (outside its backdrop layer), tracking the header.
-            val buttonsY by remember(buttonsTopPx) {
+            val buttonsY by remember {
                 derivedStateOf {
-                    if (listState.firstVisibleItemIndex > 0) -10_000 else (buttonsTopPx - listState.firstVisibleItemScrollOffset).roundToInt()
+                    if (listState.firstVisibleItemIndex > 0) -10_000
+                    else (with(densityS.value) { geoState.value.buttonsTop.toPx() } - listState.firstVisibleItemScrollOffset).roundToInt()
                 }
             }
-            val buttonsAlpha by remember(barBottomPx, buttonsTopPx) {
+            val buttonsAlpha by remember(barBottomPx) {
                 derivedStateOf { ((buttonsY - barBottomPx) / (with(density) { 36.dp.toPx() })).coerceIn(0f, 1f) }
             }
-            if (actions.isNotEmpty() && buttonsAlpha > 0f) {
-                ProfileActionsOverlay(actions, palette, y = { buttonsY }, alpha = { buttonsAlpha }, enabled = buttonsAlpha > 0.5f)
+            // Booleans, so the screen recomposes when the buttons appear / become tappable, not on every scroll frame.
+            val buttonsShown by remember { derivedStateOf { buttonsAlpha > 0f } }
+            val buttonsEnabled by remember { derivedStateOf { buttonsAlpha > 0.5f } }
+            if (actions.isNotEmpty() && buttonsShown) {
+                ProfileActionsOverlay(actions, paletteState, y = { buttonsY }, alpha = { buttonsAlpha }, enabled = buttonsEnabled)
             }
 
             // Selection bar: an overlay above the list (outside its backdrop layer).
@@ -616,12 +637,15 @@ fun ProfileScreen(chatId: Long) {
                         (item == null && listState.firstVisibleItemIndex > 2) || (item != null && item.offset < pinYPx)
                     }
                 }
-                if (tabsY != null) {
+                val tabsShown by remember(pinYPx) { derivedStateOf { tabsY != null } }
+                val pinnedPaletteS = rememberUpdatedState(plain.copy(tab = c.secondaryText, tabSelected = c.text))
+                val tabBarPalette = remember(pinYPx) { derivedStateOf { if (pinned) pinnedPaletteS.value else paletteState.value } }
+                if (tabsShown) {
                     ProfileTabBar(
                         tabs = tabs,
                         selected = selected,
                         position = { pill.value },
-                        palette = if (pinned) plain.copy(tab = c.secondaryText, tabSelected = c.text) else palette,
+                        paletteState = tabBarPalette,
                         pinned = pinned,
                         giftIcons = gifts,
                         onSelect = { selectTab(it, false) },
@@ -771,7 +795,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.profileTabContent(
     gifts: List<ProfileGift>,
     posts: List<com.abtin.tglass.data.Story>,
     commonGroups: List<Long>,
-    palette: ProfilePalette,
+    palette: State<ProfilePalette>,
     itemModifier: Modifier,
     grid: MediaGridState,
     onOpenMedia: (Message) -> Unit,
@@ -787,7 +811,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.profileTabContent(
         ProfileTab.Members -> {
             val members = info?.members.orEmpty().mapNotNull { m -> repo.user(m.userId)?.let { it to m.role } }
             item(key = "members") {
-                InfoCard(palette, itemModifier) {
+                InfoCard(palette.value, itemModifier) {
                     com.abtin.tglass.ui.components.Cell(
                         "Add Members", icon = TgIcons.PiAddMember, iconColor = TgTheme.colors.accent, titleColor = TgTheme.colors.accent,
                         chevron = false, divider = members.isNotEmpty(), onClick = onAddMembers,
@@ -824,8 +848,8 @@ private fun androidx.compose.foundation.lazy.LazyListScope.profileTabContent(
             }
             if (list.isEmpty()) emptyTab("empty-${tab.name}", tab.title, palette, itemModifier)
             else item(key = "list-${tab.name}") {
-                InfoCard(palette, itemModifier) {
-                    list.forEachIndexed { i, m -> SharedRow(m, palette, divider = i != list.lastIndex) }
+                InfoCard(palette.value, itemModifier) {
+                    list.forEachIndexed { i, m -> SharedRow(m, palette.value, divider = i != list.lastIndex) }
                 }
             }
         }
@@ -833,10 +857,10 @@ private fun androidx.compose.foundation.lazy.LazyListScope.profileTabContent(
             val groups = commonGroups.mapNotNull { repo.chat(it) }
             if (groups.isEmpty()) emptyTab("empty-groups", "groups", palette, itemModifier)
             else item(key = "groups") {
-                InfoCard(palette, itemModifier) {
+                InfoCard(palette.value, itemModifier) {
                     groups.forEachIndexed { i, g ->
                         val sub = if (g.members > 0) "${formatCount(g.members)} members" else null
-                        ChatRowCell(g.title, sub, g.id, palette, divider = i != groups.lastIndex) { onOpenChat(g.id) }
+                        ChatRowCell(g.title, sub, g.id, palette.value, divider = i != groups.lastIndex) { onOpenChat(g.id) }
                     }
                 }
             }
@@ -850,4 +874,14 @@ fun UserProfileScreen(userId: Long) {
     val repo = LocalRepository.current
     val chatId = remember(userId) { repo.privateChatWith(userId) }
     ProfileScreen(chatId)
+}
+
+/** Top bar in its own scope: the page color it fades into animates with the expansion without recomposing the screen. */
+@Composable
+private fun ProfileTopBar(
+    paletteState: State<ProfilePalette>,
+    center: @Composable androidx.compose.foundation.layout.BoxScope.() -> Unit,
+    right: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit,
+) {
+    GlassTopBar(title = null, fade = paletteState.value.page, center = center, right = right)
 }

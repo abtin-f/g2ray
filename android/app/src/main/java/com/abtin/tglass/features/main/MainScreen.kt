@@ -92,6 +92,9 @@ fun MainScreen() {
     val tabBar = remember { TabBarController() }
     val sheet = com.abtin.tglass.ui.components.LocalActionSheet.current
     val c = TgTheme.colors
+    androidx.compose.runtime.SideEffect {
+        com.abtin.tglass.core.perf.PerfLabel.detail = when (tab) { 0 -> "Contacts"; 1 -> "Calls"; 2 -> "Chats"; else -> "Settings" }
+    }
 
     Box(Modifier.fillMaxSize().background(c.background)) {
         CompositionLocalProvider(LocalBackdrop provides backdrop) {
@@ -123,6 +126,8 @@ fun MainScreen() {
             ) {
                 // Read only where the badge is drawn, so unread-count changes don't recompose the whole tab bar.
                 val unread by remember(repo) { androidx.compose.runtime.derivedStateOf { repo.chats.filter { !it.archived && !it.muted }.sumOf { it.unread } } }
+                // Only whether there is a badge matters for composing the overlay copy; the count itself is read in the overlay.
+                val hasUnread by remember(repo) { androidx.compose.runtime.derivedStateOf { unread > 0 } }
                 // Telegram-iOS TabBarComponent: 64pt capsule (56 + 2×4), max width 500, then an 8pt gap and a 64pt search circle.
                 Row(
                     Modifier
@@ -137,10 +142,11 @@ fun MainScreen() {
                         backdrop = backdrop,
                         tabsCount = 4,
                         modifier = Modifier.weight(1f),
+                        showOverlay = hasUnread,
                     ) {
                         TabItem(TgAnimations.TabContacts, "Contacts", selected = tab == 0) { tab = 0 }
                         TabItem(TgAnimations.TabCalls, "Calls", selected = tab == 1) { tab = 1 }
-                        TabItem(TgAnimations.TabChats, "Chats", selected = tab == 2, badge = unread) { tab = 2 }
+                        TabItem(TgAnimations.TabChats, "Chats", selected = tab == 2, badge = { unread }) { tab = 2 }
                         TabItem(
                             TgAnimations.TabSettings, "Settings", selected = tab == 3,
                             onLongClick = if (repo.isLive) ({ com.abtin.tglass.features.settings.showAccountSwitcher(repo, sheet) }) else null,
@@ -165,7 +171,7 @@ private fun androidx.compose.foundation.layout.RowScope.TabItem(
     animation: Int,
     label: String,
     selected: Boolean,
-    badge: Int = 0,
+    badge: () -> Int = { 0 },
     onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
@@ -181,9 +187,9 @@ private fun androidx.compose.foundation.layout.RowScope.TabItem(
                     // Telegram-iOS tab icons are Lottie animations that play when the tab gets selected.
                     LottieIcon(animation, c.text, 44.dp, playKey = if (selected) label else null, play = selected)
                 }
-            } else if (badge > 0) {
+            } else if (badge() > 0) {
                 // Drawn above the selection pill so it stays red instead of being tinted blue.
-                TabBadge(badge, Modifier.align(Alignment.TopCenter).offset(x = 15.dp, y = (-4).dp).wrapContentSize(unbounded = true))
+                TabBadge(badge(), Modifier.align(Alignment.TopCenter).offset(x = 15.dp, y = (-4).dp).wrapContentSize(unbounded = true))
             }
         }
         T(

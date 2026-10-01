@@ -142,6 +142,23 @@ fun RowScope.HeroAction(icon: Int, label: String, onClick: () -> Unit) {
 }
 
 /** Compact title shown in the nav bar once the hero has collapsed. */
+/** Same as below, with the collapse fraction read in the graphics layer (scrolling doesn't recompose the title). */
+@Composable
+fun CollapsedTitle(name: String, seed: Long, collapse: () -> Float, saved: Boolean = false, photoPeer: Long = seed) {
+    Row(
+        Modifier.graphicsLayer {
+            val a = ((collapse() - 0.55f) / 0.45f).coerceIn(0f, 1f)
+            alpha = a
+            translationY = (1f - a) * 12.dp.toPx()
+        },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Avatar(name, seed, 26.dp, saved = saved, photoPeer = photoPeer)
+        Spacer(Modifier.width(8.dp))
+        com.abtin.tglass.core.emoji.EmojiText(name, TgTheme.type.headline, TgTheme.colors.text, maxLines = 1)
+    }
+}
+
 @Composable
 fun CollapsedTitle(name: String, seed: Long, collapse: Float, saved: Boolean = false, photoPeer: Long = seed) {
     val a = ((collapse - 0.55f) / 0.45f).coerceIn(0f, 1f)

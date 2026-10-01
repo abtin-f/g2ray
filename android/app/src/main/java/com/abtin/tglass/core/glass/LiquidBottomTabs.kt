@@ -63,6 +63,8 @@ fun LiquidBottomTabs(
     backdrop: Backdrop,
     tabsCount: Int,
     modifier: Modifier = Modifier,
+    /** The untinted overlay copy of the tabs is only needed for badges; when false it is not composed or drawn at all. */
+    showOverlay: Boolean = true,
     content: @Composable RowScope.() -> Unit
 ) {
     val isLightTheme = !TgTheme.colors.isDark
@@ -208,10 +210,13 @@ fun LiquidBottomTabs(
                             val progress = dampedDragAnimation.pressProgress
                             vibrancy()
                             blur(8f.dp.toPx())
-                            lens(
-                                24f.dp.toPx() * progress,
-                                24f.dp.toPx() * progress
-                            )
+                            // At rest the lens has nothing to bend: skip its shader pass.
+                            if (progress > 0.001f) {
+                                lens(
+                                    24f.dp.toPx() * progress,
+                                    24f.dp.toPx() * progress
+                                )
+                            }
                         },
                         highlight = {
                             val progress = dampedDragAnimation.pressProgress
@@ -244,11 +249,13 @@ fun LiquidBottomTabs(
                     shape = { Capsule() },
                     effects = {
                         val progress = dampedDragAnimation.pressProgress
-                        lens(
-                            10f.dp.toPx() * progress,
-                            14f.dp.toPx() * progress,
-                            chromaticAberration = true
-                        )
+                        if (progress > 0.001f) {
+                            lens(
+                                10f.dp.toPx() * progress,
+                                14f.dp.toPx() * progress,
+                                chromaticAberration = true
+                            )
+                        }
                     },
                     highlight = {
                         val progress = dampedDragAnimation.pressProgress
@@ -287,7 +294,7 @@ fun LiquidBottomTabs(
         )
 
         // Things that must stay untinted and sit above the selection pill (unread badges).
-        CompositionLocalProvider(
+        if (showOverlay) CompositionLocalProvider(
             LocalLiquidBottomTabScale provides {
                 lerp(1f, 1.2f, dampedDragAnimation.pressProgress)
             },

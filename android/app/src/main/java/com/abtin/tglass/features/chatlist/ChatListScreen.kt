@@ -328,7 +328,7 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
                         }
                     }
                 }
-                items(chats, key = { it.id }) { chat ->
+                items(chats, key = { it.id }, contentType = { "chat" }) { chat ->
                     ChatListItem(
                         chat = chat,
                         repo = repo,
@@ -621,10 +621,14 @@ private fun ArchiveItem(
     val coords = remember { arrayOfNulls<androidx.compose.ui.layout.LayoutCoordinates>(1) }
     val key = "archive-row"
     val anyUnread = archived.any { it.unread > 0 || it.markedUnread }
-    val trailing = listOf(
-        if (hidden) SwipeAction("Pin", TgIcons.CtxPin, c.green, TgAnimations.Pin, onPin)
-        else SwipeAction("Hide", TgIcons.CtxArchive, Color(0xFFAAAAAF), null, onHide),
-    )
+    val onPinNow = androidx.compose.runtime.rememberUpdatedState(onPin)
+    val onHideNow = androidx.compose.runtime.rememberUpdatedState(onHide)
+    val trailing = remember(hidden, c) {
+        listOf(
+            if (hidden) SwipeAction("Pin", TgIcons.CtxPin, c.green, TgAnimations.Pin) { onPinNow.value() }
+            else SwipeAction("Hide", TgIcons.CtxArchive, Color(0xFFAAAAAF), null) { onHideNow.value() },
+        )
+    }
     Box(
         modifier
             .onGloballyPositioned { coords[0] = it }
@@ -780,7 +784,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.searchResults(repo: T
     }
     if (chats.isNotEmpty()) {
         item(key = "chatsHeader") { SectionHeader("Chats") }
-        items(chats, key = { "c${it.id}" }) { chat -> ChatRow(chat, repo, onClick = { onOpen(chat.id) }) }
+        items(chats, key = { "c${it.id}" }, contentType = { "chat" }) { chat -> ChatRow(chat, repo, onClick = { onOpen(chat.id) }) }
     }
     if (publicChats.isNotEmpty()) {
         item(key = "globalHeader") { SectionHeader("Global Search") }

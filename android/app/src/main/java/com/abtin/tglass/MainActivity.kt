@@ -31,6 +31,7 @@ import com.abtin.tglass.core.navigation.LocalNavigator
 import com.abtin.tglass.core.navigation.Navigator
 import com.abtin.tglass.core.navigation.Route
 import com.abtin.tglass.core.navigation.isDarkChrome
+import com.abtin.tglass.core.navigation.shortLabel
 import com.abtin.tglass.data.DemoRepository
 import com.abtin.tglass.data.TelegramRepository
 import com.abtin.tglass.data.td.AuthStep
@@ -272,7 +273,7 @@ class MainActivity : ComponentActivity() {
                         }
                         // Settings → Passcode Lock: covers everything while the app is locked.
                         if (DebugLaunch.screen == null) com.abtin.tglass.features.settings.PasscodeLockHost()
-                        if (settings.perfOverlay) com.abtin.tglass.core.perf.PerfOverlay()
+                        if (settings.perfOverlay) com.abtin.tglass.core.perf.PerfOverlay { nav.top.shortLabel() }
                     }
                 }
             }

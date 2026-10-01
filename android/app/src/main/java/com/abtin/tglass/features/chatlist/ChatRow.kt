@@ -36,6 +36,7 @@ import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -279,18 +280,11 @@ fun SwipeableRow(
     val width = remember { floatArrayOf(1f) }
 
     Box(Modifier.fillMaxWidth().onSizeChanged { width[0] = it.width.toFloat() }) {
-        val o = offset.value
-        if (o < 0f) {
-            Row(Modifier.matchParentSize(), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End) {
-                val w = with(density) { (-o / trailing.size.coerceAtLeast(1)).toDp() }
-                trailing.forEach { a -> ActionButton(a, w) { scope.launch { offset.animateTo(0f) }; a.onClick() } }
-            }
-        } else if (o > 0f) {
-            Row(Modifier.matchParentSize()) {
-                val w = with(density) { (o / leading.size.coerceAtLeast(1)).toDp() }
-                leading.forEach { a -> ActionButton(a, w) { scope.launch { offset.animateTo(0f) }; a.onClick() } }
-            }
-        }
+        // Only the sign is read here; the per-frame width of the revealed buttons is read inside SwipeActionButtons,
+        // so dragging a row doesn't recompose the row content itself.
+        val side by remember { androidx.compose.runtime.derivedStateOf { if (offset.value < 0f) -1 else if (offset.value > 0f) 1 else 0 } }
+        if (side < 0) SwipeActionButtons(offset, trailing, atEnd = true)
+        else if (side > 0) SwipeActionButtons(offset, leading, atEnd = false)
         Box(
             Modifier
                 .offset { androidx.compose.ui.unit.IntOffset(offset.value.roundToInt(), 0) }
@@ -329,6 +323,23 @@ fun SwipeableRow(
 }
 
 @Composable
+private fun androidx.compose.foundation.layout.BoxScope.SwipeActionButtons(
+    offset: Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
+    actions: List<SwipeAction>,
+    atEnd: Boolean,
+) {
+    val density = LocalDensity.current
+    val scope = rememberCoroutineScope()
+    val w = with(density) { (abs(offset.value) / actions.size.coerceAtLeast(1)).toDp() }
+    Row(
+        Modifier.matchParentSize(),
+        horizontalArrangement = if (atEnd) androidx.compose.foundation.layout.Arrangement.End else androidx.compose.foundation.layout.Arrangement.Start,
+    ) {
+        actions.forEach { a -> ActionButton(a, w) { scope.launch { offset.animateTo(0f) }; a.onClick() } }
+    }
+}
+
+@Composable
 private fun ActionButton(a: SwipeAction, width: androidx.compose.ui.unit.Dp, onClick: () -> Unit) {
     Column(
         Modifier
@@ -347,20 +358,27 @@ private fun ActionButton(a: SwipeAction, width: androidx.compose.ui.unit.Dp, onC
     }
 }
 
-/** Standard swipe actions for a chat. */
+/** Standard swipe actions for a chat. Remembered: the action objects are rebuilt only when what they show changes. */
 @Composable
 fun chatSwipeActions(chat: Chat, repo: TelegramRepository, onDelete: () -> Unit, folderIndex: Int = 0): Pair<List<SwipeAction>, List<SwipeAction>> {
     val c = TgTheme.colors
     val sheet = com.abtin.tglass.ui.components.LocalActionSheet.current
     val unread = chat.unread > 0 || chat.markedUnread
-    val leading = listOf(
-        SwipeAction(if (unread) "Read" else "Unread", TgIcons.CtxRead, if (unread) Color(0xFFAAAAAF) else c.accent, if (unread) TgAnimations.Read else TgAnimations.Unread) { repo.toggleRead(chat.id) },
-        SwipeAction(if (chat.pinned) "Unpin" else "Pin", if (chat.pinned) TgIcons.CtxUnpin else TgIcons.CtxPin, c.green, if (chat.pinned) TgAnimations.Unpin else TgAnimations.Pin) { repo.togglePinInFolder(chat.id, folderIndex) },
-    )
-    val trailing = listOf(
-        SwipeAction(if (chat.muted) "Unmute" else "Mute", if (chat.muted) TgIcons.CtxUnmute else TgIcons.CtxMuted, c.orange, if (chat.muted) TgAnimations.Unmute else TgAnimations.Mute) { com.abtin.tglass.features.groups.toggleMuteWithOptions(sheet, repo, chat.id) },
-        SwipeAction("Delete", TgIcons.CtxDelete, c.destructive, TgAnimations.Delete, onDelete),
-        SwipeAction(if (chat.archived) "Unarchive" else "Archive", TgIcons.CtxArchive, Color(0xFFAAAAAF), if (chat.archived) TgAnimations.Unarchive else TgAnimations.Archive) { repo.toggleArchive(chat.id) },
-    )
-    return leading to trailing
+    val onDeleteNow = androidx.compose.runtime.rememberUpdatedState(onDelete)
+    val chatId = chat.id
+    val pinned = chat.pinned
+    val muted = chat.muted
+    val archived = chat.archived
+    return remember(chatId, unread, pinned, muted, archived, folderIndex, c, repo, sheet) {
+        val leading = listOf(
+            SwipeAction(if (unread) "Read" else "Unread", TgIcons.CtxRead, if (unread) Color(0xFFAAAAAF) else c.accent, if (unread) TgAnimations.Read else TgAnimations.Unread) { repo.toggleRead(chatId) },
+            SwipeAction(if (pinned) "Unpin" else "Pin", if (pinned) TgIcons.CtxUnpin else TgIcons.CtxPin, c.green, if (pinned) TgAnimations.Unpin else TgAnimations.Pin) { repo.togglePinInFolder(chatId, folderIndex) },
+        )
+        val trailing = listOf(
+            SwipeAction(if (muted) "Unmute" else "Mute", if (muted) TgIcons.CtxUnmute else TgIcons.CtxMuted, c.orange, if (muted) TgAnimations.Unmute else TgAnimations.Mute) { com.abtin.tglass.features.groups.toggleMuteWithOptions(sheet, repo, chatId) },
+            SwipeAction("Delete", TgIcons.CtxDelete, c.destructive, TgAnimations.Delete) { onDeleteNow.value() },
+            SwipeAction(if (archived) "Unarchive" else "Archive", TgIcons.CtxArchive, Color(0xFFAAAAAF), if (archived) TgAnimations.Unarchive else TgAnimations.Archive) { repo.toggleArchive(chatId) },
+        )
+        leading to trailing
+    }
 }

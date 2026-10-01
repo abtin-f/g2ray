@@ -236,8 +236,9 @@ internal fun VideoNoteMessage(
                 if (note != null) NoteSurface(note.player, Modifier.size(diameter))
             }
             if (active) {
-                val progress = note?.progress ?: 0f
                 Canvas(Modifier.size(diameter)) {
+                    // Read while drawing: the per-frame playback progress redraws the ring, it doesn't recompose the message.
+                    val progress = note?.progress ?: 0f
                     val w = 3.5.dp.toPx()
                     val topLeft = Offset(w / 2, w / 2)
                     val arcSize = Size(size.width - w, size.height - w)
@@ -271,7 +272,9 @@ internal fun VideoNoteMessage(
                     .padding(horizontal = 6.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                val secs = if (active) ((note?.positionMs ?: 0L) / 1000).toInt() else v.seconds
+                val secs by remember(active, note, v.seconds) {
+                    androidx.compose.runtime.derivedStateOf { if (active) ((note?.positionMs ?: 0L) / 1000).toInt() else v.seconds }
+                }
                 T(formatDuration(secs), TgTheme.type.caption2, Color.White, weight = FontWeight.SemiBold, maxLines = 1)
                 if (!active) {
                     Spacer(Modifier.width(3.dp))

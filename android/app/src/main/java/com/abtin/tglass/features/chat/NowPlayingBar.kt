@@ -106,7 +106,6 @@ fun hasNowPlaying(repo: TelegramRepository, includeVideo: Boolean = true): Boole
 private fun NowPlayingContent(np: NowPlaying, onOpen: (Long, Long) -> Unit) {
     val c = TgTheme.colors
     val playing = if (np.video) VideoNotePlayback.playing else VoicePlayer.playing
-    val progress = if (np.video) VideoNotePlayback.progress else VoicePlayer.progress
     val t by animateFloatAsState(if (playing) 1f else 0f, label = "barPlay")
     Column {
         Spacer(Modifier.height(6.dp))
@@ -165,6 +164,8 @@ private fun NowPlayingContent(np: NowPlaying, onOpen: (Long, Long) -> Unit) {
                 val y = size.height - 1.5.dp.toPx()
                 val w = 2.dp.toPx()
                 drawLine(c.accent.copy(alpha = 0.18f), Offset(0f, y), Offset(size.width, y), strokeWidth = w, cap = StrokeCap.Round)
+                // Read while drawing: progress ticks redraw this line only.
+                val progress = if (np.video) VideoNotePlayback.progress else VoicePlayer.progress
                 if (progress > 0f) drawLine(c.accent, Offset(0f, y), Offset(size.width * progress.coerceIn(0f, 1f), y), strokeWidth = w, cap = StrokeCap.Round)
             }
         }
