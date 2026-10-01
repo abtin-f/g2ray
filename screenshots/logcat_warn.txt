@@ -1,0 +1,431 @@
+--------- beginning of system
+10-01 17:53:38.475   522  3538 E TaskPersister: File error accessing recents directory (directory doesn't exist?).
+10-01 17:53:40.732  5569  5701 W PackageParser: Unknown element under <manifest>: queries at /data/user_de/0/com.google.android.gms/app_chimera/m/00000000/AdsDynamite.apk Binary XML file line #15
+10-01 17:53:40.770  5569  5701 W PackageParser: Unknown element under <manifest>: queries at /data/user_de/0/com.google.android.gms/app_chimera/m/00000004/DynamiteModulesC.apk Binary XML file line #15
+10-01 17:53:41.091   522  1979 W JobScheduler: Job didn't exist in JobStore: 77d42ee #u0a155/7 com.google.android.contacts/com.google.android.apps.contacts.shortcut.ShortcutJobService
+10-01 17:53:41.441   522  5049 E SettingsToPropertiesMapper: key=persist.device_config.configuration.AdbWritableFlags__adb_writable_flags_list value=adservices/disable_sdk_sandbox,adservices/enforce_broadcast_receiver_restrictions,adservices/fledge_ad_selection_enforce_foreground_status_custom_audience,adservices/fledge_custom_audience_max_count,adservices/fledge_custom_audience_max_num_ads,adservices/fledge_custom_audience_max_owner_count,adservices/fledge_custom_audience_per_app_max_count,adservices/fledge_js_isolate_enforce_max_heap_size,adservices/fledge_js_isolate_max_heap_size_bytes,adservices/sdk_request_permits_per_second,adservices/sdksandbox_customized_sdk_context_enabled,configuration/namespace_to_package_mapping,constrain_display_apis/always_constrain_display_apis,constrain_display_apis/never_constrain_display_apis,constrain_display_apis/never_constrain_display_apis_all_packages,device_policy_manager/disable_resources_updatability,flipendo/default_savings_mode_launch,flipendo/essential_apps,flipendo/flipendo_enabled_launch,flipendo/grayscale_enabled_launch,flipendo/lever_ble_scanning_enabled_launch,flipendo/lever_hotspot_enabled_launch,flipendo/lever_work_profile_enabled_launch,flipendo/resuspend_delay_minutes,namespace/key,namespace1/key1,namespace1/key2,namespace2/key1,namespace2/key2,package_manager_service/incfs_default_timeouts,package_manager_service/known_digesters_list,privacy/location_access_check_periodic_interval_millis,rollback/enable_rollback_timeout,rollback/watchdog_explicit_health_check_enabled,rollback/watchdog_request_timeout_millis,rollback/watchdog_trigger_failure_count,rollback/watchdog_trigger_failure_duration_millis,rollback_boot/rollback_lifetime_in_millis,systemui/nas_generate_actions,systemui/nas_generate_replies,systemui/nas_max_messages_to_extract,systemui/nas_max_suggestions,testspace/another,testspace/flagname,textclassifier/config_updater_model_enabled,textclassifier/key,textclassifier/key2,textclassifier/manifest_url_annotator_en,textclassifier/manifest_url_annotator_ru,textclassifier/model_download_backoff_delay_in_millis,textclassifier/model_download_manager_enabled,textclassifier/multi_language_support_enabled,textclassifier/testing_locale_list_override,textclassifier/textclassifier_service_package_override,window_manager/enable_default_rescind_bal_privileges_from_pending_intent_sender,wrong/nas_generate_replies, exceeds system property max length.
+10-01 17:53:43.316   522   929 W ProcessStats: Tracking association SourceState{22bfca4 com.google.android.gms.persistent/10130 BFgs #12255} whose proc state 4 is better than process ProcessState{fc8f74a com.google.android.gms.unstable/10130 pkg=com.google.android.gms} proc state 14 (4823 skipped)
+10-01 17:53:44.723   522   545 W ActivityTaskManager: Launch timeout has expired, giving up wake lock!
+10-01 17:53:45.928   522  2180 W JobScheduler: Job didn't exist in JobStore: 9a6b22c #u0a132/-1000008 com.google.android.googlequicksearchbox/com.google.android.apps.gsa.tasks.BackgroundTasksJobService
+10-01 17:53:46.266   522   539 W JobScheduler: Job didn't exist in JobStore: 6790a9e #u0a132/-43 com.google.android.googlequicksearchbox/com.google.android.apps.gsa.tasks.BackgroundTasksJobService
+10-01 17:53:47.412   522   539 W ActivityTaskManager: Force removing ActivityRecord{5312d55 u0 com.abtin.tglass/.MainActivity t14 f}}: app died, no saved state
+10-01 17:53:47.503   522   539 W JobScheduler: Job didn't exist in JobStore: 6e674cf #u0a155/7 com.google.android.contacts/com.google.android.apps.contacts.shortcut.ShortcutJobService
+10-01 17:53:47.772   522  1406 W ActivityTaskManager: callingPackage for (uid=2000, pid=6565) has no WPC
+10-01 17:53:47.829   835   866 W Looper  : Slow dispatch took 100ms wmshell.main h=android.os.Handler c=com.android.wm.shell.transition.Transitions$TransitionPlayerImpl$$ExternalSyntheticLambda0@a1cb619 m=0
+10-01 17:53:47.830   835   866 W Looper  : Slow delivery took 93ms wmshell.main h=android.os.Handler c=android.window.TaskOrganizer$1$$ExternalSyntheticLambda3@e0b56de m=0
+10-01 17:53:47.840   522   822 W WindowManager: Exception thrown during dispatchAppVisibility Window{1693525 u0 com.abtin.tglass/com.abtin.tglass.MainActivity EXITING}
+10-01 17:53:47.840   522   822 W WindowManager: android.os.DeadObjectException
+10-01 17:53:47.840   522   822 W WindowManager: 	at android.os.BinderProxy.transactNative(Native Method)
+10-01 17:53:47.840   522   822 W WindowManager: 	at android.os.BinderProxy.transact(BinderProxy.java:584)
+10-01 17:53:47.840   522   822 W WindowManager: 	at android.view.IWindow$Stub$Proxy.dispatchAppVisibility(IWindow.java:546)
+10-01 17:53:47.840   522   822 W WindowManager: 	at com.android.server.wm.WindowState.sendAppVisibilityToClients(WindowState.java:3271)
+10-01 17:53:47.840   522   822 W WindowManager: 	at com.android.server.wm.WindowContainer.sendAppVisibilityToClients(WindowContainer.java:1221)
+10-01 17:53:47.840   522   822 W WindowManager: 	at com.android.server.wm.WindowToken.setClientVisible(WindowToken.java:409)
+10-01 17:53:47.840   522   822 W WindowManager: 	at com.android.server.wm.ActivityRecord.setClientVisible(ActivityRecord.java:6946)
+10-01 17:53:47.840   522   822 W WindowManager: 	at com.android.server.wm.ActivityRecord.postApplyAnimation(ActivityRecord.java:5637)
+10-01 17:53:47.840   522   822 W WindowManager: 	at com.android.server.wm.ActivityRecord.commitVisibility(ActivityRecord.java:5580)
+10-01 17:53:47.840   522   822 W WindowManager: 	at com.android.server.wm.Transition.finishTransition(Transition.java:1151)
+10-01 17:53:47.840   522   822 W WindowManager: 	at com.android.server.wm.TransitionController.finishTransition(TransitionController.java:868)
+10-01 17:53:47.840   522   822 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.finishTransition(WindowOrganizerController.java:396)
+10-01 17:53:47.840   522   822 W WindowManager: 	at android.window.IWindowOrganizerController$Stub.onTransact(IWindowOrganizerController.java:286)
+10-01 17:53:47.840   522   822 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.onTransact(WindowOrganizerController.java:181)
+10-01 17:53:47.840   522   822 W WindowManager: 	at android.os.Binder.execTransactInternal(Binder.java:1344)
+10-01 17:53:47.840   522   822 W WindowManager: 	at android.os.Binder.execTransact(Binder.java:1275)
+10-01 17:53:47.846   835   866 W Looper  : Drained
+10-01 17:53:47.884   522   545 W ActivityManager: Slow operation: 84ms so far, now at startProcess: done starting proc!
+10-01 17:53:47.887   522   545 W ActivityManager: setHasOverlayUi called on unknown pid: 6444
+10-01 17:53:47.887   522   553 W ActivityManager: Slow operation: 87ms so far, now at startProcess: asking zygote to start proc
+10-01 17:53:47.903   522   553 W ActivityManager: Slow operation: 103ms so far, now at startProcess: returned from zygote!
+10-01 17:53:47.903   522   553 W ActivityManager: Slow operation: 103ms so far, now at startProcess: done updating battery stats
+10-01 17:53:47.903   522   553 W ActivityManager: Slow operation: 103ms so far, now at startProcess: building log message
+10-01 17:53:47.903   522   553 W ActivityManager: Slow operation: 103ms so far, now at startProcess: starting to update pids map
+10-01 17:53:47.903   522   553 W ActivityManager: Slow operation: 103ms so far, now at startProcess: done updating pids map
+10-01 17:53:47.924   835   866 W Looper  : Slow delivery took 32ms wmshell.main h=android.os.Handler c=null m=17
+10-01 17:53:47.924   835   866 W Looper  : Drained
+10-01 17:53:47.982   522  2460 W ActivityTaskManager: takeTaskSnapshot: taskId=15 not found or not visible
+10-01 17:53:51.910   522  3538 E TaskPersister: File error accessing recents directory (directory doesn't exist?).
+10-01 17:53:53.499   522   551 W ProcessStats: Tracking association SourceState{a77a017 android.process.acore/10086 BFgs #12574} whose proc state 4 is better than process ProcessState{6712ea com.google.android.contacts/10155 pkg=com.google.android.contacts} proc state 13 (505 skipped)
+10-01 17:53:58.428   522  2463 W ActivityTaskManager: Force removing ActivityRecord{c9f3116 u0 com.abtin.tglass/.MainActivity t15 f}}: app died, no saved state
+10-01 17:53:58.679   522   597 W ActivityTaskManager: callingPackage for (uid=2000, pid=6669) has no WPC
+10-01 17:53:58.726   522  2180 W WindowManager: Exception thrown during dispatchAppVisibility Window{cd78c7c u0 com.abtin.tglass/com.abtin.tglass.MainActivity EXITING}
+10-01 17:53:58.726   522  2180 W WindowManager: android.os.DeadObjectException
+10-01 17:53:58.726   522  2180 W WindowManager: 	at android.os.BinderProxy.transactNative(Native Method)
+10-01 17:53:58.726   522  2180 W WindowManager: 	at android.os.BinderProxy.transact(BinderProxy.java:584)
+10-01 17:53:58.726   522  2180 W WindowManager: 	at android.view.IWindow$Stub$Proxy.dispatchAppVisibility(IWindow.java:546)
+10-01 17:53:58.726   522  2180 W WindowManager: 	at com.android.server.wm.WindowState.sendAppVisibilityToClients(WindowState.java:3271)
+10-01 17:53:58.726   522  2180 W WindowManager: 	at com.android.server.wm.WindowContainer.sendAppVisibilityToClients(WindowContainer.java:1221)
+10-01 17:53:58.726   522  2180 W WindowManager: 	at com.android.server.wm.WindowToken.setClientVisible(WindowToken.java:409)
+10-01 17:53:58.726   522  2180 W WindowManager: 	at com.android.server.wm.ActivityRecord.setClientVisible(ActivityRecord.java:6946)
+10-01 17:53:58.726   522  2180 W WindowManager: 	at com.android.server.wm.ActivityRecord.postApplyAnimation(ActivityRecord.java:5637)
+10-01 17:53:58.726   522  2180 W WindowManager: 	at com.android.server.wm.ActivityRecord.commitVisibility(ActivityRecord.java:5580)
+10-01 17:53:58.726   522  2180 W WindowManager: 	at com.android.server.wm.Transition.finishTransition(Transition.java:1151)
+10-01 17:53:58.726   522  2180 W WindowManager: 	at com.android.server.wm.TransitionController.finishTransition(TransitionController.java:868)
+10-01 17:53:58.726   522  2180 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.finishTransition(WindowOrganizerController.java:396)
+10-01 17:53:58.726   522  2180 W WindowManager: 	at android.window.IWindowOrganizerController$Stub.onTransact(IWindowOrganizerController.java:286)
+10-01 17:53:58.726   522  2180 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.onTransact(WindowOrganizerController.java:181)
+10-01 17:53:58.726   522  2180 W WindowManager: 	at android.os.Binder.execTransactInternal(Binder.java:1344)
+10-01 17:53:58.726   522  2180 W WindowManager: 	at android.os.Binder.execTransact(Binder.java:1275)
+10-01 17:53:58.745   522   545 W ActivityManager: setHasOverlayUi called on unknown pid: 6569
+10-01 17:53:59.065   835   866 W Looper  : Slow dispatch took 134ms wmshell.main h=android.os.Handler c=com.android.wm.shell.transition.DefaultTransitionHandler$$ExternalSyntheticLambda0@2473549 m=0
+10-01 17:53:59.065   835   866 W Looper  : Slow delivery took 81ms wmshell.main h=android.os.Handler c=com.android.wm.shell.pip.phone.PipController$$ExternalSyntheticLambda1@eba8201 m=0
+10-01 17:53:59.065   522  2459 W ActivityManager: Slow operation: 80ms so far, now at attachApplicationLocked: immediately before bindApplication
+10-01 17:53:59.066   522  2459 W ActivityManager: Slow operation: 81ms so far, now at attachApplicationLocked: immediately after bindApplication
+10-01 17:53:59.066   522  2459 W ActivityManager: Slow operation: 81ms so far, now at attachApplicationLocked: after updateLruProcessLocked
+10-01 17:53:59.093   835   866 W Looper  : Drained
+10-01 17:54:02.876   522  3538 E TaskPersister: File error accessing recents directory (directory doesn't exist?).
+10-01 17:54:05.900   522  2221 W ProcessStats: Tracking association SourceState{3883e03 com.google.android.gms/10130 BFgs #12694} whose proc state 4 is better than process ProcessState{5e2144 com.google.process.gservices/10130 pkg=com.google.android.gsf} proc state 8 (121 skipped)
+10-01 17:54:12.596   522  2221 W ActivityTaskManager: Force removing ActivityRecord{a3b7694 u0 com.abtin.tglass/.MainActivity t16 f}}: app died, no saved state
+10-01 17:54:12.645   835   866 W Looper  : Slow dispatch took 47ms wmshell.main h=android.os.Handler c=com.android.wm.shell.transition.Transitions$TransitionPlayerImpl$$ExternalSyntheticLambda1@46c5199 m=0
+10-01 17:54:12.646   835   866 W Looper  : Slow delivery took 47ms wmshell.main h=android.os.Handler c=com.android.wm.shell.pip.PinnedStackListenerForwarder$PinnedTaskListenerImpl$$ExternalSyntheticLambda1@8518c5e m=0
+10-01 17:54:12.661   835   866 W Looper  : Drained
+10-01 17:54:12.886   522   930 W ActivityTaskManager: callingPackage for (uid=2000, pid=6768) has no WPC
+10-01 17:54:12.932   522  2184 W WindowManager: Exception thrown during dispatchAppVisibility Window{296aa63 u0 com.abtin.tglass/com.abtin.tglass.MainActivity EXITING}
+10-01 17:54:12.932   522  2184 W WindowManager: android.os.DeadObjectException
+10-01 17:54:12.932   522  2184 W WindowManager: 	at android.os.BinderProxy.transactNative(Native Method)
+10-01 17:54:12.932   522  2184 W WindowManager: 	at android.os.BinderProxy.transact(BinderProxy.java:584)
+10-01 17:54:12.932   522  2184 W WindowManager: 	at android.view.IWindow$Stub$Proxy.dispatchAppVisibility(IWindow.java:546)
+10-01 17:54:12.932   522  2184 W WindowManager: 	at com.android.server.wm.WindowState.sendAppVisibilityToClients(WindowState.java:3271)
+10-01 17:54:12.932   522  2184 W WindowManager: 	at com.android.server.wm.WindowContainer.sendAppVisibilityToClients(WindowContainer.java:1221)
+10-01 17:54:12.932   522  2184 W WindowManager: 	at com.android.server.wm.WindowToken.setClientVisible(WindowToken.java:409)
+10-01 17:54:12.932   522  2184 W WindowManager: 	at com.android.server.wm.ActivityRecord.setClientVisible(ActivityRecord.java:6946)
+10-01 17:54:12.932   522  2184 W WindowManager: 	at com.android.server.wm.ActivityRecord.postApplyAnimation(ActivityRecord.java:5637)
+10-01 17:54:12.932   522  2184 W WindowManager: 	at com.android.server.wm.ActivityRecord.commitVisibility(ActivityRecord.java:5580)
+10-01 17:54:12.932   522  2184 W WindowManager: 	at com.android.server.wm.Transition.finishTransition(Transition.java:1151)
+10-01 17:54:12.932   522  2184 W WindowManager: 	at com.android.server.wm.TransitionController.finishTransition(TransitionController.java:868)
+10-01 17:54:12.932   522  2184 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.finishTransition(WindowOrganizerController.java:396)
+10-01 17:54:12.932   522  2184 W WindowManager: 	at android.window.IWindowOrganizerController$Stub.onTransact(IWindowOrganizerController.java:286)
+10-01 17:54:12.932   522  2184 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.onTransact(WindowOrganizerController.java:181)
+10-01 17:54:12.932   522  2184 W WindowManager: 	at android.os.Binder.execTransactInternal(Binder.java:1344)
+10-01 17:54:12.932   522  2184 W WindowManager: 	at android.os.Binder.execTransact(Binder.java:1275)
+10-01 17:54:12.934   522   545 W ActivityManager: setHasOverlayUi called on unknown pid: 6672
+10-01 17:54:12.942   835   866 W Looper  : Slow dispatch took 51ms wmshell.main h=android.os.Handler c=com.android.wm.shell.transition.DefaultTransitionHandler$$ExternalSyntheticLambda0@657d309 m=0
+10-01 17:54:12.942   835   866 W Looper  : Slow delivery took 48ms wmshell.main h=android.os.Handler c=android.window.TaskOrganizer$1$$ExternalSyntheticLambda8@7a7c90e m=0
+10-01 17:54:12.942   835   866 W Looper  : Drained
+10-01 17:54:13.094   835   866 W Looper  : Slow delivery took 35ms wmshell.main h=android.os.Handler c=null m=1
+10-01 17:54:13.094   835   866 W Looper  : Drained
+10-01 17:54:13.251   835   866 W Looper  : Slow dispatch took 78ms wmshell.main h=android.os.Handler c=com.android.wm.shell.common.ShellExecutor$$ExternalSyntheticLambda1@c6ebb35 m=0
+10-01 17:54:13.253   835   866 W Looper  : Slow delivery took 56ms wmshell.main h=android.os.Handler c=com.android.wm.shell.transition.Transitions$TransitionPlayerImpl$$ExternalSyntheticLambda0@5a61cb3 m=0
+10-01 17:54:13.291   835   866 W Looper  : Drained
+10-01 17:54:13.340   835   866 W Looper  : Slow dispatch took 37ms wmshell.main h=android.os.Handler c=com.android.wm.shell.transition.DefaultTransitionHandler$$ExternalSyntheticLambda0@5f0e66e m=0
+10-01 17:54:14.105   522  2460 W JobScheduler: Job didn't exist in JobStore: a5ecfa0 #u0a132/-1000007 com.google.android.googlequicksearchbox/com.google.android.apps.gsa.tasks.BackgroundTasksJobService
+10-01 17:54:16.275   522  2460 W ProcessStats: Tracking association SourceState{20d9b8e com.google.android.googlequicksearchbox:search/10132 BTop #12734} whose proc state 2 is better than process ProcessState{2040ede com.google.android.googlequicksearchbox:interactor/10132 pkg=com.google.android.googlequicksearchbox} proc state 4 (36 skipped)
+10-01 17:54:17.004   522  3538 E TaskPersister: File error accessing recents directory (directory doesn't exist?).
+--------- beginning of kernel
+10-01 17:54:21.423     0     0 W healthd : battery l=100 v=5000 t=25.0 h=2 st=2 c=900000 fc=3000000 cc=10 chg=a
+10-01 17:54:23.518   522  2460 W ActivityTaskManager: Force removing ActivityRecord{314680b u0 com.abtin.tglass/.MainActivity t17 f}}: app died, no saved state
+10-01 17:54:23.788   522  1089 W ActivityTaskManager: callingPackage for (uid=2000, pid=6849) has no WPC
+10-01 17:54:23.826   835   866 W Looper  : Slow delivery took 44ms wmshell.main h=android.os.Handler c=com.android.wm.shell.transition.Transitions$TransitionPlayerImpl$$ExternalSyntheticLambda0@91df815 m=0
+10-01 17:54:23.885   522   553 W ActivityManager: Slow operation: 77ms so far, now at startProcess: returned from zygote!
+10-01 17:54:23.886   522   553 W ActivityManager: Slow operation: 78ms so far, now at startProcess: done updating battery stats
+10-01 17:54:23.890   522   553 W ActivityManager: Slow operation: 82ms so far, now at startProcess: building log message
+10-01 17:54:23.890   522   553 W ActivityManager: Slow operation: 82ms so far, now at startProcess: starting to update pids map
+10-01 17:54:23.891   522   553 W ActivityManager: Slow operation: 83ms so far, now at startProcess: done updating pids map
+10-01 17:54:23.923   835   866 W Looper  : Slow dispatch took 97ms wmshell.main h=android.os.Handler c=null m=2
+10-01 17:54:24.004   835   866 W Looper  : Slow dispatch took 81ms wmshell.main h=android.os.Handler c=android.window.TaskOrganizer$1$$ExternalSyntheticLambda8@70b0a64 m=0
+10-01 17:54:24.007   522  2214 W WindowManager: Exception thrown during dispatchAppVisibility Window{c76e948 u0 com.abtin.tglass/com.abtin.tglass.MainActivity EXITING}
+10-01 17:54:24.007   522  2214 W WindowManager: android.os.DeadObjectException
+10-01 17:54:24.007   522  2214 W WindowManager: 	at android.os.BinderProxy.transactNative(Native Method)
+10-01 17:54:24.007   522  2214 W WindowManager: 	at android.os.BinderProxy.transact(BinderProxy.java:584)
+10-01 17:54:24.007   522  2214 W WindowManager: 	at android.view.IWindow$Stub$Proxy.dispatchAppVisibility(IWindow.java:546)
+10-01 17:54:24.007   522  2214 W WindowManager: 	at com.android.server.wm.WindowState.sendAppVisibilityToClients(WindowState.java:3271)
+10-01 17:54:24.007   522  2214 W WindowManager: 	at com.android.server.wm.WindowContainer.sendAppVisibilityToClients(WindowContainer.java:1221)
+10-01 17:54:24.007   522  2214 W WindowManager: 	at com.android.server.wm.WindowToken.setClientVisible(WindowToken.java:409)
+10-01 17:54:24.007   522  2214 W WindowManager: 	at com.android.server.wm.ActivityRecord.setClientVisible(ActivityRecord.java:6946)
+10-01 17:54:24.007   522  2214 W WindowManager: 	at com.android.server.wm.ActivityRecord.postApplyAnimation(ActivityRecord.java:5637)
+10-01 17:54:24.007   522  2214 W WindowManager: 	at com.android.server.wm.ActivityRecord.commitVisibility(ActivityRecord.java:5580)
+10-01 17:54:24.007   522  2214 W WindowManager: 	at com.android.server.wm.Transition.finishTransition(Transition.java:1151)
+10-01 17:54:24.007   522  2214 W WindowManager: 	at com.android.server.wm.TransitionController.finishTransition(TransitionController.java:868)
+10-01 17:54:24.007   522  2214 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.finishTransition(WindowOrganizerController.java:396)
+10-01 17:54:24.007   522  2214 W WindowManager: 	at android.window.IWindowOrganizerController$Stub.onTransact(IWindowOrganizerController.java:286)
+10-01 17:54:24.007   522  2214 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.onTransact(WindowOrganizerController.java:181)
+10-01 17:54:24.007   522  2214 W WindowManager: 	at android.os.Binder.execTransactInternal(Binder.java:1344)
+10-01 17:54:24.007   522  2214 W WindowManager: 	at android.os.Binder.execTransact(Binder.java:1275)
+10-01 17:54:24.015   522   545 W ActivityManager: setHasOverlayUi called on unknown pid: 6771
+10-01 17:54:24.016   835   866 W Looper  : Drained
+10-01 17:54:24.105   835   878 W Looper  : Slow dispatch took 49ms wmshell.anim h=android.os.Handler c=com.android.wm.shell.transition.DefaultTransitionHandler$$ExternalSyntheticLambda1@9485df m=0
+10-01 17:54:24.182   835   866 W Looper  : Slow dispatch took 51ms wmshell.main h=android.os.Handler c=com.android.wm.shell.transition.DefaultTransitionHandler$$ExternalSyntheticLambda0@3e5a0fb m=0
+10-01 17:54:24.182   835   866 W Looper  : Slow delivery took 76ms wmshell.main h=android.os.Handler c=android.window.TaskOrganizer$1$$ExternalSyntheticLambda5@cf43518 m=0
+10-01 17:54:24.200   522  2214 W JobScheduler: Job didn't exist in JobStore: adfc7f4 #u0a132/-353 com.google.android.googlequicksearchbox/com.google.android.apps.gsa.tasks.BackgroundTasksJobService
+10-01 17:54:24.205   835   866 W Looper  : Drained
+10-01 17:54:26.907   835   866 W Looper  : Slow delivery took 65ms wmshell.main h=android.os.Handler c=android.window.TaskOrganizer$1$$ExternalSyntheticLambda6@5264d56 m=0
+10-01 17:54:26.915   835   866 W Looper  : Drained
+10-01 17:54:27.158   522  2214 W ProcessStats: Tracking association SourceState{20d9b8e com.google.android.googlequicksearchbox:search/10132 BTop #12773} whose proc state 2 is better than process ProcessState{2040ede com.google.android.googlequicksearchbox:interactor/10132 pkg=com.google.android.googlequicksearchbox} proc state 4 (29 skipped)
+10-01 17:54:27.813   522  3538 E TaskPersister: File error accessing recents directory (directory doesn't exist?).
+10-01 17:54:34.296   522   901 W ActivityTaskManager: Force removing ActivityRecord{e4fac02 u0 com.abtin.tglass/.MainActivity t18 f}}: app died, no saved state
+10-01 17:54:34.543   522  2129 W ActivityTaskManager: callingPackage for (uid=2000, pid=6963) has no WPC
+10-01 17:54:34.584   522  2214 W WindowManager: Exception thrown during dispatchAppVisibility Window{821ecba u0 com.abtin.tglass/com.abtin.tglass.MainActivity EXITING}
+10-01 17:54:34.584   522  2214 W WindowManager: android.os.DeadObjectException
+10-01 17:54:34.584   522  2214 W WindowManager: 	at android.os.BinderProxy.transactNative(Native Method)
+10-01 17:54:34.584   522  2214 W WindowManager: 	at android.os.BinderProxy.transact(BinderProxy.java:584)
+10-01 17:54:34.584   522  2214 W WindowManager: 	at android.view.IWindow$Stub$Proxy.dispatchAppVisibility(IWindow.java:546)
+10-01 17:54:34.584   522  2214 W WindowManager: 	at com.android.server.wm.WindowState.sendAppVisibilityToClients(WindowState.java:3271)
+10-01 17:54:34.584   522  2214 W WindowManager: 	at com.android.server.wm.WindowContainer.sendAppVisibilityToClients(WindowContainer.java:1221)
+10-01 17:54:34.584   522  2214 W WindowManager: 	at com.android.server.wm.WindowToken.setClientVisible(WindowToken.java:409)
+10-01 17:54:34.584   522  2214 W WindowManager: 	at com.android.server.wm.ActivityRecord.setClientVisible(ActivityRecord.java:6946)
+10-01 17:54:34.584   522  2214 W WindowManager: 	at com.android.server.wm.ActivityRecord.postApplyAnimation(ActivityRecord.java:5637)
+10-01 17:54:34.584   522  2214 W WindowManager: 	at com.android.server.wm.ActivityRecord.commitVisibility(ActivityRecord.java:5580)
+10-01 17:54:34.584   522  2214 W WindowManager: 	at com.android.server.wm.Transition.finishTransition(Transition.java:1151)
+10-01 17:54:34.584   522  2214 W WindowManager: 	at com.android.server.wm.TransitionController.finishTransition(TransitionController.java:868)
+10-01 17:54:34.584   522  2214 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.finishTransition(WindowOrganizerController.java:396)
+10-01 17:54:34.584   522  2214 W WindowManager: 	at android.window.IWindowOrganizerController$Stub.onTransact(IWindowOrganizerController.java:286)
+10-01 17:54:34.584   522  2214 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.onTransact(WindowOrganizerController.java:181)
+10-01 17:54:34.584   522  2214 W WindowManager: 	at android.os.Binder.execTransactInternal(Binder.java:1344)
+10-01 17:54:34.584   522  2214 W WindowManager: 	at android.os.Binder.execTransact(Binder.java:1275)
+10-01 17:54:34.591   835   866 W Looper  : Slow dispatch took 44ms wmshell.main h=android.os.Handler c=com.android.wm.shell.transition.DefaultTransitionHandler$$ExternalSyntheticLambda0@88a4e92 m=0
+10-01 17:54:34.619   522   545 W ActivityManager: setHasOverlayUi called on unknown pid: 6853
+10-01 17:54:34.646   835   866 W Looper  : Slow dispatch took 38ms wmshell.main h=android.os.Handler c=com.android.wm.shell.transition.Transitions$TransitionPlayerImpl$$ExternalSyntheticLambda1@642651 m=0
+10-01 17:54:34.648   835   866 W Looper  : Slow delivery took 65ms wmshell.main h=android.os.Handler c=android.window.TaskOrganizer$1$$ExternalSyntheticLambda3@d3e87b7 m=0
+10-01 17:54:34.770   835   866 W Looper  : Drained
+10-01 17:54:34.804   522  2214 W ActivityTaskManager: takeTaskSnapshot: taskId=19 not found or not visible
+10-01 17:54:34.831   522   553 W ActivityManager: Slow operation: 213ms so far, now at startProcess: returned from zygote!
+10-01 17:54:34.835   522   553 W ActivityManager: Slow operation: 217ms so far, now at startProcess: done updating battery stats
+10-01 17:54:34.836   522   553 W ActivityManager: Slow operation: 218ms so far, now at startProcess: building log message
+10-01 17:54:34.836   522   553 W ActivityManager: Slow operation: 218ms so far, now at startProcess: starting to update pids map
+10-01 17:54:34.884   522   553 W ActivityManager: Slow operation: 266ms so far, now at startProcess: done updating pids map
+10-01 17:54:34.903   835   866 W Looper  : Slow dispatch took 59ms wmshell.main h=android.os.Handler c=com.android.wm.shell.transition.Transitions$TransitionPlayerImpl$$ExternalSyntheticLambda0@2de3554 m=0
+10-01 17:54:35.002   835   866 W Looper  : Slow delivery took 32ms wmshell.main h=android.os.Handler c=com.android.wm.shell.pip.phone.PipController$$ExternalSyntheticLambda1@eba8201 m=0
+10-01 17:54:35.100   835   866 W Looper  : Drained
+10-01 17:54:37.259   522   597 W ProcessStats: Tracking association SourceState{768e336 com.google.android.apps.nexuslauncher/10169 BTop #12839} whose proc state 2 is better than process ProcessState{ff9bfc9 com.google.android.googlequicksearchbox:search/10132 pkg=com.google.android.googlequicksearchbox} proc state 4 (62 skipped)
+10-01 17:54:37.677   522  2047 W JobScheduler: Job didn't exist in JobStore: a4e18bf #u0a132/-1000009 com.google.android.googlequicksearchbox/com.google.android.apps.gsa.tasks.BackgroundTasksJobService
+10-01 17:54:38.093   522  3538 E TaskPersister: File error accessing recents directory (directory doesn't exist?).
+10-01 17:54:44.474   522   921 W ActivityTaskManager: Force removing ActivityRecord{833ec83 u0 com.abtin.tglass/.MainActivity t19 f}}: app died, no saved state
+10-01 17:54:44.783   835   866 W Looper  : Slow dispatch took 49ms wmshell.main h=android.os.Handler c=com.android.wm.shell.transition.Transitions$TransitionPlayerImpl$$ExternalSyntheticLambda0@e67c569 m=0
+10-01 17:54:44.784   835   866 W Looper  : Slow delivery took 43ms wmshell.main h=android.os.Handler c=null m=2
+10-01 17:54:44.792   835   866 W Looper  : Drained
+10-01 17:54:44.793   522  2213 W WindowManager: Exception thrown during dispatchAppVisibility Window{2df519 u0 com.abtin.tglass/com.abtin.tglass.MainActivity EXITING}
+10-01 17:54:44.793   522  2213 W WindowManager: android.os.DeadObjectException
+10-01 17:54:44.793   522  2213 W WindowManager: 	at android.os.BinderProxy.transactNative(Native Method)
+10-01 17:54:44.793   522  2213 W WindowManager: 	at android.os.BinderProxy.transact(BinderProxy.java:584)
+10-01 17:54:44.793   522  2213 W WindowManager: 	at android.view.IWindow$Stub$Proxy.dispatchAppVisibility(IWindow.java:546)
+10-01 17:54:44.793   522  2213 W WindowManager: 	at com.android.server.wm.WindowState.sendAppVisibilityToClients(WindowState.java:3271)
+10-01 17:54:44.793   522  2213 W WindowManager: 	at com.android.server.wm.WindowContainer.sendAppVisibilityToClients(WindowContainer.java:1221)
+10-01 17:54:44.793   522  2213 W WindowManager: 	at com.android.server.wm.WindowToken.setClientVisible(WindowToken.java:409)
+10-01 17:54:44.793   522  2213 W WindowManager: 	at com.android.server.wm.ActivityRecord.setClientVisible(ActivityRecord.java:6946)
+10-01 17:54:44.793   522  2213 W WindowManager: 	at com.android.server.wm.ActivityRecord.postApplyAnimation(ActivityRecord.java:5637)
+10-01 17:54:44.793   522  2213 W WindowManager: 	at com.android.server.wm.ActivityRecord.commitVisibility(ActivityRecord.java:5580)
+10-01 17:54:44.793   522  2213 W WindowManager: 	at com.android.server.wm.Transition.finishTransition(Transition.java:1151)
+10-01 17:54:44.793   522  2213 W WindowManager: 	at com.android.server.wm.TransitionController.finishTransition(TransitionController.java:868)
+10-01 17:54:44.793   522  2213 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.finishTransition(WindowOrganizerController.java:396)
+10-01 17:54:44.793   522  2213 W WindowManager: 	at android.window.IWindowOrganizerController$Stub.onTransact(IWindowOrganizerController.java:286)
+10-01 17:54:44.793   522  2213 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.onTransact(WindowOrganizerController.java:181)
+10-01 17:54:44.793   522  2213 W WindowManager: 	at android.os.Binder.execTransactInternal(Binder.java:1344)
+10-01 17:54:44.793   522  2213 W WindowManager: 	at android.os.Binder.execTransact(Binder.java:1275)
+10-01 17:54:44.797   522   545 W ActivityManager: setHasOverlayUi called on unknown pid: 6968
+10-01 17:54:44.802   522  2399 W ActivityTaskManager: callingPackage for (uid=2000, pid=7059) has no WPC
+10-01 17:54:44.914   522   553 W ActivityManager: Slow operation: 87ms so far, now at startProcess: done updating pids map
+10-01 17:54:45.040   522  2221 W ActivityTaskManager: takeTaskSnapshot: taskId=20 not found or not visible
+10-01 17:54:48.153   522   921 W WindowManager: Failed looking up window session=Session{6fdb1b3 835:u0a10168} callers=com.android.server.wm.WindowManagerService.windowForClientLocked:6034 com.android.server.wm.Session.setOnBackInvokedCallbackInfo:944 android.view.IWindowSession$Stub.onTransact:1145 
+10-01 17:54:48.210   522  2221 W ProcessStats: Tracking association SourceState{20d9b8e com.google.android.googlequicksearchbox:search/10132 BTop #12912} whose proc state 2 is better than process ProcessState{2040ede com.google.android.googlequicksearchbox:interactor/10132 pkg=com.google.android.googlequicksearchbox} proc state 4 (47 skipped)
+10-01 17:54:48.399   522  3538 E TaskPersister: File error accessing recents directory (directory doesn't exist?).
+10-01 17:54:55.573   522  2399 W ActivityTaskManager: Force removing ActivityRecord{f8e5ad6 u0 com.abtin.tglass/.MainActivity t20 f}}: app died, no saved state
+10-01 17:54:55.696   522  2399 W ActivityTaskManager: callingPackage for (uid=2000, pid=7148) has no WPC
+10-01 17:54:56.041   522  2214 W WindowManager: Exception thrown during dispatchAppVisibility Window{1ec05b u0 com.abtin.tglass/com.abtin.tglass.MainActivity EXITING}
+10-01 17:54:56.041   522  2214 W WindowManager: android.os.DeadObjectException
+10-01 17:54:56.041   522  2214 W WindowManager: 	at android.os.BinderProxy.transactNative(Native Method)
+10-01 17:54:56.041   522  2214 W WindowManager: 	at android.os.BinderProxy.transact(BinderProxy.java:584)
+10-01 17:54:56.041   522  2214 W WindowManager: 	at android.view.IWindow$Stub$Proxy.dispatchAppVisibility(IWindow.java:546)
+10-01 17:54:56.041   522  2214 W WindowManager: 	at com.android.server.wm.WindowState.sendAppVisibilityToClients(WindowState.java:3271)
+10-01 17:54:56.041   522  2214 W WindowManager: 	at com.android.server.wm.WindowContainer.sendAppVisibilityToClients(WindowContainer.java:1221)
+10-01 17:54:56.041   522  2214 W WindowManager: 	at com.android.server.wm.WindowToken.setClientVisible(WindowToken.java:409)
+10-01 17:54:56.041   522  2214 W WindowManager: 	at com.android.server.wm.ActivityRecord.setClientVisible(ActivityRecord.java:6946)
+10-01 17:54:56.041   522  2214 W WindowManager: 	at com.android.server.wm.ActivityRecord.postApplyAnimation(ActivityRecord.java:5637)
+10-01 17:54:56.041   522  2214 W WindowManager: 	at com.android.server.wm.ActivityRecord.commitVisibility(ActivityRecord.java:5580)
+10-01 17:54:56.041   522  2214 W WindowManager: 	at com.android.server.wm.Transition.finishTransition(Transition.java:1151)
+10-01 17:54:56.041   522  2214 W WindowManager: 	at com.android.server.wm.TransitionController.finishTransition(TransitionController.java:868)
+10-01 17:54:56.041   522  2214 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.finishTransition(WindowOrganizerController.java:396)
+10-01 17:54:56.041   522  2214 W WindowManager: 	at android.window.IWindowOrganizerController$Stub.onTransact(IWindowOrganizerController.java:286)
+10-01 17:54:56.041   522  2214 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.onTransact(WindowOrganizerController.java:181)
+10-01 17:54:56.041   522  2214 W WindowManager: 	at android.os.Binder.execTransactInternal(Binder.java:1344)
+10-01 17:54:56.041   522  2214 W WindowManager: 	at android.os.Binder.execTransact(Binder.java:1275)
+10-01 17:54:56.054   522   545 W ActivityManager: setHasOverlayUi called on unknown pid: 7063
+10-01 17:54:59.791   522  3538 E TaskPersister: File error accessing recents directory (directory doesn't exist?).
+10-01 17:55:01.450   522  2221 W ProcessStats: Tracking association SourceState{3902e6d com.google.android.gms/10130 BFgs #12968} whose proc state 4 is better than process ProcessState{7d72aa2 android.process.acore/10086 pkg=com.android.providers.contacts (sub)} proc state 13 (18 skipped)
+10-01 17:55:03.043   522   597 W JobScheduler: Job didn't exist in JobStore: 8027bc0 #u0a155/7 com.google.android.contacts/com.google.android.apps.contacts.shortcut.ShortcutJobService
+10-01 17:55:06.306   522   929 W ActivityTaskManager: Force removing ActivityRecord{efb22d2 u0 com.abtin.tglass/.MainActivity t21 f}}: app died, no saved state
+10-01 17:55:06.345   835   866 W Looper  : Slow dispatch took 35ms wmshell.main h=android.os.Handler c=com.android.wm.shell.transition.Transitions$TransitionPlayerImpl$$ExternalSyntheticLambda1@f429856 m=0
+10-01 17:55:06.345   835   866 W Looper  : Slow delivery took 31ms wmshell.main h=android.os.Handler c=com.android.wm.shell.pip.PinnedStackListenerForwarder$PinnedTaskListenerImpl$$ExternalSyntheticLambda1@24940d7 m=0
+10-01 17:55:06.345   835   866 W Looper  : Drained
+10-01 17:55:06.525   522  2459 W ActivityTaskManager: callingPackage for (uid=2000, pid=7304) has no WPC
+10-01 17:55:06.637   522  2180 W WindowManager: Exception thrown during dispatchAppVisibility Window{212d2c u0 com.abtin.tglass/com.abtin.tglass.MainActivity EXITING}
+10-01 17:55:06.637   522  2180 W WindowManager: android.os.DeadObjectException
+10-01 17:55:06.637   522  2180 W WindowManager: 	at android.os.BinderProxy.transactNative(Native Method)
+10-01 17:55:06.637   522  2180 W WindowManager: 	at android.os.BinderProxy.transact(BinderProxy.java:584)
+10-01 17:55:06.637   522  2180 W WindowManager: 	at android.view.IWindow$Stub$Proxy.dispatchAppVisibility(IWindow.java:546)
+10-01 17:55:06.637   522  2180 W WindowManager: 	at com.android.server.wm.WindowState.sendAppVisibilityToClients(WindowState.java:3271)
+10-01 17:55:06.637   522  2180 W WindowManager: 	at com.android.server.wm.WindowContainer.sendAppVisibilityToClients(WindowContainer.java:1221)
+10-01 17:55:06.637   522  2180 W WindowManager: 	at com.android.server.wm.WindowToken.setClientVisible(WindowToken.java:409)
+10-01 17:55:06.637   522  2180 W WindowManager: 	at com.android.server.wm.ActivityRecord.setClientVisible(ActivityRecord.java:6946)
+10-01 17:55:06.637   522  2180 W WindowManager: 	at com.android.server.wm.ActivityRecord.postApplyAnimation(ActivityRecord.java:5637)
+10-01 17:55:06.637   522  2180 W WindowManager: 	at com.android.server.wm.ActivityRecord.commitVisibility(ActivityRecord.java:5580)
+10-01 17:55:06.637   522  2180 W WindowManager: 	at com.android.server.wm.Transition.finishTransition(Transition.java:1151)
+10-01 17:55:06.637   522  2180 W WindowManager: 	at com.android.server.wm.TransitionController.finishTransition(TransitionController.java:868)
+10-01 17:55:06.637   522  2180 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.finishTransition(WindowOrganizerController.java:396)
+10-01 17:55:06.637   522  2180 W WindowManager: 	at android.window.IWindowOrganizerController$Stub.onTransact(IWindowOrganizerController.java:286)
+10-01 17:55:06.637   522  2180 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.onTransact(WindowOrganizerController.java:181)
+10-01 17:55:06.637   522  2180 W WindowManager: 	at android.os.Binder.execTransactInternal(Binder.java:1344)
+10-01 17:55:06.637   522  2180 W WindowManager: 	at android.os.Binder.execTransact(Binder.java:1275)
+10-01 17:55:06.720   522   545 W ActivityManager: setHasOverlayUi called on unknown pid: 7153
+10-01 17:55:06.728   835   866 W Looper  : Slow dispatch took 203ms wmshell.main h=android.os.Handler c=com.android.wm.shell.transition.DefaultTransitionHandler$$ExternalSyntheticLambda0@74fc306 m=0
+10-01 17:55:06.728   835   866 W Looper  : Slow delivery took 172ms wmshell.main h=android.os.Handler c=null m=10
+10-01 17:55:06.762   835   866 W Looper  : Slow dispatch took 33ms wmshell.main h=android.os.Handler c=com.android.wm.shell.transition.Transitions$TransitionPlayerImpl$$ExternalSyntheticLambda1@3acedbc m=0
+10-01 17:55:06.769   835   866 W Looper  : Drained
+10-01 17:55:06.901   835   866 W Looper  : Slow delivery took 58ms wmshell.main h=android.os.Handler c=com.android.wm.shell.transition.Transitions$TransitionPlayerImpl$$ExternalSyntheticLambda0@20b831 m=0
+10-01 17:55:06.903   835   866 W Looper  : Drained
+10-01 17:55:07.019   835   866 W Looper  : Slow dispatch took 93ms wmshell.main h=android.os.Handler c=com.android.wm.shell.transition.DefaultTransitionHandler$$ExternalSyntheticLambda0@5575e84 m=0
+10-01 17:55:07.019   835   866 W Looper  : Slow delivery took 57ms wmshell.main h=android.os.Handler c=com.android.wm.shell.pip.phone.PipController$$ExternalSyntheticLambda1@eba8201 m=0
+10-01 17:55:07.136   835   866 W Looper  : Drained
+10-01 17:55:10.571   522  3538 E TaskPersister: File error accessing recents directory (directory doesn't exist?).
+10-01 17:55:12.977   522   929 W JobScheduler: Job didn't exist in JobStore: 5394eaa #u0a155/7 com.google.android.contacts/com.google.android.apps.contacts.shortcut.ShortcutJobService
+10-01 17:55:14.014   522  1909 W JobScheduler: Job didn't exist in JobStore: 70a5ad5 #u0a155/100010 com.google.android.contacts/androidx.work.impl.background.systemjob.SystemJobService
+10-01 17:55:15.512   522  2463 W ProcessStats: Tracking association SourceState{4cc1266 android.process.acore/10086 BFgs #13493} whose proc state 4 is better than process ProcessState{6712ea com.google.android.contacts/10155 pkg=com.google.android.contacts} proc state 14 (2400 skipped)
+10-01 17:55:17.291   522  2463 W ActivityTaskManager: Force removing ActivityRecord{d443642 u0 com.abtin.tglass/.MainActivity t22 f}}: app died, no saved state
+10-01 17:55:17.327   835   866 W Looper  : Slow dispatch took 33ms wmshell.main h=android.os.Handler c=com.android.wm.shell.transition.Transitions$TransitionPlayerImpl$$ExternalSyntheticLambda1@a5b078f m=0
+10-01 17:55:17.585   522  2461 W WindowManager: Exception thrown during dispatchAppVisibility Window{3668a33 u0 com.abtin.tglass/com.abtin.tglass.MainActivity EXITING}
+10-01 17:55:17.585   522  2461 W WindowManager: android.os.DeadObjectException
+10-01 17:55:17.585   522  2461 W WindowManager: 	at android.os.BinderProxy.transactNative(Native Method)
+10-01 17:55:17.585   522  2461 W WindowManager: 	at android.os.BinderProxy.transact(BinderProxy.java:584)
+10-01 17:55:17.585   522  2461 W WindowManager: 	at android.view.IWindow$Stub$Proxy.dispatchAppVisibility(IWindow.java:546)
+10-01 17:55:17.585   522  2461 W WindowManager: 	at com.android.server.wm.WindowState.sendAppVisibilityToClients(WindowState.java:3271)
+10-01 17:55:17.585   522  2461 W WindowManager: 	at com.android.server.wm.WindowContainer.sendAppVisibilityToClients(WindowContainer.java:1221)
+10-01 17:55:17.585   522  2461 W WindowManager: 	at com.android.server.wm.WindowToken.setClientVisible(WindowToken.java:409)
+10-01 17:55:17.585   522  2461 W WindowManager: 	at com.android.server.wm.ActivityRecord.setClientVisible(ActivityRecord.java:6946)
+10-01 17:55:17.585   522  2461 W WindowManager: 	at com.android.server.wm.ActivityRecord.postApplyAnimation(ActivityRecord.java:5637)
+10-01 17:55:17.585   522  2461 W WindowManager: 	at com.android.server.wm.ActivityRecord.commitVisibility(ActivityRecord.java:5580)
+10-01 17:55:17.585   522  2461 W WindowManager: 	at com.android.server.wm.Transition.finishTransition(Transition.java:1151)
+10-01 17:55:17.585   522  2461 W WindowManager: 	at com.android.server.wm.TransitionController.finishTransition(TransitionController.java:868)
+10-01 17:55:17.585   522  2461 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.finishTransition(WindowOrganizerController.java:396)
+10-01 17:55:17.585   522  2461 W WindowManager: 	at android.window.IWindowOrganizerController$Stub.onTransact(IWindowOrganizerController.java:286)
+10-01 17:55:17.585   522  2461 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.onTransact(WindowOrganizerController.java:181)
+10-01 17:55:17.585   522  2461 W WindowManager: 	at android.os.Binder.execTransactInternal(Binder.java:1344)
+10-01 17:55:17.585   522  2461 W WindowManager: 	at android.os.Binder.execTransact(Binder.java:1275)
+10-01 17:55:17.588   522   545 W ActivityManager: setHasOverlayUi called on unknown pid: 7307
+10-01 17:55:17.695   522  2463 W ActivityTaskManager: callingPackage for (uid=2000, pid=7402) has no WPC
+10-01 17:55:17.957   522  2461 W ActivityTaskManager: takeTaskSnapshot: taskId=23 not found or not visible
+10-01 17:55:20.891   835   866 W Looper  : Slow delivery took 72ms wmshell.main h=android.os.Handler c=com.android.wm.shell.bubbles.BubbleController$BubblesImpl$$ExternalSyntheticLambda5@7279f7b m=0
+10-01 17:55:21.020   835   866 W Looper  : Drained
+10-01 17:55:21.424     0     0 W healthd : battery l=100 v=5000 t=25.0 h=2 st=2 c=900000 fc=3000000 cc=10 chg=a
+10-01 17:55:21.596   522  3538 E TaskPersister: File error accessing recents directory (directory doesn't exist?).
+10-01 17:55:28.156   522  1692 W ActivityTaskManager: Force removing ActivityRecord{c2e6784 u0 com.abtin.tglass/.MainActivity t23 f}}: app died, no saved state
+10-01 17:55:28.170   522  1692 W ProcessStats: Tracking association SourceState{20d9b8e com.google.android.googlequicksearchbox:search/10132 BTop #13583} whose proc state 2 is better than process ProcessState{2040ede com.google.android.googlequicksearchbox:interactor/10132 pkg=com.google.android.googlequicksearchbox} proc state 4 (118 skipped)
+10-01 17:55:28.473   522  1692 W ActivityTaskManager: callingPackage for (uid=2000, pid=7493) has no WPC
+10-01 17:55:28.530   835   866 W Looper  : Slow dispatch took 63ms wmshell.main h=android.os.Handler c=com.android.wm.shell.transition.Transitions$TransitionPlayerImpl$$ExternalSyntheticLambda0@89f90c8 m=0
+10-01 17:55:28.531   835   866 W Looper  : Slow delivery took 59ms wmshell.main h=android.os.Handler c=null m=2
+10-01 17:55:28.531   835   866 W Looper  : Drained
+10-01 17:55:28.601   522  2180 W WindowManager: Exception thrown during dispatchAppVisibility Window{7fa1038 u0 com.abtin.tglass/com.abtin.tglass.MainActivity EXITING}
+10-01 17:55:28.601   522  2180 W WindowManager: android.os.DeadObjectException
+10-01 17:55:28.601   522  2180 W WindowManager: 	at android.os.BinderProxy.transactNative(Native Method)
+10-01 17:55:28.601   522  2180 W WindowManager: 	at android.os.BinderProxy.transact(BinderProxy.java:584)
+10-01 17:55:28.601   522  2180 W WindowManager: 	at android.view.IWindow$Stub$Proxy.dispatchAppVisibility(IWindow.java:546)
+10-01 17:55:28.601   522  2180 W WindowManager: 	at com.android.server.wm.WindowState.sendAppVisibilityToClients(WindowState.java:3271)
+10-01 17:55:28.601   522  2180 W WindowManager: 	at com.android.server.wm.WindowContainer.sendAppVisibilityToClients(WindowContainer.java:1221)
+10-01 17:55:28.601   522  2180 W WindowManager: 	at com.android.server.wm.WindowToken.setClientVisible(WindowToken.java:409)
+10-01 17:55:28.601   522  2180 W WindowManager: 	at com.android.server.wm.ActivityRecord.setClientVisible(ActivityRecord.java:6946)
+10-01 17:55:28.601   522  2180 W WindowManager: 	at com.android.server.wm.ActivityRecord.postApplyAnimation(ActivityRecord.java:5637)
+10-01 17:55:28.601   522  2180 W WindowManager: 	at com.android.server.wm.ActivityRecord.commitVisibility(ActivityRecord.java:5580)
+10-01 17:55:28.601   522  2180 W WindowManager: 	at com.android.server.wm.Transition.finishTransition(Transition.java:1151)
+10-01 17:55:28.601   522  2180 W WindowManager: 	at com.android.server.wm.TransitionController.finishTransition(TransitionController.java:868)
+10-01 17:55:28.601   522  2180 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.finishTransition(WindowOrganizerController.java:396)
+10-01 17:55:28.601   522  2180 W WindowManager: 	at android.window.IWindowOrganizerController$Stub.onTransact(IWindowOrganizerController.java:286)
+10-01 17:55:28.601   522  2180 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.onTransact(WindowOrganizerController.java:181)
+10-01 17:55:28.601   522  2180 W WindowManager: 	at android.os.Binder.execTransactInternal(Binder.java:1344)
+10-01 17:55:28.601   522  2180 W WindowManager: 	at android.os.Binder.execTransact(Binder.java:1275)
+10-01 17:55:28.610   835   866 W Looper  : Slow dispatch took 68ms wmshell.main h=android.os.Handler c=com.android.wm.shell.transition.DefaultTransitionHandler$$ExternalSyntheticLambda0@366e712 m=0
+10-01 17:55:28.610   835   866 W Looper  : Slow delivery took 61ms wmshell.main h=android.os.Handler c=android.window.TaskOrganizer$1$$ExternalSyntheticLambda8@7240ee3 m=0
+10-01 17:55:28.610   835   866 W Looper  : Drained
+10-01 17:55:28.624   522   553 W ActivityManager: Slow operation: 74ms so far, now at startProcess: done updating pids map
+10-01 17:55:28.624   522   545 W ActivityManager: setHasOverlayUi called on unknown pid: 7405
+10-01 17:55:28.789   835   866 W Looper  : Slow delivery took 72ms wmshell.main h=android.os.Handler c=com.android.wm.shell.transition.Transitions$TransitionPlayerImpl$$ExternalSyntheticLambda0@fd31328 m=0
+10-01 17:55:28.789   835   866 W Looper  : Drained
+10-01 17:55:31.289   522   542 W Looper  : Slow dispatch took 100ms android.fg h=android.os.Handler c=com.android.server.wm.ActivityMetricsLogger$$ExternalSyntheticLambda0@27573a3 m=0
+10-01 17:55:31.329   835   866 W Looper  : Slow delivery took 37ms wmshell.main h=android.os.Handler c=com.android.wm.shell.bubbles.BubbleController$BubblesImpl$$ExternalSyntheticLambda5@481677d m=0
+10-01 17:55:31.444   835   866 W Looper  : Drained
+10-01 17:55:32.661   522  3538 E TaskPersister: File error accessing recents directory (directory doesn't exist?).
+10-01 17:55:38.703   522  2399 W ActivityTaskManager: Force removing ActivityRecord{1fa6f1a u0 com.abtin.tglass/.MainActivity t24 f}}: app died, no saved state
+10-01 17:55:38.749   835   866 W Looper  : Slow dispatch took 43ms wmshell.main h=android.os.Handler c=com.android.wm.shell.transition.Transitions$TransitionPlayerImpl$$ExternalSyntheticLambda1@a3867be m=0
+10-01 17:55:38.749   835   866 W Looper  : Slow delivery took 39ms wmshell.main h=android.os.Handler c=com.android.wm.shell.pip.PinnedStackListenerForwarder$PinnedTaskListenerImpl$$ExternalSyntheticLambda1@494401f m=0
+10-01 17:55:38.749   835   866 W Looper  : Drained
+10-01 17:55:38.751   522  2399 W ProcessStats: Tracking association SourceState{20d9b8e com.google.android.googlequicksearchbox:search/10132 BTop #13630} whose proc state 2 is better than process ProcessState{2040ede com.google.android.googlequicksearchbox:interactor/10132 pkg=com.google.android.googlequicksearchbox} proc state 4 (19 skipped)
+10-01 17:55:39.032   522  2399 W WindowManager: Exception thrown during dispatchAppVisibility Window{43fea2b u0 com.abtin.tglass/com.abtin.tglass.MainActivity EXITING}
+10-01 17:55:39.032   522  2399 W WindowManager: android.os.DeadObjectException
+10-01 17:55:39.032   522  2399 W WindowManager: 	at android.os.BinderProxy.transactNative(Native Method)
+10-01 17:55:39.032   522  2399 W WindowManager: 	at android.os.BinderProxy.transact(BinderProxy.java:584)
+10-01 17:55:39.032   522  2399 W WindowManager: 	at android.view.IWindow$Stub$Proxy.dispatchAppVisibility(IWindow.java:546)
+10-01 17:55:39.032   522  2399 W WindowManager: 	at com.android.server.wm.WindowState.sendAppVisibilityToClients(WindowState.java:3271)
+10-01 17:55:39.032   522  2399 W WindowManager: 	at com.android.server.wm.WindowContainer.sendAppVisibilityToClients(WindowContainer.java:1221)
+10-01 17:55:39.032   522  2399 W WindowManager: 	at com.android.server.wm.WindowToken.setClientVisible(WindowToken.java:409)
+10-01 17:55:39.032   522  2399 W WindowManager: 	at com.android.server.wm.ActivityRecord.setClientVisible(ActivityRecord.java:6946)
+10-01 17:55:39.032   522  2399 W WindowManager: 	at com.android.server.wm.ActivityRecord.postApplyAnimation(ActivityRecord.java:5637)
+10-01 17:55:39.032   522  2399 W WindowManager: 	at com.android.server.wm.ActivityRecord.commitVisibility(ActivityRecord.java:5580)
+10-01 17:55:39.032   522  2399 W WindowManager: 	at com.android.server.wm.Transition.finishTransition(Transition.java:1151)
+10-01 17:55:39.032   522  2399 W WindowManager: 	at com.android.server.wm.TransitionController.finishTransition(TransitionController.java:868)
+10-01 17:55:39.032   522  2399 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.finishTransition(WindowOrganizerController.java:396)
+10-01 17:55:39.032   522  2399 W WindowManager: 	at android.window.IWindowOrganizerController$Stub.onTransact(IWindowOrganizerController.java:286)
+10-01 17:55:39.032   522  2399 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.onTransact(WindowOrganizerController.java:181)
+10-01 17:55:39.032   522  2399 W WindowManager: 	at android.os.Binder.execTransactInternal(Binder.java:1344)
+10-01 17:55:39.032   522  2399 W WindowManager: 	at android.os.Binder.execTransact(Binder.java:1275)
+10-01 17:55:39.037   522   545 W ActivityManager: setHasOverlayUi called on unknown pid: 7496
+10-01 17:55:39.183   522  2399 W ActivityTaskManager: callingPackage for (uid=2000, pid=7576) has no WPC
+10-01 17:55:39.369   522  1692 W ActivityTaskManager: takeTaskSnapshot: taskId=25 not found or not visible
+10-01 17:55:43.045   522  3538 E TaskPersister: File error accessing recents directory (directory doesn't exist?).
+10-01 17:55:49.539   522  2399 W ActivityTaskManager: Force removing ActivityRecord{b7ea742 u0 com.abtin.tglass/.MainActivity t25 f}}: app died, no saved state
+--------- beginning of main
+10-01 17:55:49.574   522  1645 W AppSearchIcing: icing-search-engine.cc:283: Error: 5, Message: Document (com.google.android.googlequicksearchbox$OneSearchZeroStateGoogleSuggestions/default, zp) not found.
+10-01 17:55:49.587   835   866 W Looper  : Slow dispatch took 45ms wmshell.main h=android.os.Handler c=com.android.wm.shell.transition.Transitions$TransitionPlayerImpl$$ExternalSyntheticLambda1@be427e8 m=0
+10-01 17:55:49.587   835   866 W Looper  : Slow delivery took 44ms wmshell.main h=android.os.Handler c=com.android.wm.shell.pip.PinnedStackListenerForwarder$PinnedTaskListenerImpl$$ExternalSyntheticLambda1@9bdde01 m=0
+10-01 17:55:49.587   522   930 W InputManager-JNI: Input channel object '5867716 com.abtin.tglass/com.abtin.tglass.MainActivity (client)' was disposed without first being removed with the input manager!
+10-01 17:55:49.588   835   866 W Looper  : Drained
+10-01 17:55:49.588   522  2399 W ProcessStats: Tracking association SourceState{20d9b8e com.google.android.googlequicksearchbox:search/10132 BTop #13688} whose proc state 2 is better than process ProcessState{2040ede com.google.android.googlequicksearchbox:interactor/10132 pkg=com.google.android.googlequicksearchbox} proc state 4 (19 skipped)
+10-01 17:55:49.830   835   866 W Looper  : Slow dispatch took 50ms wmshell.main h=android.os.Handler c=com.android.wm.shell.transition.Transitions$TransitionPlayerImpl$$ExternalSyntheticLambda0@940c88a m=0
+10-01 17:55:49.830   835   866 W Looper  : Slow delivery took 47ms wmshell.main h=android.os.Handler c=android.window.TaskOrganizer$1$$ExternalSyntheticLambda3@26b9efb m=0
+10-01 17:55:49.842   835   866 W Looper  : Drained
+10-01 17:55:49.872   522  2399 W WindowManager: Exception thrown during dispatchAppVisibility Window{5867716 u0 com.abtin.tglass/com.abtin.tglass.MainActivity EXITING}
+10-01 17:55:49.872   522  2399 W WindowManager: android.os.DeadObjectException
+10-01 17:55:49.872   522  2399 W WindowManager: 	at android.os.BinderProxy.transactNative(Native Method)
+10-01 17:55:49.872   522  2399 W WindowManager: 	at android.os.BinderProxy.transact(BinderProxy.java:584)
+10-01 17:55:49.872   522  2399 W WindowManager: 	at android.view.IWindow$Stub$Proxy.dispatchAppVisibility(IWindow.java:546)
+10-01 17:55:49.872   522  2399 W WindowManager: 	at com.android.server.wm.WindowState.sendAppVisibilityToClients(WindowState.java:3271)
+10-01 17:55:49.872   522  2399 W WindowManager: 	at com.android.server.wm.WindowContainer.sendAppVisibilityToClients(WindowContainer.java:1221)
+10-01 17:55:49.872   522  2399 W WindowManager: 	at com.android.server.wm.WindowToken.setClientVisible(WindowToken.java:409)
+10-01 17:55:49.872   522  2399 W WindowManager: 	at com.android.server.wm.ActivityRecord.setClientVisible(ActivityRecord.java:6946)
+10-01 17:55:49.872   522  2399 W WindowManager: 	at com.android.server.wm.ActivityRecord.postApplyAnimation(ActivityRecord.java:5637)
+10-01 17:55:49.872   522  2399 W WindowManager: 	at com.android.server.wm.ActivityRecord.commitVisibility(ActivityRecord.java:5580)
+10-01 17:55:49.872   522  2399 W WindowManager: 	at com.android.server.wm.Transition.finishTransition(Transition.java:1151)
+10-01 17:55:49.872   522  2399 W WindowManager: 	at com.android.server.wm.TransitionController.finishTransition(TransitionController.java:868)
+10-01 17:55:49.872   522  2399 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.finishTransition(WindowOrganizerController.java:396)
+10-01 17:55:49.872   522  2399 W WindowManager: 	at android.window.IWindowOrganizerController$Stub.onTransact(IWindowOrganizerController.java:286)
+10-01 17:55:49.872   522  2399 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.onTransact(WindowOrganizerController.java:181)
+10-01 17:55:49.872   522  2399 W WindowManager: 	at android.os.Binder.execTransactInternal(Binder.java:1344)
+10-01 17:55:49.872   522  2399 W WindowManager: 	at android.os.Binder.execTransact(Binder.java:1275)
+10-01 17:55:49.886   835   866 W Looper  : Slow dispatch took 44ms wmshell.main h=android.os.Handler c=com.android.wm.shell.transition.DefaultTransitionHandler$$ExternalSyntheticLambda0@66ae356 m=0
+10-01 17:55:49.893  1761  2250 W A       : Queue length for executor EventBus is now 11. Perhaps some tasks are too long, or the pool is too small.
+10-01 17:55:49.909   522   545 W ActivityManager: setHasOverlayUi called on unknown pid: 7579
+10-01 17:55:49.953   403   403 E BpTransactionCompletedListener: Failed to transact (-32)
+10-01 17:55:50.002   522  2167 W ActivityTaskManager: callingPackage for (uid=2000, pid=7668) has no WPC
+10-01 17:55:50.301  7671  7671 W om.abtin.tglass: Unexpected CPU variant for x86: x86_64.
+10-01 17:55:50.301  7671  7671 W om.abtin.tglass: Known variants: atom, sandybridge, silvermont, goldmont, goldmont-plus, tremont, kabylake, default
+10-01 17:55:50.352   835   866 W Looper  : Slow dispatch took 148ms wmshell.main h=android.os.Handler c=com.android.wm.shell.common.ShellExecutor$$ExternalSyntheticLambda1@3b35e63 m=0
+10-01 17:55:50.353   835   866 W Looper  : Slow delivery took 91ms wmshell.main h=android.os.Handler c=com.android.wm.shell.pip.phone.PipController$$ExternalSyntheticLambda1@eba8201 m=0
+10-01 17:55:50.357   835   866 W Looper  : Drained
+10-01 17:55:50.491  7671  7671 W ziparchive: Unable to open '/data/app/~~LwHwGWNSjHYFPNIy1NyQ4Q==/com.abtin.tglass-EHIMv_V34qyxThm_jMX7Uw==/base.dm': No such file or directory
+10-01 17:55:50.491  7671  7671 W ziparchive: Unable to open '/data/app/~~LwHwGWNSjHYFPNIy1NyQ4Q==/com.abtin.tglass-EHIMv_V34qyxThm_jMX7Uw==/base.dm': No such file or directory
+10-01 17:55:51.040  7671  7671 W OpenGLRenderer: Unknown dataspace 0
+10-01 17:55:51.173  7671  7671 W om.abtin.tglass: Accessing hidden method Landroid/os/SystemProperties;->addChangeCallback(Ljava/lang/Runnable;)V (unsupported, reflection, allowed)
+10-01 17:55:51.251  7671  7671 W WindowOnBackDispatcher: OnBackInvokedCallback is not enabled for the application.
+10-01 17:55:51.251  7671  7671 W WindowOnBackDispatcher: Set 'android:enableOnBackInvokedCallback="true"' in the application manifest.
+10-01 17:55:51.820  7671  7689 W OpenGLRenderer: Failed to initialize 101010-2 format, error = EGL_SUCCESS
+10-01 17:55:52.992  7671  7707 E SurfaceSyncGroup: Failed to receive transaction ready in 1000ms. Marking SurfaceSyncGroup(wmsSync-VRI[MainActivity]#0) as ready
+10-01 17:55:52.996  7671  7707 E SurfaceSyncGroup: Failed to receive transaction ready in 1000ms. Marking SurfaceSyncGroup(VRI[MainActivity]#1) as ready
+10-01 17:55:53.000   522   542 W ziparchive: Unable to open '/data/app/~~LwHwGWNSjHYFPNIy1NyQ4Q==/com.abtin.tglass-EHIMv_V34qyxThm_jMX7Uw==/base.dm': No such file or directory
+10-01 17:55:53.102   835   886 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=falsecallback=android.view.ViewRootImpl$$ExternalSyntheticLambda17@7de3ceb
+10-01 17:55:53.106   522  2061 W InputManager-JNI: Input channel object '3e5196b Splash Screen com.abtin.tglass (client)' was disposed without first being removed with the input manager!
+10-01 17:55:53.242  1761  2250 W SearchServiceCore: Abort, client detached.
+10-01 17:55:53.884   522  3538 E TaskPersister: File error accessing recents directory (directory doesn't exist?).
+10-01 17:55:55.053  7671  7693 W TGlassWatchdog: still blocked, 30 samples:
+10-01 17:55:55.053  7671  7693 W TGlassWatchdog:   29x HardwareRenderer.nSetStopped:-2 < HardwareRenderer.setStopped:525 < ViewRootImpl.performDraw:4676 < ViewRootImpl.performTraversals:3822 < ViewRootImpl.doTraversal:2465 || 
+10-01 17:55:55.053  7671  7693 W TGlassWatchdog:   1x BaseRecordingCanvas.nDrawTextRun:-2 < BaseRecordingCanvas.drawTextRun:573 < CanvasCompatM.drawTextRun:821 < TextAndroidCanvas.drawTextRun:715 < TextLine.drawTextRun:1512 || NavigationKt.IOSNavHost$lambda$3$0$1$0:270 < NavigationKt.$r8$lambda$zVDUKYYDjw4z5ejTxobehWzro3Q:0 < NavigationKt$$ExternalSyntheticLambda1.invoke:0
+10-01 17:55:55.758  7671  7693 W TGlassWatchdog: main thread blocked 4758 ms, 37 samples:
+10-01 17:55:55.758  7671  7693 W TGlassWatchdog:   36x HardwareRenderer.nSetStopped:-2 < HardwareRenderer.setStopped:525 < ViewRootImpl.performDraw:4676 < ViewRootImpl.performTraversals:3822 < ViewRootImpl.doTraversal:2465 || 
+10-01 17:55:55.758  7671  7693 W TGlassWatchdog:   1x BaseRecordingCanvas.nDrawTextRun:-2 < BaseRecordingCanvas.drawTextRun:573 < CanvasCompatM.drawTextRun:821 < TextAndroidCanvas.drawTextRun:715 < TextLine.drawTextRun:1512 || NavigationKt.IOSNavHost$lambda$3$0$1$0:270 < NavigationKt.$r8$lambda$zVDUKYYDjw4z5ejTxobehWzro3Q:0 < NavigationKt$$ExternalSyntheticLambda1.invoke:0
+10-01 17:56:00.052   835   835 W PageIndicator: Total number of pages invalid: 0. Assuming 1 page.
+10-01 17:56:00.102  7725  7725 W BpBinder: Linking to death on android.gui.ISurfaceComposer but there are no threads (yet?) listening to incoming transactions. See ProcessState::startThreadPool and ProcessState::setThreadPoolMaxThreadCount. Generally you should setup the binder threadpool before other initialization steps.
+10-01 17:56:00.102  7725  7725 W ProcessState: Extra binder thread started, but 0 threads requested. Do not use *startThreadPool when zero threads are requested.
