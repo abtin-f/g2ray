@@ -61,9 +61,11 @@ data class EditSpec(
     val contrast: Float,
     val saturation: Float,
     val warmth: Float,
+    /** Mirrored left-to-right after the rotation (the crop screen's flip button). */
+    val flipped: Boolean = false,
 ) {
     val hasAdjustments: Boolean get() = brightness != 0f || contrast != 0f || saturation != 0f || warmth != 0f
-    val isEmpty: Boolean get() = quarterTurns % 4 == 0 && crop == FullCrop && strokes.isEmpty() && texts.isEmpty() && !hasAdjustments
+    val isEmpty: Boolean get() = quarterTurns % 4 == 0 && !flipped && crop == FullCrop && strokes.isEmpty() && texts.isEmpty() && !hasAdjustments
 }
 
 /** Edits of one picked photo (observable). */
@@ -77,8 +79,10 @@ class PhotoEdits {
     var contrast by mutableFloatStateOf(0f)
     var saturation by mutableFloatStateOf(0f)
     var warmth by mutableFloatStateOf(0f)
+    /** Picture mirrored left-to-right (applied after the rotation). */
+    var flipped by mutableStateOf(false)
 
-    fun spec() = EditSpec(quarterTurns, crop, strokes.toList(), texts.toList(), brightness, contrast, saturation, warmth)
+    fun spec() = EditSpec(quarterTurns, crop, strokes.toList(), texts.toList(), brightness, contrast, saturation, warmth, flipped)
 
     fun restore(s: EditSpec) {
         quarterTurns = s.quarterTurns
@@ -89,6 +93,7 @@ class PhotoEdits {
         contrast = s.contrast
         saturation = s.saturation
         warmth = s.warmth
+        flipped = s.flipped
     }
 
     val isEmpty: Boolean get() = spec().isEmpty
@@ -102,7 +107,20 @@ class PhotoEdits {
         strokes.clear(); strokes.addAll(s)
         val t = texts.map { it.copy(center = p(it.center)) }
         texts.clear(); texts.addAll(t)
-        quarterTurns = (quarterTurns + 1) % 4
+        // Pipeline is flip(rotate(picture)): a further turn of the displayed result turns the picture the other way when flipped.
+        quarterTurns = (quarterTurns + if (flipped) 3 else 1) % 4
+    }
+
+    /** Mirrors the picture left-to-right, carrying the crop, drawings and text positions along (text itself is not mirrored). */
+    fun mirror() {
+        fun p(o: Offset) = Offset(1f - o.x, o.y)
+        val c = crop
+        crop = Rect(1f - c.right, c.top, 1f - c.left, c.bottom)
+        val s = strokes.map { it.copy(points = it.points.map(::p)) }
+        strokes.clear(); strokes.addAll(s)
+        val t = texts.map { it.copy(center = p(it.center)) }
+        texts.clear(); texts.addAll(t)
+        flipped = !flipped
     }
 
     fun updateText(id: Long, f: (EditText) -> EditText) {
@@ -186,8 +204,12 @@ suspend fun renderEditedPhoto(context: Context, uri: Uri, spec: EditSpec, maxSid
     runCatching {
         val src = decodeUpright(context, uri, maxSide) ?: return@runCatching null
         val turns = ((spec.quarterTurns % 4) + 4) % 4
-        val rotated = if (turns != 0) {
-            Bitmap.createBitmap(src, 0, 0, src.width, src.height, Matrix().apply { postRotate(-90f * turns) }, true)
+        val rotated = if (turns != 0 || spec.flipped) {
+            val m = Matrix().apply {
+                if (turns != 0) postRotate(-90f * turns)
+                if (spec.flipped) postScale(-1f, 1f)
+            }
+            Bitmap.createBitmap(src, 0, 0, src.width, src.height, m, true)
         } else src
         val w = rotated.width
         val h = rotated.height

@@ -278,6 +278,9 @@ fun EmojiPanel(
     }
 }
 
+/** Emoji size in the grid (iOS: ~34 pt, 8 columns across the full width). */
+private val EmojiCell = 34.dp
+
 /** Room left under the grids for the floating bar. */
 private val BarSpace = 60.dp
 
@@ -300,7 +303,7 @@ private fun StripItem(selected: Boolean, onClick: () -> Unit, content: @Composab
     val c = TgTheme.colors
     val bg by animateColorAsState(if (selected) c.text.copy(alpha = 0.09f) else Color.Transparent, label = "strip")
     Box(
-        Modifier.size(34.dp).clip(CircleShape).background(bg).fadeClickable(onClick = onClick),
+        Modifier.size(32.dp).clip(CircleShape).background(bg).fadeClickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { content() }
 }
@@ -309,6 +312,35 @@ private fun StripItem(selected: Boolean, onClick: () -> Unit, content: @Composab
 private fun currentSection(grid: LazyGridState, headers: List<Int>): Int {
     val first = grid.firstVisibleItemIndex
     return headers.indexOfLast { it <= first }.coerceAtLeast(0)
+}
+
+/** Rounded search field on top of the panel's pages (iOS: ~36 pt high, 18 pt magnifier, 16 pt text). */
+@Composable
+private fun PanelSearchField(query: String, onChange: (String) -> Unit, placeholder: String) {
+    val c = TgTheme.colors
+    Row(
+        Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 4.dp).fillMaxWidth().height(36.dp)
+            .clip(Capsule()).background(c.searchField).padding(start = 10.dp, end = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(ComposerIcons.Search, c.secondaryText, 18.dp)
+        Spacer(Modifier.width(6.dp))
+        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+            if (query.isEmpty()) T(placeholder, TgTheme.type.callout, c.secondaryText, maxLines = 1)
+            BasicTextField(
+                query, onChange,
+                Modifier.fillMaxWidth(),
+                textStyle = TgTheme.type.callout.copy(color = c.text, textDirection = TextDirection.Content),
+                singleLine = true,
+                cursorBrush = SolidColor(c.accent),
+            )
+        }
+        if (query.isNotEmpty()) {
+            Box(Modifier.size(28.dp).clip(CircleShape).fadeClickable { onChange("") }, contentAlignment = Alignment.Center) {
+                Icon(IosIcons.Close, c.secondaryText, 12.dp)
+            }
+        }
+    }
 }
 
 @Composable
@@ -327,22 +359,62 @@ private fun EmojiTab(onEmoji: (String) -> Unit) {
     val grid = rememberLazyGridState()
     val current by remember(headers) { derivedStateOf { currentSection(grid, headers) } }
     val icons = listOf(IosIcons.Clock, ComposerIcons.Smiley, ComposerIcons.Leaf, ComposerIcons.Cup, ComposerIcons.Ball, ComposerIcons.Car, ComposerIcons.Bulb, ComposerIcons.Hash, ComposerIcons.Flag)
+    var query by rememberSaveable { mutableStateOf("") }
+    var found by remember { mutableStateOf<List<String>?>(null) }
+    LaunchedEffect(query) {
+        val q = query.trim()
+        if (q.isEmpty()) {
+            found = null
+            return@LaunchedEffect
+        }
+        delay(120)
+        found = EmojiSearch.search(q)
+    }
     Column(Modifier.fillMaxSize()) {
+        PanelSearchField(query, { query = it }, "Search emoji")
+        val results = if (query.isBlank()) null else found
+        if (query.isNotBlank()) {
+            if (results == null) {
+                Box(Modifier.fillMaxWidth().weight(1f).padding(bottom = BarSpace), contentAlignment = Alignment.Center) { ActivityIndicator(24.dp) }
+            } else if (results.isEmpty()) {
+                Box(Modifier.fillMaxWidth().weight(1f).padding(bottom = BarSpace), contentAlignment = Alignment.Center) {
+                    T("No emoji found", TgTheme.type.subheadline, c.secondaryText)
+                }
+            } else {
+                LazyVerticalGrid(
+                    GridCells.Fixed(8),
+                    contentPadding = PaddingValues(bottom = BarSpace),
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                ) {
+                    items(results.size, key = { i -> "s:${results[i]}" }, contentType = { "emoji" }) { i ->
+                        val e = results[i]
+                        Box(
+                            Modifier.aspectRatio(1f).bounceClickable {
+                                savedRecent = RecentEmoji.push(context, savedRecent, e)
+                                onEmoji(e)
+                            },
+                            contentAlignment = Alignment.Center,
+                        ) { EmojiGlyph(e, EmojiCell) }
+                    }
+                }
+            }
+            return@Column
+        }
         Row(
-            Modifier.fillMaxWidth().height(44.dp).padding(horizontal = 8.dp),
+            Modifier.fillMaxWidth().height(38.dp).padding(horizontal = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             sections.forEachIndexed { i, _ ->
                 StripItem(current == i, { scope.launch { grid.scrollToItem(headers[i]) } }) {
-                    Icon(icons.getOrElse(i) { ComposerIcons.Smiley }, if (current == i) c.text.copy(alpha = 0.75f) else c.secondaryText, 21.dp)
+                    Icon(icons.getOrElse(i) { ComposerIcons.Smiley }, if (current == i) c.text.copy(alpha = 0.75f) else c.secondaryText, 22.dp)
                 }
             }
         }
         LazyVerticalGrid(
             GridCells.Fixed(8),
             state = grid,
-            contentPadding = PaddingValues(start = 6.dp, end = 6.dp, bottom = BarSpace),
+            contentPadding = PaddingValues(bottom = BarSpace),
             modifier = Modifier.fillMaxWidth().weight(1f),
         ) {
             sections.forEach { s ->
@@ -356,7 +428,7 @@ private fun EmojiTab(onEmoji: (String) -> Unit) {
                         },
                         contentAlignment = Alignment.Center,
                     ) {
-                        EmojiGlyph(e, 33.dp)
+                        EmojiGlyph(e, EmojiCell)
                     }
                 }
             }
@@ -467,30 +539,7 @@ private fun GifsTab(chatId: Long, onDemoGif: (Int) -> Unit, onGif: (GifItem) -> 
         }
     }
     Column(Modifier.fillMaxSize()) {
-        // Search field
-        Row(
-            Modifier.padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 4.dp).fillMaxWidth().height(36.dp)
-                .clip(Capsule()).background(c.searchField).padding(horizontal = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(ComposerIcons.Search, c.secondaryText, 17.dp)
-            Spacer(Modifier.width(6.dp))
-            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                if (query.isEmpty()) T("Search GIFs", TgTheme.type.body, c.secondaryText, maxLines = 1)
-                BasicTextField(
-                    query, { query = it },
-                    Modifier.fillMaxWidth(),
-                    textStyle = TgTheme.type.body.copy(color = c.text, textDirection = TextDirection.Content),
-                    singleLine = true,
-                    cursorBrush = SolidColor(c.accent),
-                )
-            }
-            if (query.isNotEmpty()) {
-                Box(Modifier.size(24.dp).fadeClickable { query = "" }, contentAlignment = Alignment.Center) {
-                    Icon(IosIcons.Close, c.secondaryText, 14.dp)
-                }
-            }
-        }
+        PanelSearchField(query, { query = it }, "Search GIFs")
         val shown = results ?: repo.savedGifs
         when {
             searching && results == null -> Box(Modifier.fillMaxWidth().weight(1f).padding(bottom = BarSpace), contentAlignment = Alignment.Center) { ActivityIndicator(24.dp) }

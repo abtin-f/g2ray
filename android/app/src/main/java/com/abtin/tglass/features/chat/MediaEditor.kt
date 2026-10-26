@@ -114,7 +114,6 @@ import com.abtin.tglass.ui.components.formatDuration
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.shapes.Capsule
-import com.kyant.shapes.RoundedRectangle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.max
@@ -210,8 +209,8 @@ private fun EditorContent(
     var backup by remember { mutableStateOf<EditSpec?>(null) }
     var brushColor by remember { mutableStateOf(BrushColors[2]) }
     var brushSize by remember { mutableIntStateOf(1) }
-    var adjustKind by remember { mutableStateOf(AdjustKind.Brightness) }
     var cropRatio by remember { mutableStateOf<Float?>(null) }
+    var showPresets by remember { mutableStateOf(false) }
     var textDraft by remember { mutableStateOf<EditText?>(null) }
 
     fun editsFor(item: GalleryItem): PhotoEdits = edits[item.uri] ?: PhotoEdits().also { edits[item.uri] = it }
@@ -220,6 +219,7 @@ private fun EditorContent(
         val e = editsFor(current)
         backup = e.spec()
         cropRatio = null
+        showPresets = false
         tool = t
     }
 
@@ -297,7 +297,15 @@ private fun EditorContent(
                                 .fillMaxSize()
                                 .statusBarsPadding()
                                 .navigationBarsPadding()
-                                .padding(top = 60.dp, bottom = if (pageTool == EditorTool.None) 124.dp else 196.dp),
+                                .padding(
+                                    top = 56.dp,
+                                    bottom = when (pageTool) {
+                                        EditorTool.None -> 112.dp
+                                        EditorTool.Crop -> if (showPresets) 170.dp else 140.dp
+                                        EditorTool.Draw -> 150.dp
+                                        EditorTool.Adjust -> 210.dp
+                                    },
+                                ),
                             contentAlignment = Alignment.Center,
                         ) {
                             if (item.video) {
@@ -323,13 +331,13 @@ private fun EditorContent(
             // ---- Top bar ----
             if (tool == EditorTool.None && textDraft == null) {
                 Row(
-                    Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp, vertical = 6.dp),
+                    Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 16.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    GlassIconButton(IosIcons.Close, onDismiss, iconSize = 18.dp, tint = Color.White)
+                    GlassIconButton(IosIcons.Close, onDismiss, size = 40.dp, iconSize = 18.dp, tint = Color.White)
                     Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                         if (items.size > 1) {
-                            GlassBox(onClick = null, shape = Capsule(), modifier = Modifier.height(36.dp)) {
+                            GlassBox(onClick = null, shape = Capsule(), modifier = Modifier.height(32.dp)) {
                                 T(
                                     "${pager.currentPage + 1} of ${items.size}",
                                     TgTheme.type.subheadline, Color.White, weight = FontWeight.SemiBold,
@@ -341,13 +349,13 @@ private fun EditorContent(
                     val index = selected.indexOfFirst { it.uri == current.uri }
                     Box(
                         Modifier
-                            .size(44.dp)
+                            .size(40.dp)
                             .clickable(remember { MutableInteractionSource() }, null) { onToggleSelect(current) },
                         contentAlignment = Alignment.Center,
                     ) {
                         Box(
                             Modifier
-                                .size(30.dp)
+                                .size(28.dp)
                                 .clip(CircleShape)
                                 .background(if (index >= 0) c.accent else Color.Black.copy(0.25f))
                                 .border(1.5.dp, Color.White, CircleShape),
@@ -367,59 +375,64 @@ private fun EditorContent(
                     .fillMaxWidth()
                     .imePadding()
                     .navigationBarsPadding()
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
             ) {
                 when (tool) {
                     EditorTool.None -> if (textDraft == null) {
-                        if (!current.video) {
-                            GlassBox(onClick = null, shape = Capsule(), modifier = Modifier.fillMaxWidth().height(54.dp)) {
-                                Row(
-                                    Modifier.fillMaxSize().padding(horizontal = 8.dp),
-                                    horizontalArrangement = Arrangement.SpaceEvenly,
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    val e = currentEdits
-                                    ToolButton(MediaIcons.Crop, active = e != null && (e.crop != FullCrop || e.quarterTurns != 0)) { startTool(EditorTool.Crop) }
-                                    ToolButton(MediaIcons.Brush, active = e != null && e.strokes.isNotEmpty()) { startTool(EditorTool.Draw) }
-                                    ToolButton(MediaIcons.Text, active = e != null && e.texts.isNotEmpty()) { newText() }
-                                    ToolButton(
-                                        MediaIcons.Adjust,
-                                        active = e != null && (e.brightness != 0f || e.contrast != 0f || e.saturation != 0f || e.warmth != 0f),
-                                    ) { startTool(EditorTool.Adjust) }
-                                    HdButton(hd) { onHd(!hd) }
+                        // iOS 26: a glass caption capsule, below it round back, tool pill and round send.
+                        GlassBox(
+                            onClick = null,
+                            shape = Capsule(),
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 36.dp),
+                            contentAlignment = Alignment.CenterStart,
+                        ) {
+                            Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), contentAlignment = Alignment.CenterStart) {
+                                if (caption.isEmpty()) {
+                                    T(
+                                        "Add a caption…", TgTheme.type.callout, Color.White.copy(0.5f),
+                                        modifier = Modifier.fillMaxWidth(), align = TextAlign.Center, maxLines = 1,
+                                    )
                                 }
-                            }
-                        } else {
-                            GlassBox(onClick = null, shape = Capsule(), modifier = Modifier.fillMaxWidth().height(44.dp)) {
-                                T(
-                                    if (current.durationMs > 0) "Video · ${formatDuration((current.durationMs / 1000).toInt())}" else "Video",
-                                    TgTheme.type.subheadline, Color.White.copy(0.85f), weight = FontWeight.SemiBold,
+                                BasicTextField(
+                                    value = caption,
+                                    onValueChange = onCaption,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    textStyle = TgTheme.type.callout.copy(color = Color.White, textDirection = TextDirection.Content),
+                                    cursorBrush = SolidColor(c.accent),
+                                    maxLines = 5,
                                 )
                             }
                         }
-                        Spacer(Modifier.height(8.dp))
-                        Row(verticalAlignment = Alignment.Bottom) {
-                            GlassBox(
-                                onClick = null,
-                                shape = RoundedRectangle(22.dp),
-                                modifier = Modifier.weight(1f).heightIn(min = 44.dp),
-                                contentAlignment = Alignment.CenterStart,
-                            ) {
-                                Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 11.dp)) {
-                                    if (caption.isEmpty()) T("Add a caption…", TgTheme.type.body, Color.White.copy(0.5f))
-                                    BasicTextField(
-                                        value = caption,
-                                        onValueChange = onCaption,
-                                        modifier = Modifier.fillMaxWidth(),
-                                        textStyle = TgTheme.type.body.copy(color = Color.White, textDirection = TextDirection.Content),
-                                        cursorBrush = SolidColor(c.accent),
-                                        maxLines = 5,
+                        Spacer(Modifier.height(10.dp))
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            GlassIconButton(IosIcons.ChevronLeft, onDismiss, size = 40.dp, iconSize = 20.dp, tint = Color.White)
+                            Spacer(Modifier.weight(1f))
+                            if (!current.video) {
+                                GlassBox(onClick = null, shape = Capsule(), modifier = Modifier.height(42.dp)) {
+                                    Row(Modifier.padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        val e = currentEdits
+                                        ToolButton(MediaIcons.Crop, active = e != null && (e.crop != FullCrop || e.quarterTurns != 0 || e.flipped)) { startTool(EditorTool.Crop) }
+                                        ToolButton(MediaIcons.Brush, active = e != null && e.strokes.isNotEmpty()) { startTool(EditorTool.Draw) }
+                                        ToolButton(MediaIcons.Text, active = e != null && e.texts.isNotEmpty()) { newText() }
+                                        ToolButton(
+                                            MediaIcons.Adjust,
+                                            active = e != null && (e.brightness != 0f || e.contrast != 0f || e.saturation != 0f || e.warmth != 0f),
+                                        ) { startTool(EditorTool.Adjust) }
+                                        HdButton(hd) { onHd(!hd) }
+                                    }
+                                }
+                            } else {
+                                GlassBox(onClick = null, shape = Capsule(), modifier = Modifier.height(42.dp)) {
+                                    T(
+                                        if (current.durationMs > 0) "Video · ${formatDuration((current.durationMs / 1000).toInt())}" else "Video",
+                                        TgTheme.type.subheadline, Color.White.copy(0.85f), weight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(horizontal = 16.dp),
                                     )
                                 }
                             }
-                            Spacer(Modifier.width(8.dp))
+                            Spacer(Modifier.weight(1f))
                             Box(
-                                Modifier.size(44.dp).clip(CircleShape).background(c.accent).bounceClickable { if (!sending) onSend(current) },
+                                Modifier.size(42.dp).clip(CircleShape).background(c.accent).bounceClickable { if (!sending) onSend(current) },
                                 contentAlignment = Alignment.Center,
                             ) {
                                 if (sending) ActivityIndicator(20.dp, Color.White)
@@ -434,47 +447,59 @@ private fun EditorContent(
                             )
                         }
                     }
-                    EditorTool.Crop -> ToolPanel("Crop", onCancel = { cancelTool() }, onDone = { doneTool() }) {
-                        Row(
-                            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            CropPresets.forEach { p ->
-                                Chip(p.label, selected = cropRatio == p.ratio) { cropRatio = p.ratio }
+                    EditorTool.Crop -> {
+                        if (showPresets) {
+                            Row(
+                                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                CropPresets.forEach { p ->
+                                    Chip(p.label, selected = cropRatio == p.ratio) { cropRatio = p.ratio }
+                                }
                             }
+                            Spacer(Modifier.height(6.dp))
                         }
-                        Spacer(Modifier.height(8.dp))
-                        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        // The angle ruler of iOS is not offered (no free rotation); RESET puts everything back.
+                        val e = currentEdits
+                        val changed = e != null && (e.crop != FullCrop || e.quarterTurns != 0 || e.flipped)
+                        T(
+                            "RESET", TgTheme.type.caption1.copy(letterSpacing = 0.5.sp), Color.White.copy(if (changed) 0.95f else 0.4f),
+                            weight = FontWeight.SemiBold,
+                            modifier = Modifier
+                                .align(Alignment.CenterHorizontally)
+                                .clip(Capsule())
+                                .fadeClickable(enabled = changed) {
+                                    val ed = editsFor(current)
+                                    while (ed.quarterTurns != 0) ed.rotateLeft()
+                                    if (ed.flipped) ed.mirror()
+                                    ed.crop = FullCrop
+                                    cropRatio = null
+                                }
+                                .padding(horizontal = 14.dp, vertical = 8.dp),
+                        )
+                        ToolBar(onCancel = { cancelTool() }, onDone = { doneTool() }) {
                             ToolButton(MediaIcons.Rotate, active = false) {
                                 editsFor(current).rotateLeft()
                                 cropRatio = null
                             }
-                            Spacer(Modifier.weight(1f))
-                            T(
-                                "Reset", TgTheme.type.body, Color.White, weight = FontWeight.Medium,
-                                modifier = Modifier.fadeClickable {
-                                    val e = editsFor(current)
-                                    while (e.quarterTurns != 0) e.rotateLeft()
-                                    e.crop = FullCrop
-                                    cropRatio = null
-                                }.padding(horizontal = 10.dp, vertical = 8.dp),
-                            )
+                            ToolButton(MediaIcons.Flip, active = currentEdits?.flipped == true) { editsFor(current).mirror() }
+                            ToolButton(EditorGlyphs.AspectRatio, active = showPresets) { showPresets = !showPresets }
                         }
                     }
-                    EditorTool.Draw -> ToolPanel("Draw", onCancel = { cancelTool() }, onDone = { doneTool() }) {
+                    EditorTool.Draw -> {
                         Row(
-                            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             BrushColors.forEach { col ->
                                 val on = col == brushColor
                                 Box(
                                     Modifier
-                                        .size(30.dp)
+                                        .size(28.dp)
                                         .clip(CircleShape)
-                                        .border(if (on) 3.dp else 1.5.dp, Color.White, CircleShape)
-                                        .padding(if (on) 5.dp else 2.dp)
+                                        .border(if (on) 2.5.dp else 1.5.dp, Color.White, CircleShape)
+                                        .padding(if (on) 4.dp else 2.dp)
                                         .clip(CircleShape)
                                         .background(col)
                                         .clickable(remember { MutableInteractionSource() }, null) { brushColor = col },
@@ -482,70 +507,74 @@ private fun EditorContent(
                             }
                         }
                         Spacer(Modifier.height(8.dp))
-                        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        ToolBar(onCancel = { cancelTool() }, onDone = { doneTool() }) {
                             BrushSizes.forEachIndexed { i, _ ->
                                 val on = i == brushSize
                                 Box(
-                                    Modifier.size(40.dp).clip(CircleShape)
+                                    Modifier.size(width = 40.dp, height = 42.dp).clip(CircleShape)
                                         .background(if (on) Color.White.copy(0.2f) else Color.Transparent)
                                         .clickable(remember { MutableInteractionSource() }, null) { brushSize = i },
                                     contentAlignment = Alignment.Center,
                                 ) {
-                                    Box(Modifier.size((6 + i * 6).dp).clip(CircleShape).background(brushColor))
+                                    Box(Modifier.size((6 + i * 5).dp).clip(CircleShape).background(brushColor))
                                 }
                             }
-                            Spacer(Modifier.weight(1f))
                             val canUndo = currentEdits?.strokes?.isNotEmpty() == true
                             Box(
-                                Modifier.size(40.dp).clip(CircleShape).fadeClickable(enabled = canUndo) {
+                                Modifier.size(width = 40.dp, height = 42.dp).clip(CircleShape).fadeClickable(enabled = canUndo) {
                                     currentEdits?.strokes?.let { s -> if (s.isNotEmpty()) s.removeAt(s.lastIndex) }
                                 },
                                 contentAlignment = Alignment.Center,
                             ) {
-                                Icon(MediaIcons.Undo, Color.White.copy(if (canUndo) 1f else 0.35f), 24.dp)
+                                Icon(MediaIcons.Undo, Color.White.copy(if (canUndo) 1f else 0.35f), 22.dp)
                             }
                         }
                     }
-                    EditorTool.Adjust -> ToolPanel(adjustKind.title, onCancel = { cancelTool() }, onDone = { doneTool() }) {
-                        Row(
-                            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            AdjustKind.entries.forEach { k -> Chip(k.title, selected = k == adjustKind) { adjustKind = k } }
-                        }
-                        Spacer(Modifier.height(6.dp))
+                    EditorTool.Adjust -> {
                         val e = currentEdits
                         if (e != null) {
-                            val value = when (adjustKind) {
-                                AdjustKind.Brightness -> e.brightness
-                                AdjustKind.Contrast -> e.contrast
-                                AdjustKind.Saturation -> e.saturation
-                                AdjustKind.Warmth -> e.warmth
-                            }
-                            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Box(Modifier.weight(1f)) {
-                                    IOSSlider(
-                                        value = value,
-                                        onValueChange = { v ->
-                                            val snapped = if (kotlin.math.abs(v) < 0.04f) 0f else v
-                                            when (adjustKind) {
-                                                AdjustKind.Brightness -> e.brightness = snapped
-                                                AdjustKind.Contrast -> e.contrast = snapped
-                                                AdjustKind.Saturation -> e.saturation = snapped
-                                                AdjustKind.Warmth -> e.warmth = snapped
-                                            }
-                                        },
-                                        range = -1f..1f,
+                            // All four sliders at once in ~28 pt rows (iOS "tune").
+                            AdjustKind.entries.forEach { k ->
+                                val value = when (k) {
+                                    AdjustKind.Brightness -> e.brightness
+                                    AdjustKind.Contrast -> e.contrast
+                                    AdjustKind.Saturation -> e.saturation
+                                    AdjustKind.Warmth -> e.warmth
+                                }
+                                Row(Modifier.fillMaxWidth().height(28.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    T(k.title, TgTheme.type.footnote, Color.White.copy(0.85f), weight = FontWeight.Medium, maxLines = 1, modifier = Modifier.width(78.dp))
+                                    Box(Modifier.weight(1f)) {
+                                        IOSSlider(
+                                            value = value,
+                                            onValueChange = { v ->
+                                                val snapped = if (kotlin.math.abs(v) < 0.04f) 0f else v
+                                                when (k) {
+                                                    AdjustKind.Brightness -> e.brightness = snapped
+                                                    AdjustKind.Contrast -> e.contrast = snapped
+                                                    AdjustKind.Saturation -> e.saturation = snapped
+                                                    AdjustKind.Warmth -> e.warmth = snapped
+                                                }
+                                            },
+                                            range = -1f..1f,
+                                            modifier = Modifier.height(28.dp),
+                                        )
+                                    }
+                                    T(
+                                        (value * 100).roundToInt().let { if (it > 0) "+$it" else "$it" },
+                                        TgTheme.type.footnote, Color.White, weight = FontWeight.SemiBold, maxLines = 1,
+                                        modifier = Modifier.width(40.dp),
+                                        align = TextAlign.End,
                                     )
                                 }
-                                Spacer(Modifier.width(10.dp))
-                                T(
-                                    (value * 100).roundToInt().let { if (it > 0) "+$it" else "$it" },
-                                    TgTheme.type.subheadline, Color.White, weight = FontWeight.SemiBold,
-                                    modifier = Modifier.widthIn(min = 40.dp),
-                                    align = TextAlign.End,
-                                )
                             }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            GlassIconButton(IosIcons.Close, { cancelTool() }, size = 44.dp, iconSize = 18.dp, tint = Color.White)
+                            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                T("Adjust", TgTheme.type.headline, Color.White, maxLines = 1)
+                            }
+                            DoneCircle { doneTool() }
                         }
                     }
                 }
@@ -566,21 +595,22 @@ private fun EditorContent(
 
 @Composable
 private fun ToolButton(icon: androidx.compose.ui.graphics.vector.ImageVector, active: Boolean, onClick: () -> Unit) {
-    Box(Modifier.size(44.dp).clip(CircleShape).fadeClickable(onClick = onClick), contentAlignment = Alignment.Center) {
-        Icon(icon, if (active) TgTheme.colors.accent else Color.White, 25.dp)
+    Box(Modifier.size(width = 40.dp, height = 42.dp).clip(CircleShape).fadeClickable(onClick = onClick), contentAlignment = Alignment.Center) {
+        Icon(icon, if (active) TgTheme.colors.accent else Color.White, 22.dp)
     }
 }
 
+/** Quality chip of the tool pill: outlined "SD", filled "HD" when on. */
 @Composable
 private fun HdButton(on: Boolean, onClick: () -> Unit) {
-    Box(Modifier.size(44.dp).clip(CircleShape).fadeClickable(onClick = onClick), contentAlignment = Alignment.Center) {
+    Box(Modifier.size(width = 40.dp, height = 42.dp).clip(CircleShape).fadeClickable(onClick = onClick), contentAlignment = Alignment.Center) {
         Box(
             Modifier
                 .clip(RoundedCornerShape(5.dp))
-                .then(if (on) Modifier.background(Color.White) else Modifier.border(1.8.dp, Color.White, RoundedCornerShape(5.dp)))
+                .then(if (on) Modifier.background(Color.White) else Modifier.border(1.5.dp, Color.White, RoundedCornerShape(5.dp)))
                 .padding(horizontal = 4.dp, vertical = 1.dp),
         ) {
-            T("HD", TgTheme.type.footnote.copy(fontSize = 12.sp), if (on) Color.Black else Color.White, weight = FontWeight.Bold)
+            T(if (on) "HD" else "SD", TgTheme.type.footnote.copy(fontSize = 11.sp, lineHeight = 14.sp), if (on) Color.Black else Color.White, weight = FontWeight.Bold)
         }
     }
 }
@@ -589,35 +619,37 @@ private fun HdButton(on: Boolean, onClick: () -> Unit) {
 private fun Chip(label: String, selected: Boolean, onClick: () -> Unit) {
     Box(
         Modifier
-            .height(32.dp)
+            .height(30.dp)
             .clip(Capsule())
             .background(if (selected) Color.White else Color.White.copy(0.12f))
             .clickable(remember { MutableInteractionSource() }, null, onClick = onClick)
-            .padding(horizontal = 14.dp),
+            .padding(horizontal = 12.dp),
         contentAlignment = Alignment.Center,
     ) {
-        T(label, TgTheme.type.subheadline, if (selected) Color.Black else Color.White, weight = FontWeight.SemiBold, maxLines = 1)
+        T(label, TgTheme.type.footnote, if (selected) Color.Black else Color.White, weight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 
-/** Glass panel of an open tool: its controls, then Cancel · title · Done. */
+/** Blue round confirm button (the check of the crop screen). */
 @Composable
-private fun ToolPanel(title: String, onCancel: () -> Unit, onDone: () -> Unit, content: @Composable () -> Unit) {
-    GlassBox(onClick = null, shape = RoundedRectangle(28.dp), modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-        Column(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 6.dp)) {
-            content()
-            Spacer(Modifier.height(6.dp))
-            Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                T("Cancel", TgTheme.type.body, Color.White, modifier = Modifier.fadeClickable(onClick = onCancel).padding(horizontal = 12.dp, vertical = 10.dp))
-                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    T(title, TgTheme.type.headline, Color.White, maxLines = 1)
-                }
-                T(
-                    "Done", TgTheme.type.body, TgTheme.colors.accent, weight = FontWeight.SemiBold,
-                    modifier = Modifier.fadeClickable(onClick = onDone).padding(horizontal = 12.dp, vertical = 10.dp),
-                )
-            }
+private fun DoneCircle(onClick: () -> Unit) {
+    Box(
+        Modifier.size(44.dp).clip(CircleShape).background(TgTheme.colors.accent).bounceClickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { Icon(IosIcons.Checkmark, Color.White, 20.dp) }
+}
+
+/** Bottom bar of an open tool (iOS crop screen): round X, a glass pill with the tool's buttons, blue round check. */
+@Composable
+private fun ToolBar(onCancel: () -> Unit, onDone: () -> Unit, pill: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        GlassIconButton(IosIcons.Close, onCancel, size = 44.dp, iconSize = 18.dp, tint = Color.White)
+        Spacer(Modifier.weight(1f))
+        GlassBox(onClick = null, shape = Capsule(), modifier = Modifier.height(44.dp)) {
+            Row(Modifier.padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically, content = pill)
         }
+        Spacer(Modifier.weight(1f))
+        DoneCircle(onDone)
     }
 }
 
@@ -654,6 +686,7 @@ private fun EditorPhoto(
     }
     val density = LocalDensity.current
     val turns = edits?.quarterTurns ?: 0
+    val flipped = edits?.flipped == true
     val rotW = (if (turns % 2 == 1) bmp.height else bmp.width).toFloat().coerceAtLeast(1f)
     val rotH = (if (turns % 2 == 1) bmp.width else bmp.height).toFloat().coerceAtLeast(1f)
 
@@ -723,6 +756,7 @@ private fun EditorPhoto(
                 val bh = if (turns % 2 == 1) fullW else fullH
                 withTransform({
                     translate(fx + fullW / 2f, fy + fullH / 2f)
+                    if (flipped) scale(-1f, 1f, Offset.Zero)
                     rotate(-90f * turns, Offset.Zero)
                 }) {
                     drawImage(
@@ -977,13 +1011,13 @@ private fun TextEntryOverlay(draft: EditText, onChange: (EditText) -> Unit, onCa
         ) {
             Box(
                 Modifier
-                    .size(36.dp)
-                    .clip(RoundedCornerShape(9.dp))
-                    .then(if (draft.filled) Modifier.background(Color.White) else Modifier.border(2.dp, Color.White, RoundedCornerShape(9.dp)))
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .then(if (draft.filled) Modifier.background(Color.White) else Modifier.border(2.dp, Color.White, RoundedCornerShape(8.dp)))
                     .clickable(remember { MutableInteractionSource() }, null) { onChange(draft.copy(filled = !draft.filled)) },
                 contentAlignment = Alignment.Center,
             ) {
-                T("A", TgTheme.type.headline, if (draft.filled) Color.Black else Color.White, weight = FontWeight.Bold)
+                T("A", TgTheme.type.body, if (draft.filled) Color.Black else Color.White, weight = FontWeight.Bold)
             }
             Spacer(Modifier.width(10.dp))
             Row(
@@ -995,10 +1029,10 @@ private fun TextEntryOverlay(draft: EditText, onChange: (EditText) -> Unit, onCa
                     val on = col == draft.color
                     Box(
                         Modifier
-                            .size(30.dp)
+                            .size(28.dp)
                             .clip(CircleShape)
-                            .border(if (on) 3.dp else 1.5.dp, Color.White, CircleShape)
-                            .padding(if (on) 5.dp else 2.dp)
+                            .border(if (on) 2.5.dp else 1.5.dp, Color.White, CircleShape)
+                            .padding(if (on) 4.dp else 2.dp)
                             .clip(CircleShape)
                             .background(col)
                             .clickable(remember { MutableInteractionSource() }, null) { onChange(draft.copy(color = col)) },
@@ -1034,8 +1068,8 @@ private fun EditorVideo(item: GalleryItem, isCurrent: Boolean) {
                 VideoSurface(player, Modifier.fillMaxSize())
                 if (!state.firstFrame && thumb != null) Image(thumb, null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
                 if (!state.playing) {
-                    Box(Modifier.size(60.dp).clip(CircleShape).background(Color.Black.copy(0.45f)), contentAlignment = Alignment.Center) {
-                        Icon(IosIcons.Play, Color.White, 28.dp)
+                    Box(Modifier.size(56.dp).clip(CircleShape).background(Color.Black.copy(0.45f)), contentAlignment = Alignment.Center) {
+                        Icon(IosIcons.Play, Color.White, 26.dp)
                     }
                 }
             }

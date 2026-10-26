@@ -87,7 +87,7 @@ fun AttachMenu(visible: Boolean, bottom: Dp, canPoll: Boolean, demo: Boolean, on
                         Row(
                             Modifier
                                 .fillMaxWidth()
-                                .height(50.dp)
+                                .height(44.dp)
                                 .iosClickable(highlight = c.text.copy(alpha = 0.06f)) {
                                     Haptics.tap(view)
                                     onPick(item.action)
@@ -95,8 +95,8 @@ fun AttachMenu(visible: Boolean, bottom: Dp, canPoll: Boolean, demo: Boolean, on
                                 .padding(horizontal = 16.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Box(Modifier.size(32.dp).clip(CircleShape).background(item.color), contentAlignment = Alignment.Center) {
-                                Icon(item.icon, Color.White, 19.dp)
+                            Box(Modifier.size(30.dp).clip(CircleShape).background(item.color), contentAlignment = Alignment.Center) {
+                                Icon(item.icon, Color.White, 18.dp)
                             }
                             Spacer(Modifier.width(14.dp))
                             T(item.title, TgTheme.type.body, c.text, maxLines = 1)

@@ -328,16 +328,16 @@ fun AttachSheet(
                     }
                     if (selectionCount > 0) {
                         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.weight(1f).height(44.dp).clip(Capsule()).background(c.searchField).padding(horizontal = 16.dp), contentAlignment = Alignment.CenterStart) {
-                                if (caption.isEmpty()) T("Add a caption…", TgTheme.type.body, c.secondaryText)
+                            Box(Modifier.weight(1f).height(38.dp).clip(Capsule()).background(c.searchField).padding(horizontal = 14.dp), contentAlignment = Alignment.CenterStart) {
+                                if (caption.isEmpty()) T("Add a caption…", TgTheme.type.callout, c.secondaryText)
                                 BasicTextField(
                                     caption, { caption = it }, Modifier.fillMaxWidth(),
-                                    textStyle = TgTheme.type.body.copy(color = c.text), singleLine = true, cursorBrush = SolidColor(c.accent),
+                                    textStyle = TgTheme.type.callout.copy(color = c.text), singleLine = true, cursorBrush = SolidColor(c.accent),
                                 )
                             }
                             Spacer(Modifier.width(8.dp))
                             Box(
-                                Modifier.height(44.dp).clip(Capsule()).background(c.accent).bounceClickable {
+                                Modifier.height(38.dp).clip(Capsule()).background(c.accent).bounceClickable {
                                     if (selected.isNotEmpty()) {
                                         sendGallery(selected.toList(), caption)
                                     } else {
@@ -349,12 +349,12 @@ fun AttachSheet(
                                 contentAlignment = Alignment.Center,
                             ) {
                                 if (preparing) com.abtin.tglass.ui.components.ActivityIndicator(20.dp, Color.White)
-                                else T("Send $selectionCount", TgTheme.type.headline, Color.White)
+                                else T("Send $selectionCount", TgTheme.type.body, Color.White, weight = FontWeight.SemiBold)
                             }
                         }
                     } else {
                         // iOS 26: attachment types live in a glass capsule, the current one tinted with the accent.
-                        GlassBox(onClick = null, shape = Capsule(), modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp).fillMaxWidth().height(64.dp)) {
+                        GlassBox(onClick = null, shape = Capsule(), modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp).fillMaxWidth().height(56.dp)) {
                             Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
                                 AttachType(TgIcons.AttGallery, "Gallery", selected = true) { openPicker() }
                                 AttachType(TgIcons.AttFile, "File") { runCatching { documentLauncher.launch(arrayOf("*/*")) } }
@@ -463,7 +463,7 @@ private fun AttachType(icon: Int, label: String, selected: Boolean = false, onCl
     val c = TgTheme.colors
     val tint = if (selected) c.accent else c.text
     Column(Modifier.width(46.dp).fadeClickable(onClick = onClick), horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(icon, tint, 26.dp)
+        Icon(icon, tint, 24.dp)
         Spacer(Modifier.height(2.dp))
         T(label, TgTheme.type.caption2.copy(fontSize = 10.sp), tint, maxLines = 1, weight = FontWeight.SemiBold)
     }
