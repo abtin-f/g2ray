@@ -25,6 +25,9 @@ import androidx.compose.ui.text.font.FontVariation
 import com.abtin.tglass.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineHeightStyle
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -519,6 +522,9 @@ class AppSettings(context: Context) {
         private set
     var textScale by mutableFloatStateOf(prefs.getFloat("textScale", 1f))
         private set
+    /** Interface Scale multiplier on top of the automatic fit to the iPhone's 393-point width (see [ProvideUiScale]). */
+    var uiScale by mutableFloatStateOf(prefs.getFloat("uiScale", 1f))
+        private set
     var bubbleRadius by mutableFloatStateOf(prefs.getFloat("bubbleRadius", 16f))
         private set
     /** Day wallpaper: index into [DayWallpapers]. */
@@ -686,6 +692,7 @@ class AppSettings(context: Context) {
     fun updateGlass(v: GlassLevel) { glassLevel = v; prefs.edit().putInt("glass", v.ordinal).apply() }
     fun updateAnimations(v: Boolean) { animations = v; prefs.edit().putBoolean("anim", v).apply() }
     fun updatePerfOverlay(v: Boolean) { perfOverlay = v; prefs.edit().putBoolean("perfOverlay", v).apply() }
+    fun updateUiScale(v: Float) { uiScale = v; prefs.edit().putFloat("uiScale", v).apply() }
     fun updateTextScale(v: Float) { textScale = v; prefs.edit().putFloat("textScale", v).apply() }
     fun updateBubbleRadius(v: Float) { bubbleRadius = v; prefs.edit().putFloat("bubbleRadius", v).apply() }
     fun updateLoggedIn(v: Boolean) { loggedIn = v; prefs.edit().putBoolean("loggedIn", v).apply() }
@@ -705,6 +712,32 @@ val LocalAppSettings = staticCompositionLocalOf<AppSettings> { error("AppSetting
 private val LocalTgColors = staticCompositionLocalOf { LightColors }
 private val LocalTgTypography = staticCompositionLocalOf { typography(1f) }
 val LocalThemeState = staticCompositionLocalOf { ThemeState(ColorTheme.Classic, autoNightTriggered = false, nightShowing = false) }
+
+/** Width of the iPhone the design is taken from (Telegram iOS screenshots, 393 pt). */
+private const val ReferenceWidthDp = 393f
+
+/**
+ * Every dp in the app was measured on the 393 pt wide iPhone. Android phones are 360–430 dp wide at whatever
+ * "Display size" the owner picked, so the same dp looks too big on a narrow / zoomed phone. This scales the
+ * density so the layout is always [ReferenceWidthDp] dp wide (times the user's Interface Scale), and keeps the
+ * system font scale inside a sane range so a huge system font cannot blow the controls up.
+ */
+@Composable
+fun ProvideUiScale(userScale: Float, content: @Composable () -> Unit) {
+    val cfg = LocalConfiguration.current
+    val density = LocalDensity.current
+    val k = if (cfg.screenWidthDp >= 600) userScale else (cfg.screenWidthDp / ReferenceWidthDp * userScale).coerceIn(0.75f, 1.3f)
+    val d = remember(density.density, density.fontScale, k) { Density(density.density * k, density.fontScale.coerceIn(0.85f, 1.1f)) }
+    val c = remember(cfg, k) {
+        android.content.res.Configuration(cfg).apply {
+            screenWidthDp = (cfg.screenWidthDp / k).toInt()
+            screenHeightDp = (cfg.screenHeightDp / k).toInt()
+            smallestScreenWidthDp = (cfg.smallestScreenWidthDp / k).toInt()
+            densityDpi = (cfg.densityDpi * k).toInt()
+        }
+    }
+    CompositionLocalProvider(LocalDensity provides d, LocalConfiguration provides c, content = content)
+}
 
 /** Shows [content] with another text size (the live preview while the Text Size slider is dragged). */
 @Composable
@@ -751,8 +784,9 @@ fun TgThemeProvider(settings: AppSettings, content: @Composable () -> Unit) {
         LocalTgColors provides colors,
         LocalTgTypography provides typography(settings.textScale),
         LocalThemeState provides state,
-        content = content,
-    )
+    ) {
+        ProvideUiScale(settings.uiScale, content)
+    }
 }
 
 /** Shows [content] with the dark palette regardless of the app theme (full-screen media viewer and editor). */
