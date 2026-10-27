@@ -119,14 +119,14 @@ internal fun DrawScope.drawPlayPause(t: Float, color: Color, scale: Float = 1f) 
     }
 }
 
-/** Round accent play/pause button (44pt) with the morphing glyph, or the download ring while the file loads. */
+/** Round accent play/pause button (40pt) with the morphing glyph, or the download ring while the file loads. */
 @Composable
 internal fun AudioPlayButton(
     playing: Boolean,
     loading: Boolean,
     loadProgress: Float,
     colors: BubbleColors,
-    diameter: Dp = 44.dp,
+    diameter: Dp = 40.dp,
     onClick: () -> Unit,
 ) {
     val t by animateFloatAsState(if (playing) 1f else 0f, spring(dampingRatio = 0.85f, stiffness = 520f), label = "playPause")

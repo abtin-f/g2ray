@@ -81,11 +81,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
 
-/** Height of the composer's controls (Telegram-iOS 26: the + circle, the Message field and the mic circle). */
-internal val ComposerHeight = 42.dp
+/** Height of the composer's controls (Telegram-iOS 26: the paperclip circle, the Message field and the mic circle). */
+internal val ComposerHeight = 38.dp
 
 /**
- * The floating chat composer of Telegram-iOS 26: a glass "+" circle, the glass Message field (grows up to 8 lines,
+ * The floating chat composer of Telegram-iOS 26: a glass paperclip circle, the glass Message field (grows up to 8 lines,
  * then scrolls; emoji button inside) and a glass mic circle that turns into the blue send button.
  * Holding the mic records a voice message (or a round video, after a tap switched it to the camera):
  * slide left to cancel, slide up to lock; a locked voice message can be stopped and listened to before sending.
@@ -273,7 +273,7 @@ fun Composer(
     val cancelDistance = 120.dp
     val lockDistance = 90.dp
 
-    Column(modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp)) {
+    Column(modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp)) {
         // Reply / edit context
         AnimatedVisibility(
             visible = (replyTo != null || editing != null) && !recording && preview == null,
@@ -281,7 +281,7 @@ fun Composer(
             exit = shrinkVertically() + fadeOut(),
         ) {
             val target = editing ?: replyTo
-            GlassBox(onClick = null, shape = RoundedRectangle(20.dp), modifier = Modifier.padding(start = 50.dp, end = 50.dp, bottom = 6.dp).fillMaxWidth()) {
+            GlassBox(onClick = null, shape = RoundedRectangle(20.dp), modifier = Modifier.padding(start = 44.dp, end = 44.dp, bottom = 6.dp).fillMaxWidth()) {
                 Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 6.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(if (editing != null) TgIcons.CtxEdit else TgIcons.CtxReply, c.accent, 22.dp)
                     Spacer(Modifier.width(8.dp))
@@ -320,7 +320,7 @@ fun Composer(
                 },
                 linkMode = linkMode,
                 onLinkMode = { linkMode = it },
-                modifier = Modifier.padding(start = 50.dp, bottom = 6.dp),
+                modifier = Modifier.padding(start = 44.dp, bottom = 6.dp),
             )
         }
 
@@ -332,8 +332,8 @@ fun Composer(
                 exit = fadeOut() + scaleOut(targetScale = 0.5f) + shrinkHorizontally(shrinkTowards = Alignment.Start),
             ) {
                 Row {
-                    GlassIconButton(ComposerIcons.Plus, onAttach, size = ComposerHeight, iconSize = 24.dp, tint = c.text)
-                    Spacer(Modifier.width(8.dp))
+                    GlassIconButton(IosIcons.Paperclip, onAttach, size = ComposerHeight, iconSize = 22.dp, tint = c.text, contentDescription = "Attach")
+                    Spacer(Modifier.width(6.dp))
                 }
             }
             AnimatedVisibility(
@@ -342,8 +342,8 @@ fun Composer(
                 exit = fadeOut() + scaleOut(targetScale = 0.5f) + shrinkHorizontally(shrinkTowards = Alignment.Start),
             ) {
                 Row {
-                    GlassIconButton(ComposerIcons.Trash, { discardPreview() }, size = ComposerHeight, iconSize = 22.dp, tint = c.destructive)
-                    Spacer(Modifier.width(8.dp))
+                    GlassIconButton(ComposerIcons.Trash, { discardPreview() }, size = ComposerHeight, iconSize = 21.dp, tint = c.destructive)
+                    Spacer(Modifier.width(6.dp))
                 }
             }
 
@@ -359,7 +359,7 @@ fun Composer(
                     recording -> RecordingStatus(elapsed, locked, dragX.value, cancelDistance, onCancel = { Haptics.tap(view); finishRecording(false) })
                     p != null -> VoiceDraft(p, previewKey(p))
                     else -> Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 2.dp), verticalAlignment = Alignment.Bottom) {
-                        Box(Modifier.weight(1f).padding(vertical = 10.dp), contentAlignment = Alignment.CenterStart) {
+                        Box(Modifier.weight(1f).padding(vertical = 8.dp), contentAlignment = Alignment.CenterStart) {
                             if (text.isEmpty()) T("Message", TgTheme.type.body, c.secondaryText, maxLines = 1)
                             // Apple emoji drawn over the (transparent) system glyphs.
                             val (emojiField, emojiTransformation) = com.abtin.tglass.core.emoji.rememberAppleEmojiField(maxLines = 8)
@@ -389,13 +389,13 @@ fun Composer(
                         }
                         Box(Modifier.height(ComposerHeight).width(40.dp).fadeClickable(onClick = onTogglePanel), contentAlignment = Alignment.Center) {
                             Crossfade(panelOpen, label = "panelIcon") { open ->
-                                Icon(if (open) IosIcons.Keyboard else ComposerIcons.Smiley, c.secondaryText, if (open) 24.dp else 25.dp)
+                                Icon(if (open) IosIcons.Keyboard else ComposerIcons.Smiley, c.secondaryText, if (open) 22.dp else 23.dp)
                             }
                         }
                     }
                 }
             }
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(6.dp))
 
             // Mic / send
             val sendMode = text.isNotBlank() || editing != null || preview != null
@@ -490,7 +490,7 @@ fun Composer(
                             GlassBox(onClick = null, shape = Capsule(), modifier = Modifier.size(ComposerHeight)) {
                                 Crossfade(videoMode, label = "micMode") { v ->
                                     Box(Modifier.size(ComposerHeight), contentAlignment = Alignment.Center) {
-                                        Icon(if (v) IosIcons.Video else IosIcons.Mic, c.text, if (v) 25.dp else 23.dp)
+                                        Icon(if (v) IosIcons.Video else IosIcons.Mic, c.text, if (v) 23.dp else 21.dp)
                                     }
                                 }
                             }
@@ -510,7 +510,7 @@ fun Composer(
                         },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(if (editing != null && preview == null) IosIcons.Checkmark else IosIcons.ArrowUp, Color.White, 22.dp)
+                        Icon(if (editing != null && preview == null) IosIcons.Checkmark else IosIcons.ArrowUp, Color.White, 21.dp)
                     }
                 }
                 if (recording) {

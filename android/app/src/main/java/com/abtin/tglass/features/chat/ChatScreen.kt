@@ -28,6 +28,8 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
@@ -99,6 +101,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.abtin.tglass.core.design.TgTheme
 import com.abtin.tglass.core.glass.GlassBox
 import com.abtin.tglass.core.glass.GlassIconButton
@@ -255,6 +258,10 @@ fun ChatScreen(chatId: Long) {
     // Bubbles hug their content up to ~78 % of the chat width (at most ~320 pt + tail), next to the avatar column in groups.
     val maxBubble: Dp = ((LocalConfiguration.current.screenWidthDp - (if (isGroup) 38 else 0)) * 0.78f).coerceAtMost(326f).dp
     val pinned = repo.pinnedMessage(chatId)
+    // "Translate to English" bar: shown when at least 2 of the last 12 incoming messages are in Arabic script.
+    remember { TranslateBarPrefs.init(context) }
+    val translateCandidate = remember(messages) { shouldOfferTranslation(messages) }
+    val offerTranslate = translateCandidate && !TranslateBarPrefs.isHidden(chatId)
     // "Unread Messages" divider: fixed when the chat opens (before it is marked as read).
     val readAnchor = remember { repo.readAnchor(chatId) }
     val firstUnreadId = readAnchor?.let { a -> messages.firstOrNull { !it.outgoing && it.id > a }?.id }
@@ -796,37 +803,55 @@ fun ChatScreen(chatId: Long) {
                     .fillMaxWidth()
                     .onSizeChanged { headerHeight = it.height }
                     .statusBarsPadding()
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                    .padding(start = 10.dp, end = 10.dp, top = 4.dp, bottom = 6.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (searchMode) {
                         ChatSearchField(searchQuery, { searchQuery = it }, Modifier.weight(1f), onSubmit = { focus.clearFocus(); keyboard?.hide() })
                         Spacer(Modifier.width(8.dp))
-                        GlassTextButton("Cancel", { closeSearch() })
+                        ChatPillButton("Cancel", { closeSearch() })
                     } else if (selecting) {
-                        GlassTextButton("Cancel", { selecting = false; selected.clear() })
+                        ChatPillButton("Cancel", { selecting = false; selected.clear() })
                         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                            GlassBox(onClick = null, modifier = Modifier.height(44.dp)) {
+                            GlassBox(onClick = null, modifier = Modifier.height(ChatBarHeight)) {
                                 T("${selected.size} Selected", TgTheme.type.headline, c.text, modifier = Modifier.padding(horizontal = 18.dp))
                             }
                         }
                         Spacer(Modifier.width(80.dp))
                     } else {
-                        BackButton({ nav.pop() }, badge = backBadge)
+                        ChatBackPill({ nav.pop() }, badge = backBadge)
                         Box(Modifier.weight(1f).padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
                             val (subtitle, active) = chatSubtitle(chat, repo)
-                            GlassBox(onClick = { nav.push(Route.Profile(chatId)) }, modifier = Modifier.height(48.dp)) {
-                                Column(Modifier.padding(horizontal = 18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                    com.abtin.tglass.core.emoji.EmojiText(chat.title, TgTheme.type.headline.copy(fontSize = TgTheme.type.headline.fontSize * 0.95f), c.text, maxLines = 1)
-                                    if (chat.typing != null) TypingText(chat.typing, TgTheme.type.caption1.copy(fontSize = TgTheme.type.caption1.fontSize * 1.05f), c.accent)
-                                    else if (subtitle != null) T(subtitle, TgTheme.type.caption1.copy(fontSize = TgTheme.type.caption1.fontSize * 1.05f), if (active) c.accent else c.secondaryText, maxLines = 1)
+                            val statusStyle = TgTheme.type.caption1.copy(fontSize = 12.sp, lineHeight = 14.sp)
+                            GlassBox(onClick = { nav.push(Route.Profile(chatId)) }, modifier = Modifier.height(ChatBarHeight)) {
+                                Column(Modifier.padding(horizontal = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        com.abtin.tglass.core.emoji.EmojiText(
+                                            chat.title, TgTheme.type.headline.copy(fontSize = 16.sp, lineHeight = 19.sp), c.text,
+                                            modifier = Modifier.weight(1f, fill = false), maxLines = 1,
+                                        )
+                                        if (chat.verified) {
+                                            Spacer(Modifier.width(3.dp))
+                                            com.abtin.tglass.ui.components.VerifiedBadge(14.dp)
+                                        }
+                                    }
+                                    if (chat.typing != null) TypingText(chat.typing, statusStyle, c.accent)
+                                    else if (subtitle != null) T(subtitle, statusStyle, if (active) c.accent else c.secondaryText, maxLines = 1)
                                 }
                             }
                         }
-                        Box(Modifier.size(44.dp).clip(CircleShape).fadeClickable { nav.push(Route.Profile(chatId)) }) {
-                            ChatAvatar(chat, repo, 44.dp, showOnline = false)
+                        Box(Modifier.size(ChatBarHeight).clip(CircleShape).fadeClickable { nav.push(Route.Profile(chatId)) }) {
+                            ChatAvatar(chat, repo, ChatBarHeight, showOnline = false)
                         }
                     }
+                }
+                // "Translate to English" (the last incoming messages are in Arabic script and the system language is not)
+                if (offerTranslate && !selecting && !searchMode) {
+                    Spacer(Modifier.height(6.dp))
+                    TranslateBar(
+                        onTranslate = { toast.show("Translation isn't available yet") },
+                        onMore = { sheet.show(SheetRequest(actions = listOf(SheetAction("Hide Translation Bar") { TranslateBarPrefs.hide(chatId) }))) },
+                    )
                 }
                 // Voice / music / round video playing (global player): Telegram's media panel under the header.
                 if (!searchMode) NowPlayingBar(repo, onOpen = { cid, mid ->
@@ -836,20 +861,15 @@ fun ChatScreen(chatId: Long) {
                         nav.push(Route.Chat(cid))
                     }
                 })
-                // Pinned message bar
-                if (pinned != null && !selecting && !searchMode) {
+                // Pinned message bar (the now-playing bar above is its own capsule)
+                if (pinned != null && !selecting && !searchMode && !PinnedBarPrefs.isHidden(chatId, pinned.id)) {
                     Spacer(Modifier.height(6.dp))
-                    GlassBox(onClick = { jumpToAny(pinned.id) }, shape = Capsule(), modifier = Modifier.fillMaxWidth().height(44.dp), contentAlignment = Alignment.CenterStart) {
-                        Row(Modifier.padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.width(2.dp).height(28.dp).clip(Capsule()).background(c.accent))
-                            Spacer(Modifier.width(8.dp))
-                            Column(Modifier.weight(1f)) {
-                                T("Pinned Message", TgTheme.type.footnote, c.accent, weight = FontWeight.SemiBold, maxLines = 1)
-                                T(pinned.preview, TgTheme.type.footnote, c.text, maxLines = 1)
-                            }
-                            Icon(TgIcons.MsgPinned, c.secondaryText, 16.dp)
-                        }
-                    }
+                    PinnedBar(
+                        preview = pinned.preview,
+                        closable = chat.type == ChatType.Private || chat.type == ChatType.Bot || chat.type == ChatType.Saved,
+                        onClick = { jumpToAny(pinned.id) },
+                        onClose = { PinnedBarPrefs.hide(chatId, pinned.id) },
+                    )
                 }
             }
 
@@ -863,7 +883,24 @@ fun ChatScreen(chatId: Long) {
                 // Scroll-to-bottom
                 val showDown by remember { derivedStateOf { listState.firstVisibleItemIndex > 2 } }
                 AnimatedVisibility(showDown || newestMissing, enter = scaleIn() + fadeIn(), exit = scaleOut() + fadeOut(), modifier = Modifier.align(Alignment.End).padding(end = 12.dp)) {
-                    GlassIconButton(IosIcons.ChevronDown, { scrollToBottom() }, size = 44.dp, iconSize = 24.dp)
+                    Box(Modifier.padding(top = if (chat.unread > 0) 10.dp else 0.dp)) {
+                        GlassIconButton(IosIcons.ChevronDown, { scrollToBottom() }, size = ChatBarHeight, iconSize = 22.dp)
+                        if (chat.unread > 0) {
+                            Box(
+                                Modifier
+                                    .align(Alignment.TopCenter)
+                                    .offset(y = (-10).dp)
+                                    .heightIn(min = 20.dp)
+                                    .widthIn(min = 20.dp)
+                                    .clip(Capsule())
+                                    .background(c.accent)
+                                    .padding(horizontal = 6.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                T(formatCount(chat.unread), TgTheme.type.caption1.copy(fontSize = 12.sp, lineHeight = 14.sp), Color.White, weight = FontWeight.SemiBold, maxLines = 1)
+                            }
+                        }
+                    }
                 }
                 when {
                     searchMode -> SearchResultsBar(
@@ -879,14 +916,14 @@ fun ChatScreen(chatId: Long) {
                         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        GlassIconButton(TgIcons.CtxDelete, { if (selected.isNotEmpty()) confirmDelete(selected.toList()) }, tint = c.destructive)
-                        GlassIconButton(TgIcons.CtxCopy, {
+                        GlassIconButton(TgIcons.CtxDelete, { if (selected.isNotEmpty()) confirmDelete(selected.toList()) }, size = ChatBarHeight, iconSize = 24.dp, tint = c.destructive)
+                        GlassIconButton(TgIcons.CtxCopy, size = ChatBarHeight, iconSize = 24.dp, onClick = {
                             val t = messages.filter { it.id in selected }.joinToString("\n") { it.text ?: it.preview }
                             (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("messages", t))
                             toast.show("Copied ${selected.size} messages")
                             selecting = false; selected.clear()
                         })
-                        GlassIconButton(TgIcons.CtxForward, { if (selected.isNotEmpty()) forward(selected.toList()) })
+                        GlassIconButton(TgIcons.CtxForward, { if (selected.isNotEmpty()) forward(selected.toList()) }, size = ChatBarHeight, iconSize = 24.dp)
                     }
                     !chat.joined -> ChatBottomBar(if (isChannel) "Join Channel" else "Join Group", { repo.joinChat(chatId) })
                     isChannel && !(repo.isLive && chat.canPost) -> ChannelBottomBar(
@@ -1366,10 +1403,11 @@ object ChatSearchRequest {
 private fun UnreadDivider() {
     val c = TgTheme.colors
     Box(
-        Modifier.fillMaxWidth().padding(vertical = 6.dp).background(c.background.copy(alpha = 0.75f)).padding(vertical = 5.dp),
+        Modifier.fillMaxWidth().padding(vertical = 4.dp)
+            .background(if (c.isDark) Color.Black.copy(alpha = 0.4f) else c.background.copy(alpha = 0.75f)).padding(vertical = 4.dp),
         contentAlignment = Alignment.Center,
     ) {
-        T("Unread Messages", TgTheme.type.footnote, c.secondaryText, weight = FontWeight.Medium)
+        T("Unread Messages", TgTheme.type.footnote.copy(fontSize = 13.sp, lineHeight = 16.sp), c.secondaryText, weight = FontWeight.Medium)
     }
 }
 
@@ -1398,7 +1436,7 @@ private fun ChatSearchField(value: String, onValue: (String) -> Unit, modifier: 
         kotlinx.coroutines.delay(150)
         runCatching { focus.requestFocus() }
     }
-    GlassBox(onClick = null, shape = Capsule(), modifier = modifier.height(44.dp), contentAlignment = Alignment.CenterStart) {
+    GlassBox(onClick = null, shape = Capsule(), modifier = modifier.height(ChatBarHeight), contentAlignment = Alignment.CenterStart) {
         Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(TgIcons.IcSearch, c.secondaryText, 18.dp)
             Spacer(Modifier.width(6.dp))
@@ -1437,7 +1475,7 @@ private fun SearchResultsBar(count: Int, total: Int, index: Int, query: String, 
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        GlassBox(onClick = null, shape = Capsule(), modifier = Modifier.weight(1f).height(46.dp)) {
+        GlassBox(onClick = null, shape = Capsule(), modifier = Modifier.weight(1f).height(ChatBarHeight)) {
             if (busy && count == 0) {
                 com.abtin.tglass.ui.components.ActivityIndicator(18.dp, c.secondaryText)
             } else {
@@ -1457,13 +1495,13 @@ private fun SearchResultsBar(count: Int, total: Int, index: Int, query: String, 
         GlassIconButton(
             IosIcons.ChevronDown, onOlder,
             modifier = Modifier.graphicsLayer { rotationZ = 180f; alpha = if (canOlder) 1f else 0.4f },
-            size = 46.dp, iconSize = 20.dp, tint = if (canOlder) c.accent else c.secondaryText,
+            size = ChatBarHeight, iconSize = 20.dp, tint = if (canOlder) c.accent else c.secondaryText,
         )
         Spacer(Modifier.width(8.dp))
         GlassIconButton(
             IosIcons.ChevronDown, onNewer,
             modifier = Modifier.graphicsLayer { alpha = if (canNewer) 1f else 0.4f },
-            size = 46.dp, iconSize = 20.dp, tint = if (canNewer) c.accent else c.secondaryText,
+            size = ChatBarHeight, iconSize = 20.dp, tint = if (canNewer) c.accent else c.secondaryText,
         )
     }
 }
