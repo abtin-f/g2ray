@@ -41,6 +41,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -175,7 +176,7 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
     // Stories: collapsed into the title; pulling the list down expands them (Telegram-iOS behaviour).
     val storyUsers = repo.storyUsers
     val hasStories = rememberUpdatedState(storyUsers.isNotEmpty())
-    val storiesMax = with(density) { 104.dp.toPx() }
+    val storiesMax = with(density) { 90.dp.toPx() }
     var storiesPx by rememberSaveable { mutableFloatStateOf(0f) }
     val storiesFraction = (storiesPx / storiesMax).coerceIn(0f, 1f)
     // As in the owner's Telegram iOS 26 reference, the list opens with the stories collapsed into the stacked
@@ -264,7 +265,7 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
     val chats = repo.chatsInFolder(folder)
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val headerHeight = 56.dp
+    val headerHeight = 48.dp
     val storiesHeight = with(density) { storiesPx.toDp() }
     // Music / voice playing (global player): Telegram's top player bar under the header.
     val playerShown = !searching && com.abtin.tglass.features.chat.hasNowPlaying(repo, includeVideo = false)
@@ -351,16 +352,16 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
         if (searching) {
             Column(Modifier.fillMaxWidth()) {
                 Box {
-                    ScrollEdgeBlur(top + 80.dp)
+                    ScrollEdgeBlur(top + 68.dp)
                     Row(
-                        Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp, vertical = 6.dp),
+                        Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        GlassBox(onClick = null, shape = Capsule(), modifier = Modifier.weight(1f).height(48.dp), contentAlignment = Alignment.CenterStart) {
+                        GlassBox(onClick = null, shape = Capsule(), modifier = Modifier.weight(1f).height(40.dp), contentAlignment = Alignment.CenterStart) {
                             SearchField(query, { query = it }, Modifier.fillMaxWidth().padding(horizontal = 6.dp), focusRequester = searchFocus, background = Color.Transparent)
                         }
                         Spacer(Modifier.width(8.dp))
-                        GlassIconButton(IosIcons.Close, { searching = false; query = ""; focus.clearFocus() }, size = 48.dp)
+                        GlassIconButton(IosIcons.Close, { searching = false; query = ""; focus.clearFocus() }, size = 40.dp)
                     }
                 }
             }
@@ -385,9 +386,16 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
                                 }
                             },
                         )
+                        // Telegram iOS 26: [proxy shield (only with an enabled proxy)] [add story] [compose] in one capsule.
+                        LaunchedEffect(Unit) { repo.loadProxies() }
+                        val proxyOn = repo.proxies.any { it.enabled }
+                        val groupButtons = buildList<Pair<Any, () -> Unit>> {
+                            if (proxyOn) add(com.abtin.tglass.features.settings.SettingsGlyphs.Shield to { nav.push(Route.Proxy) })
+                            add(TgIcons.IcAddStory to { nav.push(Route.Stories(storyUsers.firstOrNull()?.id ?: 1L)) })
+                            add(TgIcons.IcCompose to { nav.push(Route.NewMessage) })
+                        }
                         GlassButtonGroup(
-                            TgIcons.IcAddStory to { nav.push(Route.Stories(storyUsers.firstOrNull()?.id ?: 1L)) },
-                            TgIcons.IcCompose to { nav.push(Route.NewMessage) },
+                            *groupButtons.toTypedArray(),
                             modifier = Modifier.align(Alignment.CenterEnd),
                         )
                     }
@@ -464,19 +472,25 @@ private fun ChatsTitle(stories: List<Pair<Long, String>>, status: String?, colla
                     Box(Modifier.padding(start = (i * 14).dp).zIndex((stories.size - i).toFloat())) {
                         Box(
                             Modifier
-                                .size(30.dp)
+                                .size(26.dp)
                                 .clip(CircleShape)
                                 .background(Brush.linearGradient(listOf(Color(0xFF34C76F), Color(0xFF3DA1FD))))
                                 .padding(1.5.dp)
                                 .clip(CircleShape)
                                 .background(c.background)
                                 .padding(1.5.dp)
-                        ) { Avatar(name, id, 24.dp) }
+                        ) { Avatar(name, id, 20.dp) }
                     }
                 }
             }
         }
         // Telegram shows the connection state in place of the title until it is online.
+        val context = androidx.compose.ui.platform.LocalContext.current
+        com.abtin.tglass.features.settings.PasscodeLock.attach(context)
+        if (com.abtin.tglass.features.settings.PasscodeLock.enabled) {
+            Icon(IosIcons.Lock, c.text, 14.dp)
+            Spacer(Modifier.width(4.dp))
+        }
         androidx.compose.animation.AnimatedContent(status, label = "chatsTitle") { st ->
             if (st == null) T("Chats", TgTheme.type.headline, c.text)
             else Row(Modifier.fadeClickable(onClick = onStatus), verticalAlignment = Alignment.CenterVertically) {
@@ -496,34 +510,36 @@ private fun FolderTabs(folders: List<String>, selected: Int, onSelect: (Int) -> 
     // inside the list that the glass bars sample (layerBackdrop), so the capsule must not be a backdrop glass itself:
     // that would draw the layer into itself and overflow the RenderThread stack (native crash).
     Box(
-        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp).height(42.dp).clip(Capsule()).background(c.searchField),
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).height(38.dp).clip(Capsule()).background(c.searchField),
         contentAlignment = Alignment.CenterStart,
     ) {
     Row(
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        horizontalArrangement = Arrangement.spacedBy(0.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         folders.forEachIndexed { i, f ->
             val sel = i == selected
             val bg by animateColorAsState(if (sel) c.text.copy(alpha = if (c.isDark) 0.14f else 0.07f) else Color.Transparent, label = "folderBg")
-            Row(
-                Modifier
-                    .height(34.dp)
-                    .clip(Capsule())
-                    .background(bg)
-                    .fadeClickable { onSelect(i) }
-                    .padding(horizontal = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                T(f, TgTheme.type.subheadline, if (sel) c.text else c.secondaryText, weight = FontWeight.SemiBold, maxLines = 1)
-                val count = unreadFor(i)
-                if (count > 0 && f != "Unread") {
-                    Spacer(Modifier.width(6.dp))
-                    Box(
-                        Modifier.height(18.dp).clip(Capsule()).background(if (sel) c.accent else c.mutedBadge).padding(horizontal = 6.dp),
-                        contentAlignment = Alignment.Center,
-                    ) { T("$count", TgTheme.type.caption1, Color.White, weight = FontWeight.SemiBold) }
+            // The whole 38 pt strip is the tap target; only the 30 pt capsule is drawn.
+            Box(Modifier.height(38.dp).fadeClickable { onSelect(i) }, contentAlignment = Alignment.Center) {
+                Row(
+                    Modifier
+                        .height(30.dp)
+                        .clip(Capsule())
+                        .background(bg)
+                        .padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    T(f, TgTheme.type.subheadline, if (sel) c.text else c.secondaryText, weight = FontWeight.Medium, maxLines = 1)
+                    val count = unreadFor(i)
+                    if (count > 0 && f != "Unread") {
+                        Spacer(Modifier.width(5.dp))
+                        Box(
+                            Modifier.height(16.dp).defaultMinSize(minWidth = 16.dp).clip(Capsule()).background(if (sel) c.accent else c.mutedBadge).padding(horizontal = 5.dp),
+                            contentAlignment = Alignment.Center,
+                        ) { T("$count", TgTheme.type.caption1.copy(fontSize = 12.sp, lineHeight = 14.sp), Color.White, weight = FontWeight.SemiBold) }
+                    }
                 }
             }
         }
@@ -668,7 +684,7 @@ private fun ArchiveRow(archived: List<Chat>, repo: TelegramRepository, onClick: 
                 .fillMaxWidth()
                 .iosClickable(onLongClick = onLongClick, onClick = onClick)
                 .height(size.row.dp)
-                .padding(start = 14.dp, end = 12.dp),
+                .padding(start = 10.dp, end = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Avatar("Archive", 0, size.avatar.dp, iconRes = TgIcons.IcArchiveLarge, iconColors = Color(0xFFDEDEE5) to Color(0xFFC5C6CC))
@@ -696,7 +712,7 @@ private fun ArchiveRow(archived: List<Chat>, repo: TelegramRepository, onClick: 
                 }
             }
         }
-        Separator(Modifier.align(Alignment.BottomStart), startPadding = (14 + size.avatar + 10).dp)
+        Separator(Modifier.align(Alignment.BottomStart), startPadding = (10 + size.avatar + 10).dp)
     }
 }
 
@@ -712,10 +728,10 @@ private fun StoriesRow(repo: TelegramRepository, fraction: Float, modifier: Modi
     ) {
         item(key = "me") {
             val me = repo.me
-            Column(Modifier.width(68.dp).fadeClickable { if (me.hasStory) onOpen(me.id) }, horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(Modifier.width(64.dp).fadeClickable { if (me.hasStory) onOpen(me.id) }, horizontalAlignment = Alignment.CenterHorizontally) {
                 Box {
-                    if (me.hasStory) Avatar(me.name, 3, 68.dp, photoPeer = me.id, storyRing = if (me.storySeen) StoryRing.Seen else StoryRing.Unseen)
-                    else Avatar(me.name, 3, 64.dp, photoPeer = me.id)
+                    if (me.hasStory) Avatar(me.name, 3, 62.dp, photoPeer = me.id, storyRing = if (me.storySeen) StoryRing.Seen else StoryRing.Unseen)
+                    else Avatar(me.name, 3, 56.dp, photoPeer = me.id)
                     Box(
                         Modifier
                             .align(Alignment.BottomEnd)
@@ -733,8 +749,8 @@ private fun StoriesRow(repo: TelegramRepository, fraction: Float, modifier: Modi
             }
         }
         items(withStories, key = { it.id }) { u ->
-            Column(Modifier.width(68.dp).fadeClickable { onOpen(u.id) }, horizontalAlignment = Alignment.CenterHorizontally) {
-                Avatar(u.name, u.id, 68.dp, storyRing = if (u.storySeen) StoryRing.Seen else StoryRing.Unseen)
+            Column(Modifier.width(64.dp).fadeClickable { onOpen(u.id) }, horizontalAlignment = Alignment.CenterHorizontally) {
+                Avatar(u.name, u.id, 62.dp, storyRing = if (u.storySeen) StoryRing.Seen else StoryRing.Unseen)
                 Spacer(Modifier.height(3.dp))
                 com.abtin.tglass.core.emoji.EmojiText(u.firstName, TgTheme.type.caption1, if (u.storySeen) c.secondaryText else c.text, maxLines = 1, align = TextAlign.Center)
             }

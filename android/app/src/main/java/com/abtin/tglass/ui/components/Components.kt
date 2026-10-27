@@ -349,7 +349,7 @@ fun SegmentedControl(
     val c = TgTheme.colors
     BoxWithConstraints(
         modifier
-            .height(34.dp)
+            .height(32.dp)
             .clip(Capsule())
             .background(c.searchField)
             .padding(2.dp)
@@ -399,7 +399,7 @@ fun ChipTabs(
             val sel = i == selected
             Box(
                 Modifier
-                    .height(32.dp)
+                    .height(30.dp)
                     .clip(Capsule())
                     .background(if (sel) c.accent.copy(alpha = if (c.isDark) 0.28f else 0.12f) else Color.Transparent)
                     .clickable(remember { MutableInteractionSource() }, null) { onSelect(i) }
@@ -421,7 +421,7 @@ fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifi
     Box(
         modifier
             .fillMaxWidth()
-            .height(52.dp)
+            .height(50.dp)
             .clip(Capsule())
             .background(if (enabled) c.accent else c.accent.copy(alpha = 0.4f))
             .then(if (active) Modifier.bounceClickable(onClick) else Modifier),

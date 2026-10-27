@@ -82,7 +82,7 @@ fun ProfileHero(
                     center = Offset(size.width / 2f, size.height * 0.34f),
                 )
             }
-            .padding(top = statusTop + 56.dp, bottom = 18.dp),
+            .padding(top = statusTop + 52.dp, bottom = 18.dp),
     ) {
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             Box(
@@ -94,15 +94,15 @@ fun ProfileHero(
                 }
             ) {
                 Box(Modifier.shadow(24.dp, CircleShape, clip = false, ambientColor = bottom, spotColor = bottom)) {
-                    Avatar(name, seed, 112.dp, saved = saved, photoPeer = photoPeer)
+                    Avatar(name, seed, 100.dp, saved = saved, photoPeer = photoPeer)
                 }
             }
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(12.dp))
             Row(
                 Modifier.graphicsLayer { alpha = 1f - collapse * 1.4f },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                T(name, TgTheme.type.title2.copy(fontSize = 26.sp, lineHeight = 30.sp), c.text, weight = FontWeight.SemiBold, maxLines = 1, align = TextAlign.Center)
+                T(name, TgTheme.type.title2.copy(fontSize = 24.sp, lineHeight = 28.sp), c.text, weight = FontWeight.SemiBold, maxLines = 1, align = TextAlign.Center)
                 if (badge != null) {
                     Spacer(Modifier.width(6.dp))
                     badge()

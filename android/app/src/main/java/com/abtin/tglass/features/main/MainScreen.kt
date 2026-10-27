@@ -128,11 +128,11 @@ fun MainScreen() {
                 val unread by remember(repo) { androidx.compose.runtime.derivedStateOf { repo.chats.filter { !it.archived && !it.muted }.sumOf { it.unread } } }
                 // Only whether there is a badge matters for composing the overlay copy; the count itself is read in the overlay.
                 val hasUnread by remember(repo) { androidx.compose.runtime.derivedStateOf { unread > 0 } }
-                // Telegram-iOS TabBarComponent: 64pt capsule (56 + 2×4), max width 500, then an 8pt gap and a 64pt search circle.
+                // Measured on Telegram iOS 26: 62pt capsule (54 + 2×4), then an 8pt gap and a 62pt search circle; 12pt side margins.
                 Row(
                     Modifier
                         .navigationBarsPadding()
-                        .padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
+                        .padding(start = 12.dp, end = 12.dp, bottom = 10.dp)
                         .widthIn(max = 500.dp + 72.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -156,8 +156,8 @@ fun MainScreen() {
                     GlassIconButton(
                         TgIcons.IcSearch,
                         onClick = { tab = 2; tabBar.searchRequests++ },
-                        size = 64.dp,
-                        iconSize = 28.dp,
+                        size = 62.dp,
+                        iconSize = 24.dp,
                         contentDescription = "Search",
                     )
                 }
@@ -208,8 +208,8 @@ private fun TabBadge(count: Int, modifier: Modifier = Modifier) {
     val c = TgTheme.colors
     Box(
         modifier
-            .defaultMinSize(minWidth = 18.dp)
-            .height(18.dp)
+            .defaultMinSize(minWidth = 16.dp)
+            .height(16.dp)
             .clip(Capsule())
             .background(c.destructive)
             .padding(horizontal = 5.dp),
@@ -217,7 +217,7 @@ private fun TabBadge(count: Int, modifier: Modifier = Modifier) {
     ) {
         T(
             com.abtin.tglass.ui.components.formatCount(count),
-            TgTheme.type.footnote.copy(fontSize = 12.sp, lineHeight = 14.sp),
+            TgTheme.type.footnote.copy(fontSize = 11.sp, lineHeight = 13.sp),
             Color.White,
             maxLines = 1,
             weight = androidx.compose.ui.text.font.FontWeight.SemiBold,

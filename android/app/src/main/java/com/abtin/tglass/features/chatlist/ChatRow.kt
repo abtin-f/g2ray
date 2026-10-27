@@ -120,7 +120,7 @@ fun ChatRow(
     val bg = if (chat.pinned) c.pinnedRow else c.background
     // Formatted once per timestamp, not on every recomposition.
     val time = remember(last?.date) { last?.let { formatListDate(it.date) } }
-    val dateStyle = TgTheme.type.subheadline.copy(fontSize = size.previewSp.sp)
+    val dateStyle = TgTheme.type.subheadline.copy(fontSize = (size.previewSp - 1f).sp)
     // The row layout never mirrors (avatar left, time right) even when the phone language is RTL;
     // the texts themselves follow their own script (TextDirection.Content).
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
@@ -130,22 +130,22 @@ fun ChatRow(
                 .fillMaxWidth()
                 .iosClickable(onLongClick = onLongClick, onClick = onClick)
                 .height(size.row.dp)
-                .padding(start = 14.dp, end = 12.dp),
+                .padding(start = 10.dp, end = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (editing) {
                 Box(
                     Modifier
                         .padding(end = 10.dp)
-                        .size(24.dp)
+                        .size(22.dp)
                         .clip(CircleShape)
                         .then(if (selected) Modifier.background(c.accent) else Modifier.border(1.5.dp, c.tertiaryText, CircleShape)),
                     contentAlignment = Alignment.Center,
-                ) { if (selected) Icon(IosIcons.Checkmark, Color.White, 15.dp) }
+                ) { if (selected) Icon(IosIcons.Checkmark, Color.White, 14.dp) }
             }
             ChatAvatar(chat, repo, size.avatar.dp, showStory = true)
             Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f).fillMaxHeight().padding(top = if (size == com.abtin.tglass.core.design.ChatListSize.Compact) 6.dp else 8.dp, bottom = 5.dp)) {
+            Column(Modifier.weight(1f).fillMaxHeight().padding(top = if (size == com.abtin.tglass.core.design.ChatListSize.Compact) 8.dp else 9.dp, bottom = 6.dp)) {
                 // Top line (ChatListItem): [name verified mute .......... status-check time]
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
@@ -156,7 +156,7 @@ fun ChatRow(
                         }
                         if (chat.muted) {
                             Spacer(Modifier.width(2.dp))
-                            Icon(TgIcons.IcMutedPeer, c.secondaryText.copy(alpha = 0.8f), 16.dp)
+                            Icon(TgIcons.IcMutedPeer, c.secondaryText.copy(alpha = 0.8f), 15.dp)
                         }
                     }
                     Spacer(Modifier.width(6.dp))
@@ -167,7 +167,7 @@ fun ChatRow(
                             MessageStatus.Read -> IosIcons.CheckDouble to c.listCheckmark
                             MessageStatus.Failed -> Icons.Rounded.ErrorOutline to c.destructive
                         }
-                        Icon(icon, tint, 17.dp)
+                        Icon(icon, tint, 15.dp)
                         Spacer(Modifier.width(3.dp))
                     }
                     if (time != null) T(time, dateStyle, c.secondaryText, maxLines = 1)
@@ -187,13 +187,13 @@ fun ChatRow(
                             }
                             chat.unread > 0 -> Badge(chat.unread, muted = chat.muted)
                             chat.markedUnread -> Box(Modifier.size(20.dp).clip(CircleShape).background(if (chat.muted) c.mutedBadge else c.accent))
-                            chat.pinned -> Icon(TgIcons.MsgPinned, c.mutedBadge, 16.dp)
+                            chat.pinned -> Icon(TgIcons.MsgPinned, c.mutedBadge, 15.dp)
                         }
                     }
                 }
             }
         }
-        Separator(Modifier.align(Alignment.BottomStart), startPadding = (14 + size.avatar + 10 + if (editing) 34 else 0).dp)
+        Separator(Modifier.align(Alignment.BottomStart), startPadding = (10 + size.avatar + 10 + if (editing) 32 else 0).dp)
     }
     }
 }

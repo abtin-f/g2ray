@@ -197,6 +197,37 @@ internal fun LazyListScope.appearancePage() {
     appearanceGap()
     item {
         val s = LocalAppSettings.current
+        val c = TgTheme.colors
+        // Only the label follows the finger; the whole app is re-laid out once, when it lifts (as with Text Size).
+        var scale by remember { mutableFloatStateOf((s.uiScale * 20f).roundToInt() / 20f) }
+        Section(header = "Interface Scale", footer = "Adjusts the size of everything. If buttons look too big, lower it.") {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                T("80%", TgTheme.type.footnote, c.secondaryText)
+                IOSSlider(
+                    scale, { scale = it }, 0.8f..1.2f, Modifier.weight(1f).padding(horizontal = 12.dp), steps = 7,
+                    onValueChangeFinished = {
+                        val v = (scale * 20f).roundToInt() / 20f
+                        scale = v
+                        if (v != s.uiScale) s.updateUiScale(v)
+                    },
+                )
+                T("120%", TgTheme.type.footnote, c.secondaryText)
+            }
+            Separator(startPadding = 16.dp)
+            Cell(
+                "Scale", value = "${(scale * 100f).roundToInt()}%", chevron = false, divider = false,
+            )
+        }
+        if (kotlin.math.abs(scale - 1f) > 0.01f) {
+            Spacer(Modifier.height(24.dp))
+            Section {
+                Cell("Reset to Default", titleColor = c.accent, chevron = false, divider = false, onClick = { scale = 1f; s.updateUiScale(1f) })
+            }
+        }
+    }
+    appearanceGap()
+    item {
+        val s = LocalAppSettings.current
         val nav = LocalNavigator.current
         Section {
             Cell("Animations", value = if (s.animations) "On" else "Off", divider = false, onClick = { nav.push(Route.SettingsPage(Page.PowerSaving)) })

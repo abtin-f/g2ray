@@ -99,8 +99,8 @@ fun GlassTopBar(
             Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(top = 4.dp)
-                .height(52.dp)
+                .padding(top = 6.dp)
+                .height(44.dp)
                 .padding(horizontal = 12.dp)
         ) {
             Row(Modifier.align(Alignment.CenterStart), verticalAlignment = Alignment.CenterVertically) {
@@ -125,26 +125,26 @@ fun GlassTopBar(
 @Composable
 fun BackButton(onClick: () -> Unit, modifier: Modifier = Modifier, badge: Int = 0) {
     if (badge > 0) {
-        GlassBox(onClick = onClick, modifier = modifier.height(44.dp), shape = Capsule()) {
+        GlassBox(onClick = onClick, modifier = modifier.height(40.dp), shape = Capsule()) {
             Row(Modifier.padding(start = 8.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(IosIcons.ChevronLeft, TgTheme.colors.text, 24.dp)
+                Icon(IosIcons.ChevronLeft, TgTheme.colors.text, 22.dp)
                 Spacer(Modifier.width(2.dp))
                 T(formatCount(badge), TgTheme.type.body, TgTheme.colors.text, weight = FontWeight.Medium, maxLines = 1)
             }
         }
     } else {
-        GlassIconButton(IosIcons.ChevronLeft, onClick, modifier, iconSize = 24.dp, tint = TgTheme.colors.text)
+        GlassIconButton(IosIcons.ChevronLeft, onClick, modifier, iconSize = 22.dp, tint = TgTheme.colors.text)
     }
 }
 
 /** Text pill in glass ("Edit", "Done"). */
 @Composable
 fun GlassTextButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, color: Color = TgTheme.colors.text, bold: Boolean = false) {
-    GlassBox(onClick = onClick, modifier = modifier.height(44.dp), shape = Capsule()) {
+    GlassBox(onClick = onClick, modifier = modifier.height(40.dp), shape = Capsule()) {
         T(
             text, TgTheme.type.body, color,
             weight = if (bold) FontWeight.SemiBold else FontWeight.Medium,
-            modifier = Modifier.padding(horizontal = 16.dp), maxLines = 1,
+            modifier = Modifier.padding(horizontal = 13.dp), maxLines = 1,
         )
     }
 }
@@ -152,19 +152,19 @@ fun GlassTextButton(text: String, onClick: () -> Unit, modifier: Modifier = Modi
 /** Several glass icon buttons fused into one capsule (iOS 26 toolbar group). */
 @Composable
 fun GlassButtonGroup(vararg buttons: Pair<Any, () -> Unit>, modifier: Modifier = Modifier) {
-    GlassBox(onClick = null, modifier = modifier.height(44.dp), shape = Capsule()) {
-        Row(Modifier.padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+    GlassBox(onClick = null, modifier = modifier.height(40.dp), shape = Capsule()) {
+        Row(Modifier.padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically) {
             buttons.forEach { (icon, onClick) ->
                 Box(
                     Modifier
-                        .height(44.dp)
-                        .width(44.dp)
+                        .height(40.dp)
+                        .width(40.dp)
                         .fadeClickable(onClick = onClick),
                     contentAlignment = Alignment.Center,
                 ) {
                     when (icon) {
                         is Int -> Icon(icon, TgTheme.colors.text, 24.dp)
-                        is androidx.compose.ui.graphics.vector.ImageVector -> Icon(icon, TgTheme.colors.text, 24.dp)
+                        is androidx.compose.ui.graphics.vector.ImageVector -> Icon(icon, TgTheme.colors.text, 22.dp)
                     }
                 }
             }
