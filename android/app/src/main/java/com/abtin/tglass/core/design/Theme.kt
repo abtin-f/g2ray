@@ -107,7 +107,8 @@ val LightColors = TgColors(
     bubbleInMeta = Color(0xFF525252).copy(alpha = 0.6f),
     bubbleOutMeta = Color(0xFF008C09).copy(alpha = 0.8f),
     bubbleOutAccent = Color(0xFF00A700),
-    glassSurface = Color(0xFFFAFAFA).copy(alpha = 0.45f),
+    // GlassBackgroundComponent .panel (light): white veil (legacy fill white @ 70 %, native tint white @ 10 %).
+    glassSurface = Color(0xFFFFFFFF).copy(alpha = 0.6f),
     // rootNavigationBar.opaqueBackgroundColor: #F7F7F7 mixed with 14 % white.
     glassOpaque = Color(0xFFF8F8F8),
     // contextMenu.backgroundColor.
@@ -161,8 +162,9 @@ val DarkColors = TgColors(
     bubbleInMeta = Color(0xFFFFFFFF).copy(alpha = 0.5f),
     bubbleOutMeta = Color(0xFFFFFFFF).copy(alpha = 0.5f),
     bubbleOutAccent = Color(0xFFFFFFFF),
-    // iOS 26 dark Liquid Glass: a light grey veil (≈ #1C1C1E over black, measured #1C1C1C on the iPhone) that still
-    // lets bright content through; the rim highlight and shadow come from the glass modifier.
+    // iOS 26 dark Liquid Glass (GlassBackgroundComponent .panel: #1C1C1C @ 85 % legacy fill): a grey veil that reads
+    // #1C1C1C over black (measured on the iPhone) and still lets bright content through (the scroll-to-bottom button
+    // over a blue bubble reads dark blue); the rim highlight and shadow come from the glass modifier.
     glassSurface = Color(0xFF3A3A3C).copy(alpha = 0.5f),
     // Opaque variant (glass off / no backdrop): list.itemBlocksBackgroundColor #1C1C1D, never pure black.
     glassOpaque = Color(0xFF1C1C1D),
