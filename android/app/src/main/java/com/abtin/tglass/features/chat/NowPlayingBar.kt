@@ -29,6 +29,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -42,6 +43,7 @@ import com.abtin.tglass.ui.components.IosIcons
 import com.abtin.tglass.ui.components.T
 import com.abtin.tglass.ui.components.fadeClickable
 import com.kyant.shapes.Capsule
+import com.kyant.shapes.RoundedRectangle
 import kotlin.math.roundToInt
 
 /** What the now-playing bar shows (a voice / music item of [VoicePlayer], or the round video playing with sound). */
@@ -111,32 +113,31 @@ private fun NowPlayingContent(np: NowPlaying, onOpen: (Long, Long) -> Unit) {
         Spacer(Modifier.height(6.dp))
         GlassBox(
             onClick = { if (np.chatId != 0L) onOpen(np.chatId, np.messageId) },
-            shape = Capsule(),
-            modifier = Modifier.fillMaxWidth().height(44.dp),
+            shape = RoundedRectangle(16.dp),
+            modifier = Modifier.fillMaxWidth().height(ChatBarHeight),
             contentAlignment = Alignment.CenterStart,
         ) {
-            Row(Modifier.fillMaxWidth().padding(start = 6.dp, end = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                // Play / pause
+            Row(Modifier.fillMaxWidth().padding(start = 2.dp, end = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                // Play / pause (white glyph; 40 dp hit area)
                 Box(
-                    Modifier.size(36.dp).clip(CircleShape).fadeClickable {
+                    Modifier.size(ChatBarHeight).clip(CircleShape).fadeClickable {
                         if (np.video) VideoNotePlayback.togglePause?.invoke() else VoicePlayer.playPause()
                     },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Canvas(Modifier.size(36.dp)) { drawPlayPause(t, c.accent, scale = 0.72f) }
+                    Canvas(Modifier.size(ChatBarHeight)) { drawPlayPause(t, c.text, scale = 0.8f) }
                 }
-                Spacer(Modifier.width(4.dp))
-                Column(Modifier.weight(1f)) {
-                    val style = TgTheme.type.footnote.copy(fontSize = 14.sp, lineHeight = 17.sp, textDirection = TextDirection.Content)
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    val style = TgTheme.type.footnote.copy(fontSize = 13.sp, lineHeight = 16.sp, textDirection = TextDirection.Content, textAlign = TextAlign.Center)
                     T(np.title, style, c.text, weight = FontWeight.SemiBold, maxLines = 1)
-                    if (np.subtitle != null) T(np.subtitle, style.copy(fontSize = 13.sp, lineHeight = 16.sp), c.secondaryText, maxLines = 1)
+                    if (np.subtitle != null) T(np.subtitle, style.copy(fontSize = 12.sp, lineHeight = 14.sp), c.secondaryText, maxLines = 1)
                 }
                 if (!np.video) {
                     val speed = VoicePlayer.speed
                     val label = if (speed == 1.5f) "1.5X" else "${speed.roundToInt()}X"
                     Box(
                         Modifier
-                            .height(36.dp)
+                            .height(ChatBarHeight)
                             .clip(Capsule())
                             .fadeClickable { VoicePlayer.cycleSpeed() }
                             .padding(horizontal = 8.dp),
@@ -144,20 +145,20 @@ private fun NowPlayingContent(np: NowPlaying, onOpen: (Long, Long) -> Unit) {
                     ) {
                         Box(
                             Modifier
-                                .clip(com.kyant.shapes.RoundedRectangle(5.dp))
+                                .clip(RoundedRectangle(5.dp))
                                 .background(if (speed != 1f) c.accent else c.secondaryText.copy(alpha = 0.9f))
                                 .padding(horizontal = 4.dp, vertical = 1.dp),
                         ) {
-                            T(label, TgTheme.type.caption2.copy(fontSize = 11.sp, lineHeight = 13.sp), TgTheme.colors.background, weight = FontWeight.Bold, maxLines = 1)
+                            T(label, TgTheme.type.caption2.copy(fontSize = 10.sp, lineHeight = 12.sp), TgTheme.colors.background, weight = FontWeight.Bold, maxLines = 1)
                         }
                     }
                 }
                 Box(
-                    Modifier.size(36.dp).clip(CircleShape).fadeClickable {
+                    Modifier.size(ChatBarHeight).clip(CircleShape).fadeClickable {
                         if (np.video) VideoNotePlayback.activeKey = null else VoicePlayer.stop()
                     },
                     contentAlignment = Alignment.Center,
-                ) { Icon(IosIcons.Close, c.secondaryText, 16.dp) }
+                ) { Icon(IosIcons.Close, c.text, 14.dp) }
             }
             // Progress line along the bottom edge of the capsule.
             Canvas(Modifier.fillMaxWidth().fillMaxHeight().padding(horizontal = 18.dp)) {

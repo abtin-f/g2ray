@@ -963,6 +963,8 @@ class DemoRepository(private val scope: CoroutineScope) : TelegramRepository {
         put(103, listOf(
             msg(103, 2, 60 * 3, text("The build is green now ✅")),
             msg(103, 0, 60 * 3 - 1, text("Great, thanks Reza!")),
+            msg(103, 2, 60 * 3 - 2, text("ممنون، فردا صبح کد را با هم مرور کنیم؟")),
+            msg(103, 2, 60 * 3 - 3, text("سلام، ساخت پروژه با موفقیت انجام شد")),
             msg(103, 2, 60 * 2, text("Want to review the PR together?")),
         ))
         put(104, listOf(

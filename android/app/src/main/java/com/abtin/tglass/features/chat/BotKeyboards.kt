@@ -212,7 +212,7 @@ fun ChatBottomBar(title: String, onClick: () -> Unit, color: Color = TgTheme.col
         GlassBox(
             onClick = onClick,
             shape = Capsule(),
-            modifier = Modifier.height(50.dp).widthIn(min = 220.dp),
+            modifier = Modifier.height(44.dp).widthIn(min = 220.dp),
         ) {
             T(title, TgTheme.type.body, color, weight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.padding(horizontal = 32.dp))
         }
@@ -226,18 +226,18 @@ fun ChatBottomBar(title: String, onClick: () -> Unit, color: Color = TgTheme.col
 @Composable
 fun ChannelBottomBar(muted: Boolean, onDiscuss: (() -> Unit)?, onMute: () -> Unit, onSearch: () -> Unit) {
     val c = TgTheme.colors
-    Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).height(48.dp)) {
+    Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).height(44.dp)) {
         if (onDiscuss != null) {
-            GlassIconButton(TgIcons.PiMessage, onDiscuss, Modifier.align(Alignment.CenterStart), size = 48.dp, iconSize = 44.dp, contentDescription = "Discussion")
+            GlassIconButton(TgIcons.PiMessage, onDiscuss, Modifier.align(Alignment.CenterStart), size = 44.dp, iconSize = 40.dp, contentDescription = "Discussion")
         }
         GlassBox(
             onClick = onMute,
             shape = Capsule(),
-            modifier = Modifier.align(Alignment.Center).height(48.dp).widthIn(min = 112.dp),
+            modifier = Modifier.align(Alignment.Center).height(44.dp).widthIn(min = 112.dp),
         ) {
             T(if (muted) "Unmute" else "Mute", TgTheme.type.body, c.text, weight = FontWeight.Medium, maxLines = 1, modifier = Modifier.padding(horizontal = 26.dp))
         }
-        GlassIconButton(TgIcons.PiSearch, onSearch, Modifier.align(Alignment.CenterEnd), size = 48.dp, iconSize = 44.dp, contentDescription = "Search")
+        GlassIconButton(TgIcons.PiSearch, onSearch, Modifier.align(Alignment.CenterEnd), size = 44.dp, iconSize = 40.dp, contentDescription = "Search")
     }
 }
 

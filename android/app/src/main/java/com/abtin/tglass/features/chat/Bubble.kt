@@ -1012,7 +1012,7 @@ private fun StickerMessage(m: Message, s: MessageContent.Sticker, modifier: Modi
 /** 1–3 emoji without a bubble, big — like Telegram. */
 @Composable
 private fun BigEmojiMessage(m: Message, text: String, count: Int, modifier: Modifier, onReact: (String) -> Unit) {
-    val size = when (count) { 1 -> 64; 2 -> 50; else -> 42 }
+    val size = when (count) { 1 -> 80; 2 -> 64; else -> 52 }
     Column(modifier.padding(horizontal = 6.dp), horizontalAlignment = if (m.outgoing) Alignment.End else Alignment.Start) {
         val emoji = rememberAppleEmojiText(text.trim(), remember(m.content, text) { com.abtin.tglass.core.emoji.customEmojiSpansTrimmed(m, text) })
         BasicText(
