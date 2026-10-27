@@ -76,6 +76,11 @@ data class TgColors(
     val onlineDot: Color = Color(0xFF4CC91F),
     val listCheckmark: Color = Color(0xFF0088FF),
     val pinnedRow: Color = Color(0xFFF7F7F7),
+    /**
+     * Telegram-iOS dark pattern wallpaper (negative intensity): the screen is black and only the pattern lines show
+     * the [wallpaper] gradient, at [wallpaperPattern]'s alpha.
+     */
+    val wallpaperInverted: Boolean = false,
 )
 
 /** Telegram's default "Classic" day theme: green outgoing bubbles on the green pattern wallpaper. */
@@ -103,16 +108,27 @@ val LightColors = TgColors(
     bubbleOutMeta = Color(0xFF008C09).copy(alpha = 0.8f),
     bubbleOutAccent = Color(0xFF00A700),
     glassSurface = Color(0xFFFAFAFA).copy(alpha = 0.45f),
-    glassOpaque = Color(0xFFFFFFFF).copy(alpha = 0.92f),
-    menuSurface = Color(0xFFF7F7F7).copy(alpha = 0.72f),
+    // rootNavigationBar.opaqueBackgroundColor: #F7F7F7 mixed with 14 % white.
+    glassOpaque = Color(0xFFF8F8F8),
+    // contextMenu.backgroundColor.
+    menuSurface = Color(0xFFF9F9F9).copy(alpha = 0.78f),
     scrim = Color(0xFF000000).copy(alpha = 0.18f),
     wallpaper = listOf(Color(0xFFDBDDBB), Color(0xFF6BA587), Color(0xFFD5D88D), Color(0xFF88B884)),
     wallpaperPattern = Color(0xFF000000).copy(alpha = 0.09f),
     serviceBubble = Color(0xFF000000).copy(alpha = 0.2f),
 )
 
-/** iOS `defaultDarkPresentationTheme` wallpaper gradient (shown through a dark pattern, intensity −34). */
+/** iOS `defaultDarkWallpaperGradientColors` (shown only through the pattern on black, intensity −34). */
 private val NightWallpaperGradient = listOf(Color(0xFF598BF6), Color(0xFF7A5EEF), Color(0xFFD67CFF), Color(0xFFF38B58))
+
+/**
+ * Outgoing bubbles of the default Night theme (accent #3E88F7): `[0x0771ff, 0x9047ff, 0xa256bf].reversed()` in
+ * customizeDefaultDarkPresentationTheme, top of the screen to bottom: violet → purple → blue (iOS screenshots).
+ */
+private val NightBubbleGradient = listOf(Color(0xFFA256BF), Color(0xFF9047FF), Color(0xFF0771FF))
+
+/** Incoming bubble fill of the Night theme (#1D1D1D); on iOS it picks up a little of the wallpaper gradient. */
+private val NightIncoming = Color(0xFF1D1D1D)
 
 /**
  * Telegram-iOS "Night" (DefaultDarkPresentationTheme.swift): true black backgrounds, #1C1C1D grouped cells,
@@ -134,18 +150,24 @@ val DarkColors = TgColors(
     green = Color(0xFF30D158),
     orange = Color(0xFFFF9F0A),
     mutedBadge = Color(0xFF666666),
-    searchField = Color(0xFF767680).copy(alpha = 0.3f),
-    bubbleIn = Color(0xFF1D1D1D),
-    bubbleOut = Color(0xFF0088FF),
-    bubbleOutGradient = listOf(Color(0xFF61BCF9), Color(0xFF0088FF)),
+    // navigationSearchBar.inputFillColor: white @ 10 % (≈ #1A1A1A on black, like the iOS 26 search capsule).
+    searchField = Color(0xFFFFFFFF).copy(alpha = 0.1f),
+    // #1D1D1D mixed with 10 % of the default wallpaper gradient (#2A262F measured on the iPhone).
+    bubbleIn = Color(0xFF2A262F),
+    bubbleOut = Color(0xFF0771FF),
+    bubbleOutGradient = NightBubbleGradient,
     bubbleInText = Color(0xFFFFFFFF),
     bubbleOutText = Color(0xFFFFFFFF),
     bubbleInMeta = Color(0xFFFFFFFF).copy(alpha = 0.5f),
     bubbleOutMeta = Color(0xFFFFFFFF).copy(alpha = 0.5f),
     bubbleOutAccent = Color(0xFFFFFFFF),
-    glassSurface = Color(0xFF121212).copy(alpha = 0.45f),
-    glassOpaque = Color(0xFF1C1C1C).copy(alpha = 0.9f),
-    menuSurface = Color(0xFF252525).copy(alpha = 0.8f),
+    // iOS 26 dark Liquid Glass: a light grey veil (≈ #1C1C1E over black, measured #1C1C1C on the iPhone) that still
+    // lets bright content through; the rim highlight and shadow come from the glass modifier.
+    glassSurface = Color(0xFF3A3A3C).copy(alpha = 0.5f),
+    // Opaque variant (glass off / no backdrop): list.itemBlocksBackgroundColor #1C1C1D, never pure black.
+    glassOpaque = Color(0xFF1C1C1D),
+    // contextMenu.backgroundColor.
+    menuSurface = Color(0xFF252525).copy(alpha = 0.78f),
     scrim = Color(0xFF000000).copy(alpha = 0.45f),
     wallpaper = NightWallpaperGradient.map { it.mixedWith(Color.Black, 0.84f) },
     wallpaperPattern = Color(0xFF8C7CF0).copy(alpha = 0.22f),
@@ -155,6 +177,13 @@ val DarkColors = TgColors(
 )
 
 // ---- Color math (UIColor.withMultiplied / lightness as used by Telegram-iOS themes) ----
+
+/** Plain average of [colors] (opaque). */
+internal fun averageColor(colors: List<Color>): Color = if (colors.isEmpty()) Color.Black else Color(
+    colors.sumOf { it.red.toDouble() }.toFloat() / colors.size,
+    colors.sumOf { it.green.toDouble() }.toFloat() / colors.size,
+    colors.sumOf { it.blue.toDouble() }.toFloat() / colors.size,
+)
 
 /** [amount] 0 = this color, 1 = [other]. */
 fun Color.mixedWith(other: Color, amount: Float): Color = Color(
@@ -436,16 +465,17 @@ fun buildColors(spec: ThemeSpec): TgColors {
             )
         }
         ColorTheme.Day -> {
-            val grad = listOf(acc.multiplied(0.966f, 0.61f, 0.98f), acc)
+            // DefaultDayPresentationTheme messageDay.outgoing fill: [#57B2E0, #0088FF].
+            val grad = if (!custom) listOf(Color(0xFF57B2E0), Color(0xFF0088FF)) else listOf(acc.multiplied(0.966f, 0.61f, 0.98f), acc)
             LightColors.copy(
                 accent = acc, listCheckmark = acc,
                 bubbleOut = acc, bubbleOutGradient = if (spec.bubbleGradient) grad else null,
-                bubbleOutText = Color.White, bubbleOutMeta = Color.White.copy(alpha = 0.7f), bubbleOutAccent = Color.White,
+                bubbleOutText = Color.White, bubbleOutMeta = Color.White.copy(alpha = 0.65f), bubbleOutAccent = Color.White,
                 wallpaperPattern = Color.Transparent,
             )
         }
         ColorTheme.Night -> {
-            val grad = if (!custom) listOf(Color(0xFF61BCF9), Color(0xFF0088FF)) else listOf(acc.multiplied(0.966f, 0.61f, 0.98f), acc)
+            val grad = if (!custom) NightBubbleGradient else listOf(acc.multiplied(0.966f, 0.61f, 0.98f), acc)
             DarkColors.copy(
                 accent = acc, listCheckmark = acc,
                 bubbleOut = grad.last(), bubbleOutGradient = if (spec.bubbleGradient) grad else null,
@@ -496,9 +526,18 @@ fun buildColors(spec: ThemeSpec): TgColors {
         avg < 0.35f -> Color.White.copy(alpha = 0.07f)
         else -> Color.Black.copy(alpha = 0.09f)
     }
-    val pattern = if (!spec.pattern || patternBase.alpha == 0f) Color.Transparent
-    else patternBase.copy(alpha = (patternBase.alpha * spec.patternIntensity * 2f).coerceIn(0f, 1f))
-    var colors = base.copy(wallpaper = wall.colors, wallpaperPattern = pattern)
+    // Night's own wallpaper is Telegram's inverted pattern: black with the gradient showing through the doodles.
+    val inverted = theme == ColorTheme.Night && picked == null
+    val invertedPattern = Color.White.copy(alpha = 0.3f)
+    val pattern = when {
+        !spec.pattern -> Color.Transparent
+        inverted -> invertedPattern.copy(alpha = (invertedPattern.alpha * spec.patternIntensity * 2f).coerceIn(0f, 1f))
+        patternBase.alpha == 0f -> Color.Transparent
+        else -> patternBase.copy(alpha = (patternBase.alpha * spec.patternIntensity * 2f).coerceIn(0f, 1f))
+    }
+    val wallColors = if (inverted) NightWallpaperGradient else wall.colors
+    var colors = base.copy(wallpaper = wallColors, wallpaperPattern = pattern, wallpaperInverted = inverted)
+    if (theme == ColorTheme.Night) colors = colors.copy(bubbleIn = NightIncoming.mixedWith(averageColor(wallColors), 0.1f))
     // White incoming bubbles would vanish on a white wallpaper (Telegram-iOS day: #F1F1F4 without wallpaper).
     if (!colors.isDark && avg > 0.93f) colors = colors.copy(bubbleIn = Color(0xFFF1F1F4))
     if (!colors.isDark && avg < 0.3f) colors = colors.copy(serviceBubble = Color.White.copy(alpha = 0.18f))
