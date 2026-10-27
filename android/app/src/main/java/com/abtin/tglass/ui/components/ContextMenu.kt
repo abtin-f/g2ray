@@ -364,7 +364,7 @@ private fun MenuList(actions: List<MenuAction>, backdrop: Backdrop, enabled: Boo
             .glass(
                 shape = RoundedRectangle(26.dp),
                 backdrop = backdrop,
-                surface = if (c.isDark) Color(0xFF1C1C1C).copy(alpha = 0.6f) else Color.White.copy(alpha = 0.62f),
+                surface = c.menuSurface, // contextMenu.backgroundColor (#252525 @ 78 % / #F9F9F9 @ 78 %)
                 blurRadius = 12.dp,
                 lensHeight = 14.dp,
                 lensAmount = 20.dp,
@@ -444,7 +444,7 @@ private fun ReactionsControl(
     onReact: (String) -> Unit,
 ) {
     val c = TgTheme.colors
-    val surface = if (c.isDark) Color(0xFF1C1C1C).copy(alpha = 0.62f) else Color.White.copy(alpha = 0.7f)
+    val surface = c.menuSurface
     // About six fit next to the chevron; fewer on narrow screens.
     val fit = ((LocalConfiguration.current.screenWidthDp - 16 - 10 - 46) / ReactionSlot.value).toInt().coerceIn(3, VisibleReactions)
     val top = reactions.top.take(fit)

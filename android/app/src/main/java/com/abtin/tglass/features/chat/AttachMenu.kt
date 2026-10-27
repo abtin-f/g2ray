@@ -79,7 +79,7 @@ fun AttachMenu(visible: Boolean, bottom: Dp, canPoll: Boolean, demo: Boolean, on
             GlassBox(
                 onClick = null,
                 shape = RoundedRectangle(30.dp),
-                surface = if (c.isDark) Color(0xFF1C1C1E).copy(alpha = 0.55f) else Color.White.copy(alpha = 0.55f),
+                surface = c.menuSurface, // contextMenu.backgroundColor
                 modifier = Modifier.width(236.dp),
             ) {
                 Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {

@@ -179,7 +179,7 @@ private fun AccountMenu(repo: TelegramRepository, backdrop: com.kyant.backdrop.B
     // Slot with the checkmark: the active account until another one is tapped.
     var checked by remember { mutableIntStateOf(accounts.firstOrNull { it.active }?.slot ?: -1) }
     var busy by remember { mutableStateOf(false) }
-    val surface = if (c.isDark) Color(0xFF1E1E20).copy(alpha = 0.74f) else Color(0xFFF7F7F9).copy(alpha = 0.78f)
+    val surface = c.menuSurface // contextMenu.backgroundColor
     Column(
         Modifier
             .width(264.dp)

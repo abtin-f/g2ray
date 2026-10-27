@@ -330,7 +330,7 @@ private fun ThemeThumb(theme: ColorTheme, selected: Boolean, onClick: () -> Unit
                 .border(if (selected) 2.5.dp else 1.dp, if (selected) c.accent else c.separator, RoundedRectangle(16.dp))
                 .padding(if (selected) 4.dp else 1.dp)
                 .clip(RoundedRectangle(13.dp))
-                .background(Brush.linearGradient(colors.wallpaper))
+                .then(if (colors.wallpaperInverted) Modifier.background(Color.Black) else Modifier.background(Brush.linearGradient(colors.wallpaper)))
                 .padding(8.dp),
         ) {
             Box(Modifier.align(Alignment.TopStart).size(46.dp, 16.dp).clip(RoundedRectangle(8.dp)).background(colors.bubbleIn))
@@ -437,7 +437,7 @@ internal fun LazyListScope.wallpaperPage() {
             })
             Cell("Set a Color", titleColor = c.accent, chevron = false, divider = false, onClick = {
                 val cur = s.backgroundFor(night)
-                val start = if (cur.colors.isNotEmpty()) cur else com.abtin.tglass.core.design.UserBackground(colors = listOf(colors.wallpaper.first().toArgb()))
+                val start = if (cur.colors.isNotEmpty()) cur else com.abtin.tglass.core.design.UserBackground(colors = listOf((if (colors.wallpaperInverted) Color.Black else colors.wallpaper.first()).toArgb()))
                 WallpaperDraft.open(night, start.copy(photo = null))
                 nav.push(Route.SettingsPage(Page.WallpaperEditor))
             })

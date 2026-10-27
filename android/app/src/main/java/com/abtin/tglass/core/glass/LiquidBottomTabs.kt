@@ -68,12 +68,10 @@ fun LiquidBottomTabs(
     content: @Composable RowScope.() -> Unit
 ) {
     val isLightTheme = !TgTheme.colors.isDark
-    val accentColor =
-        if (isLightTheme) Color(0xFF0088FF)
-        else Color(0xFF0091FF)
-    val containerColor =
-        if (isLightTheme) Color(0xFFFAFAFA).copy(0.4f)
-        else Color(0xFF121212).copy(0.4f)
+    // tabBar.selectedIconColor = the theme accent (#3E88F7 Night, #0088FF Day).
+    val accentColor = TgTheme.colors.accent
+    // Same material as every other glass capsule (grey veil on dark, white veil on light).
+    val containerColor = TgTheme.colors.glassSurface
 
     val tabsBackdrop = rememberLayerBackdrop()
 

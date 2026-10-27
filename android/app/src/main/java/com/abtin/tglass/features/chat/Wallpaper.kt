@@ -20,6 +20,7 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.Color
@@ -138,7 +139,7 @@ fun WallpaperBackground(bg: UserBackground, modifier: Modifier = Modifier, phase
 @Composable
 private fun PhotoWallpaper(photo: String, blur: Boolean, dim: Float, modifier: Modifier) {
     val context = LocalContext.current
-    val fallback = TgTheme.colors.wallpaper.first()
+    val fallback = TgTheme.colors.let { if (it.wallpaperInverted) Color.Black else it.wallpaper.first() }
     val image by produceState<ImageBitmap?>(null, photo, blur) { value = WallpaperStore.load(context, photo, blur) }
     Box(
         modifier.fillMaxSize().drawBehind {
@@ -200,8 +201,11 @@ private fun DefaultWallpaper(modifier: Modifier, phase: Int) {
         else anim.snapTo(phase.toFloat())
     }
     val colors = c.wallpaper
+    val inverted = c.wallpaperInverted
     var gradient by remember { mutableStateOf<ImageBitmap?>(null) }
-    LaunchedEffect(colors) {
+    LaunchedEffect(colors, inverted) {
+        // Inverted (Night) wallpaper: the gradient only tints the static pattern, so it is not animated.
+        if (inverted) return@LaunchedEffect
         snapshotFlow { anim.value }.conflate().collect { f ->
             gradient = withContext(Dispatchers.Default) { renderGradientBitmap(colors, f) }
         }
@@ -212,6 +216,16 @@ private fun DefaultWallpaper(modifier: Modifier, phase: Int) {
         modifier.fillMaxSize().drawWithCache {
             val w = size.width.roundToInt()
             val h = size.height.roundToInt()
+            if (inverted) {
+                // Telegram-iOS negative-intensity pattern: black, with the gradient visible only through the doodles.
+                // Rendered once per size into one bitmap; a frame is a rect and one drawImage.
+                val tinted = if (patternColor.alpha > 0f && w > 0 && h > 0)
+                    renderPattern(this, layoutDirection, w, h, patternColor, tint = renderGradientBitmap(colors, 0f)) else null
+                return@drawWithCache onDrawBehind {
+                    drawRect(Color.Black)
+                    if (tinted != null) drawImage(tinted)
+                }
+            }
             val pattern = if (patternColor.alpha > 0f && w > 0 && h > 0) renderPattern(this, layoutDirection, w, h, patternColor) else null
             onDrawBehind {
                 val g = gradient
@@ -234,7 +248,8 @@ private fun renderGradientBitmap(colors: List<Color>, f: Float): ImageBitmap {
     return Bitmap.createBitmap(pixels, GW, GH, Bitmap.Config.ARGB_8888).asImageBitmap()
 }
 
-private fun renderPattern(density: Density, direction: LayoutDirection, w: Int, h: Int, color: Color): ImageBitmap {
+/** The doodles in [color]; with [tint], recolored by that gradient bitmap (its alpha kept from [color]). */
+private fun renderPattern(density: Density, direction: LayoutDirection, w: Int, h: Int, color: Color, tint: ImageBitmap? = null): ImageBitmap {
     val bmp = ImageBitmap(w, h)
     CanvasDrawScope().draw(density, direction, Canvas(bmp), Size(w.toFloat(), h.toFloat())) {
         val unit = 24f * this.density
@@ -242,6 +257,12 @@ private fun renderPattern(density: Density, direction: LayoutDirection, w: Int, 
             translate(d.x * w, d.y * h) {
                 rotate(d.angle, Offset.Zero) { drawDoodle(d.kind, unit * d.size, color) }
             }
+        }
+        if (tint != null) {
+            drawImage(
+                tint, srcSize = IntSize(tint.width, tint.height), dstSize = IntSize(w, h),
+                blendMode = BlendMode.SrcIn, filterQuality = FilterQuality.High,
+            )
         }
     }
     return bmp

@@ -268,10 +268,12 @@ fun bubbleColors(outgoing: Boolean): BubbleColors {
         }
     } else {
         if (outgoing) {
+            // mediaControlInnerBackgroundColor = the first (top) bubble color: violet play glyph on Night (iOS).
+            val glyph = c.bubbleOutGradient?.firstOrNull() ?: c.bubbleOut
             BubbleColors(
-                fill = c.bubbleOut, text = white, meta = white.copy(alpha = 0.6f), accent = white, link = white, gradient = c.bubbleOutGradient,
-                control = white, controlGlyph = Color(0xFF1E8EF7), inactive = white.copy(alpha = 0.45f), fileTitle = white,
-                reactionBg = white.copy(alpha = 0.16f), reactionFg = white, reactionActiveBg = white, reactionActiveFg = Color(0xFF1E8EF7),
+                fill = c.bubbleOut, text = white, meta = c.bubbleOutMeta, accent = white, link = white, gradient = c.bubbleOutGradient,
+                control = white, controlGlyph = glyph, inactive = white.copy(alpha = 0.45f), fileTitle = white,
+                reactionBg = white.copy(alpha = 0.16f), reactionFg = white, reactionActiveBg = white, reactionActiveFg = glyph,
                 pollBar = white, radio = white.copy(alpha = 0.55f), separator = white.copy(alpha = 0.3f), underlineLinks = true,
             )
         } else {
@@ -319,7 +321,8 @@ private const val GradientStepPx = 24f
 
 /**
  * Bubble background. Night outgoing bubbles use Telegram's screen-wide gradient: each bubble shows the part of
- * the #61BCF9 → #0088FF gradient behind its position, so bubbles darken towards the bottom of the screen.
+ * the violet → blue (#A256BF → #9047FF → #0771FF) gradient behind its position, so bubbles turn blue towards the
+ * bottom of the screen.
  * The position is quantized (a step is ~1 color level, invisible), so while scrolling a bubble is redrawn every
  * few frames instead of every frame, and neither the outline nor the gradient shader are rebuilt per draw.
  */

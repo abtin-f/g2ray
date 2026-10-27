@@ -146,7 +146,8 @@ fun ActionSheetHost(state: ActionSheetState) {
 @Composable
 private fun alertSurface(): Color {
     val c = TgTheme.colors
-    return if (c.isDark) Color(0xFF1E1E20).copy(alpha = 0.72f) else Color(0xFFF7F7F9).copy(alpha = 0.74f)
+    // actionSheet.itemBackgroundColor: #1C1C1D @ 80 % (night), white @ 80 % (day).
+    return if (c.isDark) Color(0xFF1C1C1D).copy(alpha = 0.8f) else Color.White.copy(alpha = 0.8f)
 }
 
 /** iOS 26 alert: centered glass card, big corner radius, capsule buttons (side by side for two, stacked otherwise). */
