@@ -49,4 +49,25 @@ shot contacts light
 shot calls light
 shot devices dark
 
+# Scroll benchmark: frame stats while flinging the list up and down (software GPU, so compare runs, not devices).
+bench() {
+  local screen=$1
+  adb shell am force-stop com.abtin.tglass
+  adb shell am start -W -n com.abtin.tglass/.MainActivity --es screen "$screen" --es theme dark >/dev/null
+  sleep 10
+  adb shell dumpsys gfxinfo com.abtin.tglass reset >/dev/null 2>&1 || true
+  for i in 1 2 3 4 5; do
+    adb shell input swipe 540 900 540 1900 180; sleep 1
+    adb shell input swipe 540 1900 540 900 180; sleep 1
+  done
+  {
+    echo "=== bench $screen"
+    adb shell dumpsys gfxinfo com.abtin.tglass | grep -E "Total frames rendered|Janky frames|percentile|Number (Missed Vsync|High input latency|Slow UI thread|Slow bitmap uploads|Slow issue draw commands|Frame deadline missed)|GPU [0-9]+th"
+  } >> "$OUT/bench.txt" 2>&1 || true
+}
+bench chats
+bench chat
+bench channel
+bench profile
+
 adb logcat -d -t 2000 "*:W" > "$OUT/logcat_warn.txt" 2>&1 || true
