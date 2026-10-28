@@ -184,7 +184,7 @@ private fun AccountMenu(repo: TelegramRepository, backdrop: com.kyant.backdrop.B
         Modifier
             .width(264.dp)
             .clickable(remember { MutableInteractionSource() }, null) {}
-            .glass(shape = RoundedRectangle(24.dp), backdrop = backdrop, surface = surface, blurRadius = 18.dp, lensHeight = 14.dp, lensAmount = 20.dp),
+            .glass(shape = RoundedRectangle(24.dp), style = com.abtin.tglass.core.glass.GlassStyle.Blur, backdrop = backdrop, surface = surface, blurRadius = 18.dp),
     ) {
         accounts.forEachIndexed { i, a ->
             if (i > 0) Separator(startPadding = 56.dp)

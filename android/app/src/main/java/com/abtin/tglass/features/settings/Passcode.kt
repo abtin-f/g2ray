@@ -330,17 +330,20 @@ internal fun PasscodeSettingsScreen() {
     Box(Modifier.fillMaxSize()) {
         SettingsScaffold(Page.Passcode.title) { passcodeItems() }
         if (!verified) {
-            Box(
+            com.abtin.tglass.core.glass.BackdropScaffold(
                 Modifier
                     .fillMaxSize()
-                    .background(c.groupedBackground)
                     .pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent() } },
+                content = {
+                    Box(Modifier.fillMaxSize().background(c.groupedBackground)) {
+                        PasscodeEntry(title = "Enter Passcode", onEntered = { pin ->
+                            val ok = PasscodeLock.check(pin)
+                            if (ok) verified = true
+                            ok
+                        })
+                    }
+                },
             ) {
-                PasscodeEntry(title = "Enter Passcode", onEntered = { pin ->
-                    val ok = PasscodeLock.check(pin)
-                    if (ok) verified = true
-                    ok
-                })
                 GlassTopBar(Page.Passcode.title, fade = c.groupedBackground)
             }
         }
@@ -413,7 +416,7 @@ internal fun PasscodeSetupScreen() {
     val changing = remember { PasscodeLock.enabled }
     var first by remember { mutableStateOf<String?>(null) }
     var mismatch by remember { mutableStateOf(false) }
-    Box(Modifier.fillMaxSize().background(c.groupedBackground)) {
+    com.abtin.tglass.core.glass.BackdropScaffold(Modifier.fillMaxSize(), content = { Box(Modifier.fillMaxSize().background(c.groupedBackground)) {
         PasscodeEntry(
             title = if (first == null) (if (changing) "Enter a new passcode" else "Enter a passcode") else "Re-enter your passcode",
             subtitle = if (mismatch) "Passcodes didn't match. Try again." else null,
@@ -440,6 +443,7 @@ internal fun PasscodeSetupScreen() {
                 }
             },
         )
+    } }) {
         GlassTopBar("Passcode", fade = c.groupedBackground)
     }
 }

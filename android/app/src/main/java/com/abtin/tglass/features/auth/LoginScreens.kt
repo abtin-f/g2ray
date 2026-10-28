@@ -98,8 +98,9 @@ private fun AuthPage(
     // Sign-in errors (invalid number, wrong password, flood wait…) are iOS alerts, like Telegram for iPhone.
     val sheet = LocalActionSheet.current
     LaunchedEffect(error) { if (error != null) sheet.showError(error) }
-    Box(Modifier.fillMaxSize().background(c.background)) {
-        Column(Modifier.fillMaxSize().statusBarsPadding().imePadding()) {
+    // The page is recorded as the backdrop of the glass top bar (Cancel / Proxy pills).
+    com.abtin.tglass.core.glass.BackdropScaffold(Modifier.fillMaxSize(), content = {
+        Column(Modifier.fillMaxSize().background(c.background).statusBarsPadding().imePadding()) {
             Column(
                 Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(top = 64.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -114,6 +115,7 @@ private fun AuthPage(
             }
             if (button != null) Box(Modifier.padding(horizontal = 24.dp, vertical = 16.dp).navigationBarsPadding()) { button() }
         }
+    }) {
         val live = liveRepo()
         val nav = LocalNavigator.current
         GlassTopBar(

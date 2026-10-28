@@ -263,7 +263,7 @@ private fun IosActionSheet(r: SheetRequest, backdrop: Backdrop?, state: ActionSh
             Modifier
                 .fillMaxWidth()
                 .clickable(remember { MutableInteractionSource() }, null) {}
-                .glass(shape = RoundedRectangle(28.dp), backdrop = backdrop, surface = surface, blurRadius = 16.dp, lensHeight = 16.dp, lensAmount = 22.dp)
+                .glass(shape = RoundedRectangle(28.dp), style = com.abtin.tglass.core.glass.GlassStyle.Blur, backdrop = backdrop, surface = surface, blurRadius = 16.dp)
                 .heightIn(max = 560.dp)
                 .verticalScroll(rememberScrollState()),
         ) {
@@ -283,7 +283,7 @@ private fun IosActionSheet(r: SheetRequest, backdrop: Backdrop?, state: ActionSh
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .glass(shape = RoundedRectangle(28.dp), backdrop = backdrop, surface = surface, blurRadius = 16.dp, lensHeight = 16.dp, lensAmount = 22.dp)
+                    .glass(shape = RoundedRectangle(28.dp), style = com.abtin.tglass.core.glass.GlassStyle.Blur, backdrop = backdrop, surface = surface, blurRadius = 16.dp)
             ) {
                 SheetButton(SheetAction(r.cancel, bold = true), Modifier.fillMaxWidth()) { state.dismiss() }
             }

@@ -363,6 +363,8 @@ private fun MenuList(actions: List<MenuAction>, backdrop: Backdrop, enabled: Boo
             .width(250.dp)
             .glass(
                 shape = RoundedRectangle(26.dp),
+                // Menu body: frosted panel (iOS 26 menus are blur-only; the reaction bar above is liquid).
+                style = com.abtin.tglass.core.glass.GlassStyle.Blur,
                 backdrop = backdrop,
                 surface = c.menuSurface, // contextMenu.backgroundColor (#252525 @ 78 % / #F9F9F9 @ 78 %)
                 blurRadius = 12.dp,

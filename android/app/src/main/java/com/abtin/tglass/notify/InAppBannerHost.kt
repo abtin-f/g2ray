@@ -87,6 +87,7 @@ fun InAppBannerHost(onOpen: (Long) -> Unit) {
                     .pointerInput(Unit) { detectVerticalDragGestures { _, dy -> if (dy < -8f) visible = false } }
                     .glass(
                         shape = RoundedRectangle(26.dp),
+                        style = com.abtin.tglass.core.glass.GlassStyle.Blur,
                         backdrop = LocalContextMenu.current.backdrop,
                         surface = surface,
                         blurRadius = 28.dp,
