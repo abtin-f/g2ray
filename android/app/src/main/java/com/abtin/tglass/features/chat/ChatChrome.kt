@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -36,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.abtin.tglass.core.design.TgTheme
 import com.abtin.tglass.core.glass.GlassBox
+import com.abtin.tglass.core.glass.GlassStyle
 import com.abtin.tglass.data.Message
 import com.abtin.tglass.ui.components.Icon
 import com.abtin.tglass.ui.components.IosIcons
@@ -49,28 +51,38 @@ import com.kyant.shapes.RoundedRectangle
 /** Height of the chat screen's glass bars and header controls (Telegram-iOS: 40 pt). */
 val ChatBarHeight = 40.dp
 
+/** Corner radius of the pinned / now-playing panel under the chat header (iOS 26 photos: ~20 pt). */
+val ChatPanelRadius = 20.dp
+
+/** Height of the pinned-message row (Telegram-iOS ChatPinnedMessageTitlePanelNode: 50 pt; iPhone photos ~47-48 pt). */
+val PinnedBarHeight = 48.dp
+
 /**
- * Back control of the chat header: a 40 dp glass capsule with the chevron and, when other chats have unread
- * messages, a light inner pill with the count (iOS "‹ 256"). Without a count it is a 40 dp circle.
+ * Back control of the chat header: a 40 pt liquid-glass capsule with the chevron and, when other chats have unread
+ * messages, a filled light pill with the count in dark text (iOS "‹ 256": 18 pt tall, 14 pt digits; measured on the
+ * iPhone photos: capsule 70 × 40, chevron 15 pt from the left edge, pill 8 pt from the right edge).
+ * Without a count it is a 40 pt circle.
  */
 @Composable
 fun ChatBackPill(onClick: () -> Unit, badge: Int, modifier: Modifier = Modifier) {
     val c = TgTheme.colors
     if (badge <= 0) {
         GlassBox(onClick = onClick, modifier = modifier.size(ChatBarHeight), shape = Capsule()) {
-            Icon(IosIcons.ChevronLeft, c.text, 22.dp)
+            Icon(IosIcons.ChevronLeft, c.text, 24.dp)
         }
         return
     }
     GlassBox(onClick = onClick, modifier = modifier.height(ChatBarHeight), shape = Capsule()) {
-        Row(Modifier.padding(start = 8.dp, end = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(IosIcons.ChevronLeft, c.text, 22.dp)
-            Spacer(Modifier.width(3.dp))
+        Row(Modifier.padding(start = 9.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            // The chevron glyph is 7.5 pt wide inside its 24 pt box: a 19 pt slot puts the pill right after it.
+            Box(Modifier.width(19.dp).height(24.dp), contentAlignment = Alignment.Center) {
+                Icon(IosIcons.ChevronLeft, c.text, 24.dp, Modifier.requiredSize(24.dp))
+            }
             Box(
-                Modifier.height(24.dp).clip(Capsule()).background(c.text.copy(alpha = 0.14f)).padding(horizontal = 7.dp),
+                Modifier.height(18.dp).widthIn(min = 18.dp).clip(Capsule()).background(c.text.copy(alpha = 0.92f)).padding(horizontal = 6.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                T(formatCount(badge), TgTheme.type.body.copy(fontSize = 13.sp, lineHeight = 16.sp), c.text, weight = FontWeight.Medium, maxLines = 1)
+                T(formatCount(badge), TgTheme.type.body.copy(fontSize = 14.sp, lineHeight = 17.sp), c.background, weight = FontWeight.Medium, maxLines = 1)
             }
         }
     }
@@ -172,38 +184,41 @@ private val TranslateGlyph: ImageVector by lazy {
     }.build()
 }
 
-/** 24 dp ring with three dots ("…") — the more button of the translate bar. */
+/** 20 pt ring with three dots ("…") — the more button of the translate bar (iPhone photos: 20 pt, 1.5 pt stroke). */
 @Composable
 private fun DotsRing(color: Color) {
-    Canvas(Modifier.size(24.dp)) {
+    Canvas(Modifier.size(20.dp)) {
         drawCircle(color, radius = size.minDimension / 2f - 0.75.dp.toPx(), style = Stroke(width = 1.5.dp.toPx()))
-        val r = 1.5.dp.toPx()
+        val r = 1.25.dp.toPx()
         val cy = size.height / 2f
-        val gap = 4.5.dp.toPx()
+        val gap = 4.dp.toPx()
         drawCircle(color, r, Offset(size.width / 2f - gap, cy))
         drawCircle(color, r, Offset(size.width / 2f, cy))
         drawCircle(color, r, Offset(size.width / 2f + gap, cy))
     }
 }
 
-/** Full-width glass capsule under the header: translate glyph, "Translate to English" and a "…" menu. */
+/**
+ * Full-width frosted capsule under the header (Telegram-iOS ChatTranslationPanelNode: 40 pt, regular 17 pt text,
+ * 10 pt icon spacing, more button 11 pt from the right edge): translate glyph, "Translate to English" and a "…" menu.
+ */
 @Composable
 fun TranslateBar(onTranslate: () -> Unit, onMore: () -> Unit, modifier: Modifier = Modifier) {
     val c = TgTheme.colors
-    GlassBox(onClick = null, shape = Capsule(), modifier = modifier.fillMaxWidth().height(38.dp)) {
+    GlassBox(onClick = null, shape = Capsule(), style = GlassStyle.Blur, modifier = modifier.fillMaxWidth().height(ChatBarHeight)) {
         Box(Modifier.fillMaxWidth().fillMaxHeight()) {
             Row(
-                Modifier.align(Alignment.Center).fillMaxHeight().fadeClickable(onClick = onTranslate).padding(horizontal = 14.dp),
+                Modifier.align(Alignment.Center).fillMaxHeight().fadeClickable(onClick = onTranslate).padding(horizontal = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(TranslateGlyph, c.text, 20.dp)
-                Spacer(Modifier.width(8.dp))
-                T("Translate to English", TgTheme.type.subheadline.copy(fontSize = 15.sp, lineHeight = 20.sp), c.text, weight = FontWeight.Medium, maxLines = 1)
+                Icon(TranslateGlyph, c.text, 22.dp)
+                Spacer(Modifier.width(10.dp))
+                T("Translate to English", TgTheme.type.body.copy(fontSize = 17.sp, lineHeight = 20.sp), c.text, maxLines = 1)
             }
             Box(
-                Modifier.align(Alignment.CenterEnd).size(38.dp).fadeClickable(onClick = onMore),
+                Modifier.align(Alignment.CenterEnd).padding(end = 1.dp).size(ChatBarHeight).fadeClickable(onClick = onMore),
                 contentAlignment = Alignment.Center,
-            ) { DotsRing(c.secondaryText) }
+            ) { DotsRing(c.text) }
         }
     }
 }
@@ -211,33 +226,50 @@ fun TranslateBar(onTranslate: () -> Unit, onMore: () -> Unit, modifier: Modifier
 // ---- Pinned message bar ----
 
 /**
- * Pinned-message bar (40 dp, 16 dp radius): accent vertical bar, "Pinned Message" and the text; a pin glyph at
- * the right, or an X ([closable], private / bot / Saved chats) that hides the bar.
+ * Pinned-message row (iOS 26 photos: ~48 pt tall, 2 pt bar 14 pt from the left, "Pinned Message" medium 15 pt and the
+ * text regular 15 pt in the panel's control color, a 12 pt X 8 pt from the right edge): the bar, the title and the
+ * text; a pin glyph at the right, or an X ([closable], private / bot / Saved chats) that hides the bar.
+ * With [container] it is its own frosted panel; without, it is a row of the panel it shares with the now-playing bar.
  */
 @Composable
-fun PinnedBar(preview: String, closable: Boolean, onClick: () -> Unit, onClose: () -> Unit, modifier: Modifier = Modifier) {
+fun PinnedBar(
+    preview: String,
+    closable: Boolean,
+    onClick: () -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+    container: Boolean = true,
+) {
+    if (container) {
+        GlassBox(
+            onClick = onClick,
+            shape = RoundedRectangle(ChatPanelRadius),
+            style = GlassStyle.Blur,
+            modifier = modifier.fillMaxWidth().height(PinnedBarHeight),
+            contentAlignment = Alignment.CenterStart,
+        ) { PinnedRow(preview, closable, onClose, Modifier) }
+    } else {
+        PinnedRow(preview, closable, onClose, modifier.fillMaxWidth().height(PinnedBarHeight).fadeClickable(onClick = onClick))
+    }
+}
+
+@Composable
+private fun PinnedRow(preview: String, closable: Boolean, onClose: () -> Unit, modifier: Modifier) {
     val c = TgTheme.colors
-    GlassBox(
-        onClick = onClick,
-        shape = RoundedRectangle(16.dp),
-        modifier = modifier.fillMaxWidth().height(ChatBarHeight),
-        contentAlignment = Alignment.CenterStart,
-    ) {
-        Row(Modifier.fillMaxWidth().padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.width(2.dp).height(30.dp).clip(Capsule()).background(c.accent))
-            Spacer(Modifier.width(8.dp))
-            Column(Modifier.weight(1f)) {
-                T("Pinned Message", TgTheme.type.footnote.copy(fontSize = 13.sp, lineHeight = 16.sp), c.accent, weight = FontWeight.SemiBold, maxLines = 1)
-                T(preview, TgTheme.type.footnote.copy(fontSize = 14.sp, lineHeight = 17.sp, textDirection = TextDirection.Content), c.text, maxLines = 1)
+    Row(modifier.fillMaxWidth().padding(start = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.width(2.dp).height(34.dp).clip(Capsule()).background(c.text))
+        Spacer(Modifier.width(8.dp))
+        Column(Modifier.weight(1f)) {
+            T("Pinned Message", TgTheme.type.subheadline.copy(fontSize = 15.sp, lineHeight = 18.sp), c.text, weight = FontWeight.Medium, maxLines = 1)
+            T(preview, TgTheme.type.subheadline.copy(fontSize = 15.sp, lineHeight = 18.sp, textDirection = TextDirection.Content), c.text, maxLines = 1)
+        }
+        if (closable) {
+            Box(Modifier.size(ChatBarHeight).fadeClickable(onClick = onClose), contentAlignment = Alignment.Center) {
+                Icon(IosIcons.Close, c.text, 12.dp)
             }
-            if (closable) {
-                Box(Modifier.size(ChatBarHeight).fadeClickable(onClick = onClose), contentAlignment = Alignment.Center) {
-                    Icon(IosIcons.Close, c.secondaryText, 14.dp)
-                }
-            } else {
-                Box(Modifier.heightIn(min = ChatBarHeight).widthIn(min = 36.dp), contentAlignment = Alignment.Center) {
-                    Icon(TgIcons.MsgPinned, c.secondaryText, 16.dp)
-                }
+        } else {
+            Box(Modifier.heightIn(min = ChatBarHeight).widthIn(min = 40.dp), contentAlignment = Alignment.Center) {
+                Icon(TgIcons.MsgPinned, c.secondaryText, 16.dp)
             }
         }
     }

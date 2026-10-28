@@ -9,6 +9,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -31,10 +32,12 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.abtin.tglass.core.design.TgTheme
 import com.abtin.tglass.core.glass.GlassBox
+import com.abtin.tglass.core.glass.GlassStyle
 import com.abtin.tglass.core.media.VoicePlayer
 import com.abtin.tglass.data.TelegramRepository
 import com.abtin.tglass.data.senderName
@@ -86,6 +89,8 @@ fun NowPlayingBar(
     onOpen: (chatId: Long, messageId: Long) -> Unit,
     modifier: Modifier = Modifier,
     includeVideo: Boolean = true,
+    /** False: a bare 40 pt row for the panel it shares with the pinned-message row (iOS 26 chat header). */
+    container: Boolean = true,
 ) {
     val current = nowPlaying(repo, includeVideo)
     val last = remember { arrayOfNulls<NowPlaying>(1) }
@@ -97,7 +102,7 @@ fun NowPlayingBar(
         modifier = modifier,
     ) {
         val np = current ?: last[0] ?: return@AnimatedVisibility
-        NowPlayingContent(np, onOpen)
+        NowPlayingContent(np, onOpen, container)
     }
 }
 
@@ -105,18 +110,34 @@ fun NowPlayingBar(
 fun hasNowPlaying(repo: TelegramRepository, includeVideo: Boolean = true): Boolean = nowPlaying(repo, includeVideo) != null
 
 @Composable
-private fun NowPlayingContent(np: NowPlaying, onOpen: (Long, Long) -> Unit) {
+private fun NowPlayingContent(np: NowPlaying, onOpen: (Long, Long) -> Unit, container: Boolean) {
+    val open = { if (np.chatId != 0L) onOpen(np.chatId, np.messageId) }
+    if (container) {
+        Column {
+            Spacer(Modifier.height(6.dp))
+            GlassBox(
+                onClick = open,
+                shape = RoundedRectangle(ChatPanelRadius),
+                style = GlassStyle.Blur,
+                modifier = Modifier.fillMaxWidth().height(ChatBarHeight),
+                contentAlignment = Alignment.CenterStart,
+            ) { NowPlayingRow(np, inset = 18.dp) }
+        }
+    } else {
+        Box(Modifier.fillMaxWidth().height(ChatBarHeight).fadeClickable(onClick = open), contentAlignment = Alignment.CenterStart) {
+            NowPlayingRow(np, inset = 0.dp)
+        }
+    }
+}
+
+/** Play/pause, title, speed, close and the progress line ([inset] from the sides) of the player panel. */
+@Composable
+private fun BoxScope.NowPlayingRow(np: NowPlaying, inset: Dp) {
     val c = TgTheme.colors
     val playing = if (np.video) VideoNotePlayback.playing else VoicePlayer.playing
     val t by animateFloatAsState(if (playing) 1f else 0f, label = "barPlay")
-    Column {
-        Spacer(Modifier.height(6.dp))
-        GlassBox(
-            onClick = { if (np.chatId != 0L) onOpen(np.chatId, np.messageId) },
-            shape = RoundedRectangle(16.dp),
-            modifier = Modifier.fillMaxWidth().height(ChatBarHeight),
-            contentAlignment = Alignment.CenterStart,
-        ) {
+    run {
+        run {
             Row(Modifier.fillMaxWidth().padding(start = 2.dp, end = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                 // Play / pause (white glyph; 40 dp hit area)
                 Box(
@@ -161,13 +182,13 @@ private fun NowPlayingContent(np: NowPlaying, onOpen: (Long, Long) -> Unit) {
                 ) { Icon(IosIcons.Close, c.text, 14.dp) }
             }
             // Progress line along the bottom edge of the capsule.
-            Canvas(Modifier.fillMaxWidth().fillMaxHeight().padding(horizontal = 18.dp)) {
-                val y = size.height - 1.5.dp.toPx()
+            Canvas(Modifier.matchParentSize().padding(horizontal = inset)) {
+                val y = size.height - 1.dp.toPx()
                 val w = 2.dp.toPx()
-                drawLine(c.accent.copy(alpha = 0.18f), Offset(0f, y), Offset(size.width, y), strokeWidth = w, cap = StrokeCap.Round)
-                // Read while drawing: progress ticks redraw this line only.
+                drawLine(c.text.copy(alpha = 0.12f), Offset(0f, y), Offset(size.width, y), strokeWidth = w, cap = StrokeCap.Round)
+                // Read while drawing: progress ticks redraw this line only. iOS 26: a white (control color) line.
                 val progress = if (np.video) VideoNotePlayback.progress else VoicePlayer.progress
-                if (progress > 0f) drawLine(c.accent, Offset(0f, y), Offset(size.width * progress.coerceIn(0f, 1f), y), strokeWidth = w, cap = StrokeCap.Round)
+                if (progress > 0f) drawLine(c.text, Offset(0f, y), Offset(size.width * progress.coerceIn(0f, 1f), y), strokeWidth = w, cap = StrokeCap.Round)
             }
         }
     }

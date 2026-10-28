@@ -142,6 +142,7 @@ import com.abtin.tglass.ui.components.formatDay
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.shapes.Capsule
+import com.kyant.shapes.RoundedRectangle
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
@@ -822,12 +823,13 @@ fun ChatScreen(chatId: Long) {
                         ChatBackPill({ nav.pop() }, badge = backBadge)
                         Box(Modifier.weight(1f).padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
                             val (subtitle, active) = chatSubtitle(chat, repo)
+                            // Telegram-iOS ChatTitleComponent: semibold 17 title, regular 12 status, 14 pt side insets.
                             val statusStyle = TgTheme.type.caption1.copy(fontSize = 12.sp, lineHeight = 14.sp)
                             GlassBox(onClick = { nav.push(Route.Profile(chatId)) }, modifier = Modifier.height(ChatBarHeight)) {
-                                Column(Modifier.padding(horizontal = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Column(Modifier.padding(horizontal = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         com.abtin.tglass.core.emoji.EmojiText(
-                                            chat.title, TgTheme.type.headline.copy(fontSize = 16.sp, lineHeight = 19.sp), c.text,
+                                            chat.title, TgTheme.type.headline.copy(fontSize = 17.sp, lineHeight = 20.sp), c.text,
                                             modifier = Modifier.weight(1f, fill = false), maxLines = 1,
                                         )
                                         if (chat.verified) {
@@ -847,29 +849,45 @@ fun ChatScreen(chatId: Long) {
                 }
                 // "Translate to English" (the last incoming messages are in Arabic script and the system language is not)
                 if (offerTranslate && !selecting && !searchMode) {
-                    Spacer(Modifier.height(6.dp))
+                    Spacer(Modifier.height(7.dp))
                     TranslateBar(
                         onTranslate = { toast.show("Translation isn't available yet") },
                         onMore = { sheet.show(SheetRequest(actions = listOf(SheetAction("Hide Translation Bar") { TranslateBarPrefs.hide(chatId) }))) },
                     )
                 }
-                // Voice / music / round video playing (global player): Telegram's media panel under the header.
-                if (!searchMode) NowPlayingBar(repo, onOpen = { cid, mid ->
+                // Voice / music / round video playing (global player) and the pinned message: on iOS 26 they share one
+                // frosted panel under the header (player row on top, its progress line, then the pinned row).
+                val openPlayer: (Long, Long) -> Unit = { cid, mid ->
                     if (cid == chatId) jumpToAny(mid)
                     else {
                         ChatJumpRequest.request(cid, mid)
                         nav.push(Route.Chat(cid))
                     }
-                })
-                // Pinned message bar (the now-playing bar above is its own capsule)
-                if (pinned != null && !selecting && !searchMode && !PinnedBarPrefs.isHidden(chatId, pinned.id)) {
-                    Spacer(Modifier.height(6.dp))
-                    PinnedBar(
-                        preview = pinned.preview,
-                        closable = chat.type == ChatType.Private || chat.type == ChatType.Bot || chat.type == ChatType.Saved,
-                        onClick = { jumpToAny(pinned.id) },
-                        onClose = { PinnedBarPrefs.hide(chatId, pinned.id) },
-                    )
+                }
+                val showPinned = pinned != null && !selecting && !searchMode && !PinnedBarPrefs.isHidden(chatId, pinned.id)
+                val showPlayer = !searchMode && hasNowPlaying(repo)
+                if (showPinned && pinned != null) {
+                    Spacer(Modifier.height(8.dp))
+                    GlassBox(
+                        onClick = null,
+                        shape = RoundedRectangle(ChatPanelRadius),
+                        style = com.abtin.tglass.core.glass.GlassStyle.Blur,
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.TopStart,
+                    ) {
+                        Column(Modifier.fillMaxWidth()) {
+                            if (showPlayer) NowPlayingBar(repo, onOpen = openPlayer, container = false)
+                            PinnedBar(
+                                preview = pinned.preview,
+                                closable = chat.type == ChatType.Private || chat.type == ChatType.Bot || chat.type == ChatType.Saved,
+                                onClick = { jumpToAny(pinned.id) },
+                                onClose = { PinnedBarPrefs.hide(chatId, pinned.id) },
+                                container = false,
+                            )
+                        }
+                    }
+                } else if (!searchMode) {
+                    NowPlayingBar(repo, onOpen = openPlayer)
                 }
             }
 
@@ -1436,7 +1454,7 @@ private fun ChatSearchField(value: String, onValue: (String) -> Unit, modifier: 
         kotlinx.coroutines.delay(150)
         runCatching { focus.requestFocus() }
     }
-    GlassBox(onClick = null, shape = Capsule(), modifier = modifier.height(ChatBarHeight), contentAlignment = Alignment.CenterStart) {
+    GlassBox(onClick = null, shape = Capsule(), modifier = modifier.height(ChatBarHeight), contentAlignment = Alignment.CenterStart, style = com.abtin.tglass.core.glass.GlassStyle.Blur) {
         Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(TgIcons.IcSearch, c.secondaryText, 18.dp)
             Spacer(Modifier.width(6.dp))
@@ -1475,7 +1493,7 @@ private fun SearchResultsBar(count: Int, total: Int, index: Int, query: String, 
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        GlassBox(onClick = null, shape = Capsule(), modifier = Modifier.weight(1f).height(ChatBarHeight)) {
+        GlassBox(onClick = null, shape = Capsule(), modifier = Modifier.weight(1f).height(ChatBarHeight), style = com.abtin.tglass.core.glass.GlassStyle.Blur) {
             if (busy && count == 0) {
                 com.abtin.tglass.ui.components.ActivityIndicator(18.dp, c.secondaryText)
             } else {

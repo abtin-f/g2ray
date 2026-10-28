@@ -254,6 +254,7 @@ fun EmojiPanel(
     GlassBox(
         onClick = null,
         shape = RoundedRectangle(26.dp),
+        style = com.abtin.tglass.core.glass.GlassStyle.Blur,
         modifier = modifier.fillMaxWidth().height(height).padding(start = 4.dp, end = 4.dp, bottom = 4.dp),
         contentAlignment = Alignment.TopCenter,
     ) {

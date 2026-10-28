@@ -257,6 +257,7 @@ fun AttachSheet(
             GlassBox(
                 onClick = null,
                 shape = RoundedRectangle(34.dp),
+                style = com.abtin.tglass.core.glass.GlassStyle.Blur,
                 surface = if (c.isDark) Color(0xFF1C1C1E).copy(0.9f) else Color.White.copy(0.9f),
                 modifier = Modifier.padding(6.dp).navigationBarsPadding().imePadding().fillMaxWidth().height(520.dp),
                 contentAlignment = Alignment.TopCenter,

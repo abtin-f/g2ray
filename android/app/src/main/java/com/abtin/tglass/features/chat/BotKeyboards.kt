@@ -160,7 +160,7 @@ fun ReplyKeyboardPanel(
     modifier: Modifier = Modifier,
 ) {
     val c = TgTheme.colors
-    GlassBox(onClick = null, shape = RoundedRectangle(24.dp), modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+    GlassBox(onClick = null, shape = RoundedRectangle(24.dp), modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter, style = com.abtin.tglass.core.glass.GlassStyle.Blur) {
         Column(Modifier.fillMaxWidth().padding(8.dp)) {
             Row(Modifier.fillMaxWidth().padding(start = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 T(keyboard.placeholder, TgTheme.type.footnote, c.secondaryText, maxLines = 1, modifier = Modifier.weight(1f))

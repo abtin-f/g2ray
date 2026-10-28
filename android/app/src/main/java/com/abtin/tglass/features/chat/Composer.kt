@@ -81,8 +81,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
 
-/** Height of the composer's controls (Telegram-iOS 26: the paperclip circle, the Message field and the mic circle). */
-internal val ComposerHeight = 38.dp
+/** Height of the composer's controls (Telegram-iOS 26 ChatTextInputPanelNode: 40 pt attach / mic buttons, 40 pt minimal field = 5 + 31 + 4). */
+internal val ComposerHeight = 40.dp
 
 /**
  * The floating chat composer of Telegram-iOS 26: a glass paperclip circle, the glass Message field (grows up to 8 lines,
@@ -281,7 +281,7 @@ fun Composer(
             exit = shrinkVertically() + fadeOut(),
         ) {
             val target = editing ?: replyTo
-            GlassBox(onClick = null, shape = RoundedRectangle(20.dp), modifier = Modifier.padding(start = 44.dp, end = 44.dp, bottom = 6.dp).fillMaxWidth()) {
+            GlassBox(onClick = null, shape = RoundedRectangle(20.dp), style = com.abtin.tglass.core.glass.GlassStyle.Blur, modifier = Modifier.padding(start = 46.dp, end = 46.dp, bottom = 6.dp).fillMaxWidth()) {
                 Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 6.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(if (editing != null) TgIcons.CtxEdit else TgIcons.CtxReply, c.accent, 22.dp)
                     Spacer(Modifier.width(8.dp))
@@ -351,6 +351,8 @@ fun Composer(
             GlassBox(
                 onClick = null,
                 shape = RoundedRectangle(ComposerHeight / 2),
+                // iOS 26: the text field is a frosted panel; the attach / mic circles are liquid glass.
+                style = com.abtin.tglass.core.glass.GlassStyle.Blur,
                 modifier = Modifier.weight(1f).heightIn(min = ComposerHeight),
                 contentAlignment = Alignment.CenterStart,
             ) {
@@ -358,8 +360,8 @@ fun Composer(
                 when {
                     recording -> RecordingStatus(elapsed, locked, dragX.value, cancelDistance, onCancel = { Haptics.tap(view); finishRecording(false) })
                     p != null -> VoiceDraft(p, previewKey(p))
-                    else -> Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 2.dp), verticalAlignment = Alignment.Bottom) {
-                        Box(Modifier.weight(1f).padding(vertical = 8.dp), contentAlignment = Alignment.CenterStart) {
+                    else -> Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 2.dp), verticalAlignment = Alignment.Bottom) {
+                        Box(Modifier.weight(1f).padding(vertical = 9.dp), contentAlignment = Alignment.CenterStart) {
                             if (text.isEmpty()) T("Message", TgTheme.type.body, c.secondaryText, maxLines = 1)
                             // Apple emoji drawn over the (transparent) system glyphs.
                             val (emojiField, emojiTransformation) = com.abtin.tglass.core.emoji.rememberAppleEmojiField(maxLines = 8)

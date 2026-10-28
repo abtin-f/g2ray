@@ -79,6 +79,7 @@ fun AttachMenu(visible: Boolean, bottom: Dp, canPoll: Boolean, demo: Boolean, on
             GlassBox(
                 onClick = null,
                 shape = RoundedRectangle(30.dp),
+                style = com.abtin.tglass.core.glass.GlassStyle.Blur,
                 surface = c.menuSurface, // contextMenu.backgroundColor
                 modifier = Modifier.width(236.dp),
             ) {

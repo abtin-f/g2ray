@@ -383,6 +383,7 @@ private fun EditorContent(
                         GlassBox(
                             onClick = null,
                             shape = Capsule(),
+                            style = com.abtin.tglass.core.glass.GlassStyle.Blur,
                             modifier = Modifier.fillMaxWidth().heightIn(min = 36.dp),
                             contentAlignment = Alignment.CenterStart,
                         ) {
