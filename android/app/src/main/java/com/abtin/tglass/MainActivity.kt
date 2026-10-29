@@ -25,6 +25,7 @@ import com.abtin.tglass.core.design.AppSettings
 import com.abtin.tglass.core.design.LocalAppSettings
 import com.abtin.tglass.core.design.ThemeMode
 import com.abtin.tglass.core.design.TgTheme
+import com.abtin.tglass.core.design.GlassLevel
 import com.abtin.tglass.core.design.TgThemeProvider
 import com.abtin.tglass.core.navigation.IOSNavHost
 import com.abtin.tglass.core.navigation.LocalNavigator
@@ -76,11 +77,14 @@ import com.abtin.tglass.ui.components.showError
 object DebugLaunch {
     var screen: String? = null
     var theme: String? = null
+    /** CI benchmark: Power Saving glass level to force (full / medium / low / off). */
+    var glass: String? = null
     var autoMenuMessageId: Long? = null
 
     fun parse(intent: Intent?) {
         screen = intent?.getStringExtra("screen")
         theme = intent?.getStringExtra("theme")
+        glass = intent?.getStringExtra("glass")
     }
 }
 
@@ -128,6 +132,7 @@ class MainActivity : ComponentActivity() {
         com.abtin.tglass.data.td.TdAccounts.attach(this)
         readChatRequest(intent)
         val settings = AppSettings(this)
+        DebugLaunch.glass?.let { g -> GlassLevel.entries.firstOrNull { it.name.equals(g, ignoreCase = true) }?.let(settings::updateGlass) }
         DebugLaunch.theme?.let { settings.updateTheme(if (it == "dark") ThemeMode.Dark else ThemeMode.Light) }
         if (DebugLaunch.screen != null && DebugLaunch.screen != "welcome") settings.updateLoggedIn(true)
         setContent { App(settings) }
