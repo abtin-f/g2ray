@@ -786,6 +786,12 @@ fun ChatScreen(chatId: Long) {
     // ---- end Row callbacks ----
 
     val videoNoteRecorder = com.abtin.tglass.core.media.rememberVideoNoteRecorder()
+    // The header / composer heights change on every frame of a keyboard animation: the list reads them itself (own
+    // recomposition scope) instead of recomposing the whole screen, and the open "+" menu is the only other reader.
+    val attachMenuBottom = remember { floatArrayOf(0f) }
+    if (attachMenuOpen) attachMenuBottom[0] = (with(density) { bottomHeight.toDp() } - 8.dp).coerceAtLeast(0.dp).value
+    val topPad: () -> Dp = remember { { with(density) { headerHeight.toDp() } + 8.dp } }
+    val bottomPad: () -> Dp = remember { { with(density) { bottomHeight.toDp() } + 4.dp } }
 
     androidx.compose.runtime.CompositionLocalProvider(
         LocalBackdrop provides backdrop, LocalLinkHandler provides linkHandler,
@@ -801,8 +807,8 @@ fun ChatScreen(chatId: Long) {
                     listState = listState,
                     items = items,
                     reversedItems = reversedItems,
-                    topPadding = with(density) { headerHeight.toDp() } + 8.dp,
-                    bottomPadding = with(density) { bottomHeight.toDp() } + 4.dp,
+                    topPadding = topPad,
+                    bottomPadding = bottomPad,
                     chatId = chatId,
                     repo = repo,
                     isGroup = isGroup,
@@ -1050,6 +1056,9 @@ fun ChatScreen(chatId: Long) {
                                 sheet.show(SheetRequest(actions = listOf(SheetAction("Send Without Sound") { sendSilently() })))
                             }) else null,
                             videoRecorder = videoNoteRecorder,
+                            onGift = if (chat.type == ChatType.Private) ({
+                                sheet.show(SheetRequest(title = "Gifts", message = "Sending gifts isn't supported in TGlass yet.", actions = emptyList(), alert = true, cancel = "OK"))
+                            }) else null,
                             onVideoNote = { note ->
                                 repo.sendContent(chatId, note.toContent(), replyToId)
                                 replyToId = null
@@ -1090,7 +1099,7 @@ fun ChatScreen(chatId: Long) {
             // "+" menu (iOS 26 glass popup above the composer)
             AttachMenu(
                 visible = attachMenuOpen,
-                bottom = (with(density) { bottomHeight.toDp() } - 8.dp).coerceAtLeast(0.dp),
+                bottom = attachMenuBottom[0].dp,
                 canPoll = !repo.isLive || chat.type != ChatType.Private,
                 demo = !repo.isLive,
                 onDismiss = { attachMenuOpen = false },
@@ -1161,8 +1170,8 @@ private fun ChatMessageList(
     listState: LazyListState,
     items: List<ChatItem>,
     reversedItems: List<ChatItem>,
-    topPadding: Dp,
-    bottomPadding: Dp,
+    topPadding: () -> Dp,
+    bottomPadding: () -> Dp,
     chatId: Long,
     repo: TelegramRepository,
     isGroup: Boolean,
@@ -1180,7 +1189,7 @@ private fun ChatMessageList(
         reverseLayout = true,
         // Own layer: rows coming and going re-record only the list, not the backdrop box around it.
         modifier = Modifier.fillMaxSize().graphicsLayer { },
-        contentPadding = PaddingValues(top = topPadding, bottom = bottomPadding),
+        contentPadding = PaddingValues(top = topPadding(), bottom = bottomPadding()),
     ) {
         itemsIndexed(
             reversedItems,

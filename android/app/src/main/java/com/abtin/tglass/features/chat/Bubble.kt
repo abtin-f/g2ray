@@ -53,6 +53,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.IntrinsicMeasurable
@@ -434,7 +435,12 @@ fun MessageBubble(
                 .width(size.first + TailWidth)
                 .height(size.second)
                 .clip(shape)
-                .background(colors.fill.copy(alpha = 0.5f)),
+                .background(colors.fill.copy(alpha = 0.5f))
+                .drawWithContent {
+                    drawContent()
+                    // Outgoing media bubbles keep a 1.5 pt outline in the bubble color (iOS 26); the stroke is centered on the edge, the clip keeps the inner half.
+                    if (m.outgoing) drawOutline(shape.createOutline(size, layoutDirection, this), colors.fill, style = Stroke(width = 3.dp.toPx()))
+                },
         ) {
             MediaTile(content, Modifier.fillMaxSize(), onMediaClick)
             Box(

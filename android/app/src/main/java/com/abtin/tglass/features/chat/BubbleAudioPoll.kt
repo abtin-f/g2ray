@@ -375,10 +375,10 @@ internal fun VoiceMessageBody(m: Message, v: MessageContent.Voice, colors: Bubbl
 @Composable
 private fun TranscribeButton(colors: BubbleColors, active: Boolean, open: Boolean, onClick: () -> Unit) {
     Box(
-        Modifier.size(28.dp).clip(CircleShape).background(colors.control.copy(alpha = 0.16f)).bounceClickable(onClick = onClick),
+        Modifier.size(width = 30.dp, height = 22.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(9.dp)).background(colors.control.copy(alpha = 0.16f)).bounceClickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        if (active) com.abtin.tglass.ui.components.ActivityIndicator(14.dp, colors.control)
+        if (active) com.abtin.tglass.ui.components.ActivityIndicator(13.dp, colors.control)
         else T(if (open) "A\u2191" else "\u2192A", TgTheme.type.caption1.copy(fontSize = 11.sp, lineHeight = 13.sp), colors.control, weight = FontWeight.Bold, maxLines = 1)
     }
 }

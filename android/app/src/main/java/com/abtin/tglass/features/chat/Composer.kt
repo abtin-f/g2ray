@@ -114,6 +114,8 @@ fun Composer(
     onVideoNote: (RecordedVideoNote) -> Unit = {},
     /** Formatting entities of the typed text (bold, italic, links...), kept in sync with [text]. */
     onEntities: (List<Entity>) -> Unit = {},
+    /** Private chats: the gift glyph left of the sticker glyph while the field is empty; null hides it. */
+    onGift: (() -> Unit)? = null,
 ) {
     val c = TgTheme.colors
     val view = LocalView.current
@@ -389,9 +391,15 @@ fun Composer(
                                 modifier = Modifier.fillMaxWidth().focusRequester(focusRequester).onFocusChanged { fieldFocused = it.isFocused; onFocus(it.isFocused) }.then(emojiField.modifier),
                             )
                         }
+                        if (onGift != null && text.isEmpty() && editing == null) {
+                            Box(Modifier.height(ComposerHeight).width(36.dp).fadeClickable(onClick = onGift), contentAlignment = Alignment.Center) {
+                                Icon(ComposerIcons.Gift, c.inputIcon, 23.dp)
+                            }
+                        }
                         Box(Modifier.height(ComposerHeight).width(40.dp).fadeClickable(onClick = onTogglePanel), contentAlignment = Alignment.Center) {
                             Crossfade(panelOpen, label = "panelIcon") { open ->
-                                Icon(if (open) IosIcons.Keyboard else ComposerIcons.Smiley, c.inputIcon, if (open) 22.dp else 23.dp)
+                                // Telegram iOS: the sticker glyph while the field is empty, the smiley once there is text.
+                                Icon(if (open) IosIcons.Keyboard else if (text.isEmpty()) ComposerIcons.Sticker else ComposerIcons.Smiley, c.inputIcon, if (open) 22.dp else 23.dp)
                             }
                         }
                     }
