@@ -71,7 +71,16 @@ sealed interface MessageContent {
         val loop: Boolean = false,
     ) : MessageContent
     /** [listened]: false while the recipient has not played it yet (Telegram's small dot next to the duration). */
-    data class Voice(val seconds: Int, val waveform: List<Float>, val media: ImageRef? = null, val listened: Boolean = true) : MessageContent
+    data class Voice(
+        val seconds: Int,
+        val waveform: List<Float>,
+        val media: ImageRef? = null,
+        val listened: Boolean = true,
+        /** Speech-to-text result (TDLib speechRecognitionResult); [transcribing] while it is still running ([transcript] may then be partial). */
+        val transcript: String? = null,
+        val transcribing: Boolean = false,
+        val transcriptError: String? = null,
+    ) : MessageContent
     /**
      * A round video message ("video note"): [video] is the square MP4, [thumb] its cover (with Telegram's blurred minithumbnail),
      * [viewed] whether the recipient has played it.

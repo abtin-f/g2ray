@@ -825,6 +825,25 @@ interface TelegramRepository {
     /** Sends text with formatting entities (bold, italic, ..., links); demo ignores the formatting. */
     fun sendFormattedText(chatId: Long, text: String, entities: List<Entity>, replyTo: Long?) = sendText(chatId, text, replyTo)
     // ---- end Text formatting ----
+
+    // ---- Translate & transcribe ----
+    /**
+     * Translates the text / caption of an incoming message into [toLanguage] (TDLib translateMessageText).
+     * [onDone] gets the translation, or null plus a readable error (e.g. Telegram Premium required). Demo: a fake "[EN] " prefix.
+     */
+    fun translateMessage(chatId: Long, messageId: Long, toLanguage: String, onDone: (TranslatedText?, String?) -> Unit) {
+        val m = messages(chatId).firstOrNull { it.id == messageId }
+        val t = m?.text
+        if (t.isNullOrBlank()) onDone(null, "Nothing to translate.")
+        else onDone(TranslatedText("[EN] $t", emptyList()), null)
+    }
+
+    /**
+     * Starts speech recognition of a voice message (TDLib recognizeSpeech). The text arrives in the message's
+     * [MessageContent.Voice.transcript] via updates; [onDone] only reports a failure to start (null = started).
+     */
+    fun recognizeSpeech(chatId: Long, messageId: Long, onDone: (String?) -> Unit) = onDone("Speech recognition isn't available.")
+    // ---- end Translate & transcribe ----
 }
 
 /** "❤" and "❤️" are the same reaction. */
@@ -1280,6 +1299,23 @@ class DemoRepository(private val scope: CoroutineScope) : TelegramRepository {
         folderPins[index] = if (chatId in pins) pins - chatId else listOf(chatId) + pins
     }
     // ---- end Folder pins (demo) ----
+
+    // ---- Translate & transcribe (demo) ----
+    override fun recognizeSpeech(chatId: Long, messageId: Long, onDone: (String?) -> Unit) {
+        updateMessage(chatId, messageId) { m ->
+            val v = m.content as? MessageContent.Voice ?: return@updateMessage m
+            m.copy(content = v.copy(transcribing = true, transcriptError = null))
+        }
+        onDone(null)
+        scope.launch {
+            delay(1400)
+            updateMessage(chatId, messageId) { m ->
+                val v = m.content as? MessageContent.Voice ?: return@updateMessage m
+                m.copy(content = v.copy(transcribing = false, transcript = "Hey, just checking that we are still on for tomorrow. Call me when you can."))
+            }
+        }
+    }
+    // ---- end Translate & transcribe (demo) ----
 }
 
 /** Sender label for a message in group chats. */
