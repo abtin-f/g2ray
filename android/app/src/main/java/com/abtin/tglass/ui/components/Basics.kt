@@ -34,6 +34,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.abtin.tglass.core.design.TgTheme
+import com.abtin.tglass.core.design.withPersianFont
 
 /** Plain text with iOS defaults. */
 @Composable
@@ -47,8 +48,9 @@ fun T(
     align: TextAlign? = null,
     onTextLayout: ((TextLayoutResult) -> Unit)? = null,
 ) {
+    val shown = remember(text) { text.withPersianFont() }
     BasicText(
-        text = text,
+        text = shown,
         modifier = modifier,
         style = style.copy(
             color = color,

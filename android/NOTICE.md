@@ -15,6 +15,7 @@ includes artwork from Telegram for iOS.
 | Theme palettes (`core/design/TelegramThemes.kt`) | Ported from Telegram-iOS `TelegramPresentationData` default themes | GPL-2.0 |
 | Glass components in `core/glass/` | Adapted from [Kyant0/AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass) | Apache-2.0 |
 | Inter font (`app/src/main/res/font/inter.ttf`) | [rsms/inter](https://github.com/rsms/inter) | SIL OFL 1.1 (`INTER_OFL.txt`) |
+| Vazirmatn font, Non-Latin variable build (`app/src/main/res/font/vazirmatn.ttf`, Persian / Arabic script) | [rastikerdar/vazirmatn](https://github.com/rastikerdar/vazirmatn) | SIL OFL 1.1 (`VAZIRMATN_OFL.txt`) |
 | Paperclip glyph (`ui/components/IosIcons.kt`) | [Feather Icons](https://feathericons.com) | MIT |
 
 "Telegram" is a trademark of Telegram FZ-LLC. TGlass is an unofficial personal project.
