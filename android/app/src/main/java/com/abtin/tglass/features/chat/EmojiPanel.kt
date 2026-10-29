@@ -128,6 +128,12 @@ internal object ComposerIcons {
     private const val Circle = "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z"
 
     val Smiley = glyph("face.smiling", Circle, "M8.3 14.2c.9 1.4 2.2 2.1 3.7 2.1s2.8-.7 3.7-2.1", "M9.2 9.3v1.2", "M14.8 9.3v1.2", width = 1.7f)
+    /** Telegram's empty-field glyph: a round sticker with a peeled corner. */
+    val Sticker = glyph("sticker", "M20.9 12.6A9 9 0 1 0 12.6 20.9", "M20.9 12.6c-4.6.3-8 3.7-8.3 8.3", width = 1.7f)
+    val Gift = glyph(
+        "gift", "M4 11.5h16V19a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19z", "M3 8h18v3.5H3z", "M12 8v12.5",
+        "M12 8C9.8 8 7.5 7.4 7.5 5.6 7.5 4.4 8.4 3.7 9.5 3.7 11 3.7 12 5.6 12 8z", "M12 8c2.2 0 4.5-.6 4.5-2.4 0-1.2-.9-1.9-2-1.9C13 3.7 12 5.6 12 8z", width = 1.6f,
+    )
     val Leaf = glyph("leaf", "M5 19C5 10.5 10.5 5 19 5c0 8.5-5.5 14-14 14z", "M5 19l8.5-8.5")
     val Cup = glyph("cup", "M5 10h11v4a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5z", "M16 11h1.5a2.5 2.5 0 0 1 0 5H16", "M9 4.5V7", "M12.5 4.5V7")
     val Ball = glyph("ball", Circle, "M3.6 9.6c3 1.4 5 4.6 5.4 10.9", "M20.4 9.6c-3 1.4-5 4.6-5.4 10.9", "M6.8 4.7C8.3 6.4 10 7.3 12 7.3s3.7-.9 5.2-2.6")

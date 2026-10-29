@@ -1368,7 +1368,15 @@ class TdRepository(context: Context) : TelegramRepository {
             )
         }
         is MessageVideoNote -> videoNoteContent(c)
-        is MessageVoiceNote -> UiContent.Voice(c.voiceNote.duration, waveform(c.voiceNote.waveform), imageOf(c.voiceNote.voice, null), listened = c.isListened)
+        is MessageVoiceNote -> {
+            val sr = c.voiceNote.speechRecognitionResult
+            UiContent.Voice(
+                c.voiceNote.duration, waveform(c.voiceNote.waveform), imageOf(c.voiceNote.voice, null), listened = c.isListened,
+                transcript = (sr as? SpeechRecognitionResultText)?.text ?: (sr as? SpeechRecognitionResultPending)?.partialText?.takeIf { it.isNotEmpty() },
+                transcribing = sr is SpeechRecognitionResultPending,
+                transcriptError = (sr as? SpeechRecognitionResultError)?.error?.message,
+            )
+        }
         is MessageAudio -> UiContent.File(
             name = c.audio.title.ifBlank { c.audio.fileName.ifBlank { "Audio" } },
             size = Formats.size(c.audio.audio.size),
@@ -1429,7 +1437,12 @@ class TdRepository(context: Context) : TelegramRepository {
         is MessageChatUpgradeFrom, is MessageChatUpgradeTo -> UiContent.Service("Group upgraded to supergroup")
         is MessageExpiredPhoto -> UiContent.Service("Photo has expired")
         is MessageExpiredVideo -> UiContent.Service("Video has expired")
-        else -> UiContent.Service("This message is not supported yet")
+        // Anything else (giveaways, gifts, invoices, stories, games ...): a clear text bubble naming the type instead of a blank row.
+        else -> {
+            val type = (c::class.simpleName ?: "message").removePrefix("Message").replace(Regex("(?<=[a-z])(?=[A-Z])"), " ").lowercase()
+            val label = "Unsupported message ($type)"
+            UiContent.Text("$label\nOpen the official Telegram app to view it.", listOf(Entity(0, label.length, EntityType.Italic)))
+        }
     }
 
     private fun entities(t: FormattedText): List<Entity> = t.entities.mapNotNull { e ->
@@ -4253,6 +4266,44 @@ class TdRepository(context: Context) : TelegramRepository {
         send(chatId, replyTo, InputMessageText(FormattedText(text, out.toTypedArray()), null, true))
     }
     // ---- end Text formatting ----
+
+    // ---- Translate & transcribe ----
+    override fun translateMessage(chatId: Long, messageId: Long, toLanguage: String, onDone: (com.abtin.tglass.data.TranslatedText?, String?) -> Unit) {
+        scope.launch {
+            when (val r = client.translateMessageText(chatId, messageId, toLanguage, "")) {
+                is TdlResult.Success -> onDone(com.abtin.tglass.data.TranslatedText(r.result.text, entities(r.result)), null)
+                is TdlResult.Failure -> onDone(null, translateError(r.message))
+            }
+        }
+    }
+
+    override fun recognizeSpeech(chatId: Long, messageId: Long, onDone: (String?) -> Unit) {
+        // Show the shimmer straight away; TDLib confirms with updateMessageContent (speechRecognitionResult pending / text / error).
+        updateMessage(chatId, messageId) { m ->
+            val v = m.content as? UiContent.Voice ?: return@updateMessage m
+            m.copy(content = v.copy(transcribing = true, transcriptError = null))
+        }
+        scope.launch {
+            when (val r = client.recognizeSpeech(chatId, messageId)) {
+                is TdlResult.Success -> onDone(null)
+                is TdlResult.Failure -> {
+                    updateMessage(chatId, messageId) { m ->
+                        val v = m.content as? UiContent.Voice ?: return@updateMessage m
+                        if (v.transcribing && v.transcript.isNullOrEmpty()) m.copy(content = v.copy(transcribing = false)) else m
+                    }
+                    onDone(translateError(r.message))
+                }
+            }
+        }
+    }
+
+    private fun translateError(error: String): String = when {
+        "PREMIUM" in error.uppercase() -> "This needs Telegram Premium."
+        "MSG_VOICE_TOO_LONG" in error -> "This voice message is too long to be transcribed."
+        "TRIAL" in error.uppercase() -> "You have used all free transcriptions for this week. Telegram Premium removes the limit."
+        else -> humanize(error)
+    }
+    // ---- end Translate & transcribe ----
 }
 
 private const val GIFTS_ENABLED = false

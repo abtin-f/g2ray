@@ -1,6 +1,7 @@
 package com.abtin.tglass.features.chat
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -259,8 +260,13 @@ internal fun VoiceMessageBody(m: Message, v: MessageContent.Voice, colors: Bubbl
     val loading = pending && path == null || (current && !playing && media != null && path == null)
     // Telegram: the waveform grows with the duration (min 120, max ~190 pt).
     val waveWidth = (96 + v.seconds * 3).coerceIn(120, 190).dp
+    val sheet = com.abtin.tglass.ui.components.LocalActionSheet.current
+    // Transcript (TDLib recognizeSpeech): the round "→A" button starts it, then shows / hides the text.
+    var transcriptOpen by remember(key) { mutableStateOf(true) }
+    val hasTranscript = !v.transcript.isNullOrEmpty()
+    Column {
     Row(
-        Modifier.padding(start = 8.dp, end = 11.dp, top = 8.dp, bottom = 7.dp),
+        Modifier.padding(start = 8.dp, end = 11.dp, top = 8.dp, bottom = if (hasTranscript || v.transcribing) 2.dp else 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AudioPlayButton(
@@ -325,8 +331,69 @@ internal fun VoiceMessageBody(m: Message, v: MessageContent.Voice, colors: Bubbl
                     SpeedPill(player.speed, colors) { player.cycleSpeed() }
                 }
                 Spacer(Modifier.weight(1f).widthIn(min = 10.dp))
-                if (showMeta) MetaRow(m, colors.meta)
+                if (showMeta && !(hasTranscript || v.transcribing || v.transcriptError != null)) MetaRow(m, colors.meta)
             }
+        }
+        Spacer(Modifier.width(8.dp))
+        TranscribeButton(colors, active = v.transcribing, open = hasTranscript && transcriptOpen) {
+            when {
+                v.transcribing -> {}
+                hasTranscript -> transcriptOpen = !transcriptOpen
+                else -> {
+                    transcriptOpen = true
+                    repo.recognizeSpeech(m.chatId, m.id) { err ->
+                        if (err != null) sheet.show(
+                            com.abtin.tglass.ui.components.SheetRequest(
+                                title = "Transcription Failed", message = err, actions = emptyList(), alert = true, cancel = "OK",
+                            )
+                        )
+                    }
+                }
+            }
+        }
+    }
+    if (v.transcribing && !hasTranscript) {
+        TranscriptShimmer(colors, Modifier.padding(start = 11.dp, end = 11.dp, bottom = 6.dp))
+    } else if (hasTranscript && transcriptOpen) {
+        val body = TgTheme.type.body.copy(color = colors.text, textDirection = TextDirection.Content)
+        TextWithMeta(
+            androidx.compose.ui.text.AnnotatedString(v.transcript.orEmpty()), body,
+            meta = { if (showMeta) MetaRow(m, colors.meta) },
+            modifier = Modifier.fillMaxWidth().padding(start = 11.dp, end = 11.dp, bottom = 6.dp),
+            maxTextWidth = 280.dp,
+        )
+    } else if (v.transcriptError != null && !v.transcribing) {
+        T(
+            "Couldn't transcribe this message", TgTheme.type.caption1.copy(fontSize = 12.sp), colors.meta,
+            modifier = Modifier.padding(start = 11.dp, end = 11.dp, bottom = 6.dp),
+        )
+    }
+    }
+}
+
+/** The small round "→A" button right of a voice message: starts speech recognition, then folds the transcript. */
+@Composable
+private fun TranscribeButton(colors: BubbleColors, active: Boolean, open: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier.size(width = 30.dp, height = 22.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(9.dp)).background(colors.control.copy(alpha = 0.16f)).bounceClickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (active) com.abtin.tglass.ui.components.ActivityIndicator(13.dp, colors.control)
+        else T(if (open) "A\u2191" else "\u2192A", TgTheme.type.caption1.copy(fontSize = 11.sp, lineHeight = 13.sp), colors.control, weight = FontWeight.Bold, maxLines = 1)
+    }
+}
+
+/** Placeholder lines while the transcript is being recognized (only alive during that wait). */
+@Composable
+private fun TranscriptShimmer(colors: BubbleColors, modifier: Modifier) {
+    val t = androidx.compose.animation.core.rememberInfiniteTransition(label = "transcribe")
+    val a by t.animateFloat(
+        0.12f, 0.3f,
+        androidx.compose.animation.core.infiniteRepeatable(tween(700), androidx.compose.animation.core.RepeatMode.Reverse), label = "a",
+    )
+    Column(modifier, verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(5.dp)) {
+        for (w in listOf(1f, 0.7f)) {
+            Box(Modifier.fillMaxWidth(w).height(10.dp).graphicsLayer { alpha = a / 0.3f }.clip(CircleShape).background(colors.control.copy(alpha = 0.3f)))
         }
     }
 }

@@ -254,7 +254,16 @@ fun ChatScreen(chatId: Long) {
     val reversed = messages.asReversed()
     // Media albums become one list item (one bubble with a grid).
     // Derived: rebuilt only when the message list changes (not on every keystroke of the composer).
-    val items by remember(chatId, repo) { derivedStateOf { com.abtin.tglass.core.perf.perfSection("buildChatItems") { buildChatItems(repo.messages(chatId).toList()) } } }
+    // Translated messages (translation bar / "Translate" menu item) replace the text of the original message in the list.
+    val translation = remember(chatId) { ChatTranslation() }
+    val items by remember(chatId, repo) {
+        derivedStateOf {
+            com.abtin.tglass.core.perf.perfSection("buildChatItems") {
+                val list = repo.messages(chatId).toList()
+                buildChatItems(if (translation.anyShown) list.map { translation.apply(it) } else list)
+            }
+        }
+    }
     val reversedItems = remember(items) { items.asReversed() }
     fun itemIndexOf(id: Long) = reversedItems.indexOfFirst { it.contains(id) }
     val isGroup = chat.type == ChatType.Group
@@ -266,6 +275,32 @@ fun ChatScreen(chatId: Long) {
     remember { TranslateBarPrefs.init(context) }
     val translateCandidate = remember(messages) { shouldOfferTranslation(messages) }
     val offerTranslate = translateCandidate && !TranslateBarPrefs.isHidden(chatId)
+    var translateAlertShown by remember(chatId) { mutableStateOf(false) }
+    /** TDLib refused (Premium required, unsupported language...): an iOS alert, and the bar goes back to "Translate". */
+    val translateFailed: (String) -> Unit = { err ->
+        translation.enabled = false
+        if (!translateAlertShown) {
+            translateAlertShown = true
+            sheet.show(SheetRequest(title = "Translation Failed", message = err, actions = emptyList(), alert = true, cancel = "OK"))
+        }
+    }
+    // While the bar's switch is on, incoming messages in view (and a few around them) are translated lazily, cached by id.
+    val reversedItemsForTranslate = rememberUpdatedState(reversedItems)
+    LaunchedEffect(translation.enabled, chatId) {
+        if (!translation.enabled) return@LaunchedEffect
+        snapshotFlow {
+            val v = listState.layoutInfo.visibleItemsInfo
+            if (v.isEmpty()) -1 to -1 else v.first().index to v.last().index
+        }.collect { (first, last) ->
+            if (first < 0) return@collect
+            val list = reversedItemsForTranslate.value
+            for (i in (first - 3).coerceAtLeast(0)..(last + 3).coerceAtMost(list.lastIndex)) {
+                for (m in list[i].messages) {
+                    if (!m.outgoing && isTranslatable(m) && hasArabicScript(m.text)) translation.request(repo, m, translateFailed)
+                }
+            }
+        }
+    }
     // "Unread Messages" divider: fixed when the chat opens (before it is marked as read).
     val readAnchor = remember { repo.readAnchor(chatId) }
     val firstUnreadId = readAnchor?.let { a -> messages.firstOrNull { !it.outgoing && it.id > a }?.id }
@@ -675,6 +710,14 @@ fun ChatScreen(chatId: Long) {
                 if (k?.canPin ?: true) MenuAction(if (m.pinned) "Unpin" else "Pin", if (m.pinned) TgIcons.CtxUnpin else TgIcons.CtxPin) { repo.togglePinMessage(chatId, m.id) } else null,
                 if (k?.canForward != false) MenuAction("Forward", TgIcons.CtxForward) { forward(listOf(m.id)) } else null,
                 if (m.outgoing && (hasText || captionable) && k?.canEdit != false) MenuAction("Edit", TgIcons.CtxEdit) { editingId = m.id; replyToId = null; text = m.text ?: ""; focusRequester.requestFocus() } else null,
+                if (!m.outgoing && isTranslatable(m)) {
+                    if (translation.showsTranslation(m.id)) MenuAction("Show Original", TranslateGlyph) { translation.forced[m.id] = false }
+                    else MenuAction("Translate", TranslateGlyph) {
+                        translateAlertShown = false
+                        translation.forced[m.id] = true
+                        translation.request(repo, m, translateFailed)
+                    }
+                } else null,
                 if (canLink) MenuAction("Copy Link", Icons.Outlined.Link) {
                     repo.loadMessageLink(chatId, m.id) { link ->
                         if (link == null) toast.show("This message has no link")
@@ -743,6 +786,12 @@ fun ChatScreen(chatId: Long) {
     // ---- end Row callbacks ----
 
     val videoNoteRecorder = com.abtin.tglass.core.media.rememberVideoNoteRecorder()
+    // The header / composer heights change on every frame of a keyboard animation: the list reads them itself (own
+    // recomposition scope) instead of recomposing the whole screen, and the open "+" menu is the only other reader.
+    val attachMenuBottom = remember { floatArrayOf(0f) }
+    if (attachMenuOpen) attachMenuBottom[0] = (with(density) { bottomHeight.toDp() } - 8.dp).coerceAtLeast(0.dp).value
+    val topPad: () -> Dp = remember { { with(density) { headerHeight.toDp() } + 8.dp } }
+    val bottomPad: () -> Dp = remember { { with(density) { bottomHeight.toDp() } + 4.dp } }
 
     androidx.compose.runtime.CompositionLocalProvider(
         LocalBackdrop provides backdrop, LocalLinkHandler provides linkHandler,
@@ -758,8 +807,8 @@ fun ChatScreen(chatId: Long) {
                     listState = listState,
                     items = items,
                     reversedItems = reversedItems,
-                    topPadding = with(density) { headerHeight.toDp() } + 8.dp,
-                    bottomPadding = with(density) { bottomHeight.toDp() } + 4.dp,
+                    topPadding = topPad,
+                    bottomPadding = bottomPad,
                     chatId = chatId,
                     repo = repo,
                     isGroup = isGroup,
@@ -833,8 +882,9 @@ fun ChatScreen(chatId: Long) {
                 if (offerTranslate && !selecting && !searchMode) {
                     Spacer(Modifier.height(7.dp))
                     TranslateBar(
-                        onTranslate = { toast.show("Translation isn't available yet") },
-                        onMore = { sheet.show(SheetRequest(actions = listOf(SheetAction("Hide Translation Bar") { TranslateBarPrefs.hide(chatId) }))) },
+                        translated = translation.enabled,
+                        onTranslate = { if (translation.enabled) translation.showOriginals() else { translateAlertShown = false; translation.forced.clear(); translation.enabled = true } },
+                        onMore = { sheet.show(SheetRequest(actions = listOf(SheetAction("Hide Translation Bar") { translation.showOriginals(); TranslateBarPrefs.hide(chatId) }))) },
                     )
                 }
                 // Voice / music / round video playing (global player) and the pinned message: on iOS 26 they share one
@@ -1006,6 +1056,9 @@ fun ChatScreen(chatId: Long) {
                                 sheet.show(SheetRequest(actions = listOf(SheetAction("Send Without Sound") { sendSilently() })))
                             }) else null,
                             videoRecorder = videoNoteRecorder,
+                            onGift = if (chat.type == ChatType.Private) ({
+                                sheet.show(SheetRequest(title = "Gifts", message = "Sending gifts isn't supported in TGlass yet.", actions = emptyList(), alert = true, cancel = "OK"))
+                            }) else null,
                             onVideoNote = { note ->
                                 repo.sendContent(chatId, note.toContent(), replyToId)
                                 replyToId = null
@@ -1046,7 +1099,7 @@ fun ChatScreen(chatId: Long) {
             // "+" menu (iOS 26 glass popup above the composer)
             AttachMenu(
                 visible = attachMenuOpen,
-                bottom = (with(density) { bottomHeight.toDp() } - 8.dp).coerceAtLeast(0.dp),
+                bottom = attachMenuBottom[0].dp,
                 canPoll = !repo.isLive || chat.type != ChatType.Private,
                 demo = !repo.isLive,
                 onDismiss = { attachMenuOpen = false },
@@ -1117,8 +1170,8 @@ private fun ChatMessageList(
     listState: LazyListState,
     items: List<ChatItem>,
     reversedItems: List<ChatItem>,
-    topPadding: Dp,
-    bottomPadding: Dp,
+    topPadding: () -> Dp,
+    bottomPadding: () -> Dp,
     chatId: Long,
     repo: TelegramRepository,
     isGroup: Boolean,
@@ -1136,7 +1189,7 @@ private fun ChatMessageList(
         reverseLayout = true,
         // Own layer: rows coming and going re-record only the list, not the backdrop box around it.
         modifier = Modifier.fillMaxSize().graphicsLayer { },
-        contentPadding = PaddingValues(top = topPadding, bottom = bottomPadding),
+        contentPadding = PaddingValues(top = topPadding(), bottom = bottomPadding()),
     ) {
         itemsIndexed(
             reversedItems,

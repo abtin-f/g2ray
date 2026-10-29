@@ -170,7 +170,7 @@ object PinnedBarPrefs {
     fun hide(chatId: Long, messageId: Long) { hidden = hidden + (chatId to messageId) }
 }
 
-private val TranslateGlyph: ImageVector by lazy {
+val TranslateGlyph: ImageVector by lazy {
     ImageVector.Builder("translate", 24.dp, 24.dp, 24f, 24f).apply {
         listOf(
             "M3 6h9M7.5 4v2M5.2 6c.6 3.2 2.8 5.8 6.3 7.4M10 6c-.6 3.2-3 6-6.8 7.6",
@@ -203,7 +203,7 @@ private fun DotsRing(color: Color) {
  * 10 pt icon spacing, more button 11 pt from the right edge): translate glyph, "Translate to English" and a "…" menu.
  */
 @Composable
-fun TranslateBar(onTranslate: () -> Unit, onMore: () -> Unit, modifier: Modifier = Modifier) {
+fun TranslateBar(onTranslate: () -> Unit, onMore: () -> Unit, modifier: Modifier = Modifier, translated: Boolean = false) {
     val c = TgTheme.colors
     GlassBox(onClick = null, shape = Capsule(), style = GlassStyle.Blur, modifier = modifier.fillMaxWidth().height(ChatBarHeight)) {
         Box(Modifier.fillMaxWidth().fillMaxHeight()) {
@@ -213,7 +213,7 @@ fun TranslateBar(onTranslate: () -> Unit, onMore: () -> Unit, modifier: Modifier
             ) {
                 Icon(TranslateGlyph, c.text, 22.dp)
                 Spacer(Modifier.width(10.dp))
-                T("Translate to English", TgTheme.type.body.copy(fontSize = 17.sp, lineHeight = 20.sp), c.text, maxLines = 1)
+                T(if (translated) "Show Original" else "Translate to English", TgTheme.type.body.copy(fontSize = 17.sp, lineHeight = 20.sp), c.text, maxLines = 1)
             }
             Box(
                 Modifier.align(Alignment.CenterEnd).padding(end = 1.dp).size(ChatBarHeight).fadeClickable(onClick = onMore),
