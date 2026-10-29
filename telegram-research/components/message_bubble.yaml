@@ -1,0 +1,29 @@
+component: MessageBubble
+source:
+  - ChatMessageItemCommon/Sources/ChatMessageItemCommon.swift (compact layout, phones)
+  - TelegramPresentationData/Sources/ChatMessageBubbleImages.swift
+  - TelegramUIPreferences/Sources/PresentationThemeSettings.swift
+corners:
+  main: 16            # PresentationChatBubbleSettings.default mainRadius
+  auxiliary: 8        # grouped side
+  mergeBubbleCorners: true
+  minRadiusForFullTail: 14
+tail:
+  shape: "fill ellipse(24,16,27x17) via quad curves, then clear ellipse(33,14,23x21) — in a 33pt reference square"
+layout:
+  edgeInset: 3
+  spacing: { default: 2, merged: 0 }
+  maxWidth: "screen - 36 (compactInset), fill factor 0.85"
+  minSize: [40, 35]
+  contentInsets: { left: 6 }             # tail side
+  textInsets: { top: 6, left: 11, bottom: 6, right: 11 }
+  image: { insets: 2, corner: 15, mergedCorner: 7, max: [300, 380], min: [170, 74] }
+  file: { insets: { top: 15, left: 9, bottom: 15, right: 12 } }
+  instantVideo: 212
+  groupAvatar: 34                        # avatarInset 34 + 4
+  dateHeaderHeight: 34
+meta:
+  date: { font: 11 }
+  check: { size: 11, offset: 6 }
+  placement: "inline on the last line if it fits, else a new line"
+reactions: { font: 12, inactiveBg: "accent @ 0.1", activeBg: accent }

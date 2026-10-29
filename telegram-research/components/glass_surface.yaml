@@ -1,0 +1,13 @@
+component: GlassBackground (Liquid Glass)
+source: submodules/TelegramUI/Components/GlassBackgroundComponent/Sources/
+ios26: "native UIGlassEffect(style: .regular), overrideUserInterfaceStyle = dark/light"
+legacy_fallback:
+  fill: { light: "#FFFFFF @ 0.70", dark: "#1C1C1C @ 0.85" }
+  backdrop: { blurRadius: 2, colorMatrix: "saturation boost (vibrancy)" }
+  shadow: { inset: 32, blur: 40, intensity: 0.04, offsetY: 1 }
+touch_effect:                            # TouchEffect.swift
+  pressedSizeIncrease: 20                # pt added to the pressed dimension
+  liftOn:  { mass: 1.36, stiffness: 568, damping: 39.7 }
+  liftOff: { mass: 2.0, stiffness: 460, damping: 21.8 }
+  stretch: "rubber-bands toward the drag direction"
+  highlight: "radial white gradient following the finger"

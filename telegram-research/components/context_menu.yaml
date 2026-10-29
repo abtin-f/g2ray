@@ -1,0 +1,16 @@
+component: MessageContextMenu
+source: submodules/TelegramUI/Components/ContextControllerImpl/Sources/
+trigger: { type: long_press, haptic: true }
+background: { blur: true, dim: true }
+selected_message: { extracted: true, sharp: true, lift: true }
+reactions_bar: above message
+item:                                   # ContextControllerActionsStackNode.swift ~line 210
+  font: 17 regular
+  sideInset: 18
+  verticalInset: 11                      # -> ~44pt rows
+  icon: { size: 24, slot: 32, sideInset: 20, position: LEFT }
+  titleX_with_icon: 60                   # iconSideInset + 40
+  subtitle: 14 regular, spacing 1
+  separator_item_minHeight: 20
+actions: [Reply, Copy, Edit, Pin, Forward, Save, Select, Delete]
+platform: { reference: iOS, implementation: Android }

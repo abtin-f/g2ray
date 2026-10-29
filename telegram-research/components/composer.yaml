@@ -1,0 +1,6 @@
+component: ChatTextInputPanel
+source: submodules/TelegramUI/Components/Chat/ChatTextInputPanelNode/Sources/ChatTextInputPanelNode.swift
+text: { font: 17 regular, internalInsets: { top: 5, left: 12, bottom: 4, right: 11 }, minHeight: 33 }
+glass: true
+start_button: { height: 50, corner: 25, glass: true }
+voice: { hold: record, slide_left: cancel, slide_up: lock }
