@@ -53,9 +53,8 @@ fun LiquidToggle(
     modifier: Modifier = Modifier
 ) {
     val isLightTheme = !TgTheme.colors.isDark
-    val accentColor =
-        if (isLightTheme) Color(0xFF34C759)
-        else Color(0xFF30D158)
+    // list.itemSwitchColors.contentColor (#35C759 day, #67CE67 night, the accent in Tinted Night).
+    val accentColor = TgTheme.colors.switchOn
     val trackColor =
         if (isLightTheme) Color(0xFF787878).copy(0.2f)
         else Color(0xFF787880).copy(0.36f)

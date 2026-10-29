@@ -1565,10 +1565,10 @@ private fun UnreadDivider() {
     val c = TgTheme.colors
     Box(
         Modifier.fillMaxWidth().padding(vertical = 4.dp)
-            .background(if (c.isDark) Color(0xFF1B1B1B).copy(alpha = 0.9f) else Color.White.copy(alpha = 0.9f)).padding(vertical = 4.dp), // serviceMessage.unreadBarFillColor
+            .background(c.unreadBar).padding(vertical = 4.dp), // serviceMessage.unreadBarFillColor
         contentAlignment = Alignment.Center,
     ) {
-        T("Unread Messages", TgTheme.type.footnote.copy(fontSize = 13.sp, lineHeight = 17.sp), c.secondaryText) // ChatUnreadItem: 25 pt bar, regular 13
+        T("Unread Messages", TgTheme.type.footnote.copy(fontSize = 13.sp, lineHeight = 17.sp), c.unreadBarText) // ChatUnreadItem: 25 pt bar, regular 13
     }
 }
 

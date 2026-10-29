@@ -246,46 +246,18 @@ data class BubbleColors(
 @Composable
 fun bubbleColors(outgoing: Boolean): BubbleColors {
     val c = TgTheme.colors
-    val white = Color.White
-    // Day theme (Settings → Appearance): accent-colored outgoing bubbles with white content, like night ones.
-    val lightStyle = !c.isDark && !(outgoing && c.bubbleOutAccent == white)
-    return if (lightStyle) {
-        if (outgoing) {
-            val green = Color(0xFF3FC33B)
-            BubbleColors(
-                fill = c.bubbleOut, text = c.bubbleOutText, meta = c.bubbleOutMeta, accent = c.bubbleOutAccent, link = Color(0xFF004BAD),
-                control = green, controlGlyph = c.bubbleOut, inactive = Color(0xFF93D987), fileTitle = Color(0xFF3FAA3C),
-                reactionBg = green.copy(alpha = 0.14f), reactionFg = Color(0xFF2E9E2B), reactionActiveBg = green, reactionActiveFg = white,
-                pollBar = Color(0xFF00A700), radio = Color(0xFF93D987), separator = Color(0xFF93D987).copy(alpha = 0.7f),
-            )
-        } else {
-            BubbleColors(
-                fill = c.bubbleIn, text = c.bubbleInText, meta = c.bubbleInMeta, accent = c.accent, link = Color(0xFF004BAD),
-                control = c.accent, controlGlyph = white, inactive = Color(0xFFCACACA), fileTitle = Color(0xFF0B8BED),
-                reactionBg = c.accent.copy(alpha = 0.1f), reactionFg = c.accent, reactionActiveBg = c.accent, reactionActiveFg = white,
-                pollBar = c.accent, radio = Color(0xFFC8C7CC), separator = Color(0xFFC8C7CC).copy(alpha = 0.8f),
-            )
-        }
-    } else {
-        if (outgoing) {
-            // mediaControlInnerBackgroundColor = the first (top) bubble color: violet play glyph on Night (iOS).
-            val glyph = c.bubbleOutGradient?.firstOrNull() ?: c.bubbleOut
-            BubbleColors(
-                fill = c.bubbleOut, text = white, meta = c.bubbleOutMeta, accent = white, link = white, gradient = c.bubbleOutGradient,
-                control = white, controlGlyph = glyph, inactive = white.copy(alpha = 0.45f), fileTitle = white,
-                reactionBg = white.copy(alpha = 0.16f), reactionFg = white, reactionActiveBg = white, reactionActiveFg = glyph,
-                pollBar = white, radio = white.copy(alpha = 0.55f), separator = white.copy(alpha = 0.3f), underlineLinks = true,
-            )
-        } else {
-            val blue = Color(0xFF5AA9F8)
-            BubbleColors(
-                fill = c.bubbleIn, text = white, meta = white.copy(alpha = 0.5f), accent = blue, link = Color(0xFF71B7FA),
-                control = c.accent, controlGlyph = white, inactive = c.accent.copy(alpha = 0.4f), fileTitle = white,
-                reactionBg = white.copy(alpha = 0.09f), reactionFg = white, reactionActiveBg = white, reactionActiveFg = c.bubbleIn,
-                pollBar = c.accent, radio = Color(0xFF737373), separator = white.copy(alpha = 0.14f),
-            )
-        }
-    }
+    // Every slot comes from the theme's PresentationThemePartedColors (core/design/TelegramThemes.kt).
+    val p = if (outgoing) c.bubbleOutPalette else c.bubbleInPalette
+    return BubbleColors(
+        fill = if (outgoing) c.bubbleOut else c.bubbleIn,
+        text = p.text, meta = p.meta, accent = p.accent, link = p.link,
+        gradient = if (outgoing) c.bubbleOutGradient else null,
+        control = p.control, controlGlyph = p.controlGlyph, inactive = p.inactive, fileTitle = p.fileTitle,
+        reactionBg = p.reactionBg, reactionFg = p.reactionFg, reactionActiveBg = p.reactionActiveBg, reactionActiveFg = p.reactionActiveFg,
+        pollBar = p.pollBar, radio = p.radio, separator = p.separator,
+        // Telegram underlines links that have the text color (outgoing bubbles of the Day / Night themes).
+        underlineLinks = p.link == p.text,
+    )
 }
 
 private val NameColorsDay = listOf(
@@ -1419,7 +1391,7 @@ fun ServicePill(text: String, modifier: Modifier = Modifier) {
             T(
                 text,
                 TgTheme.type.footnote.copy(fontSize = 13.sp, lineHeight = 16.sp, textDirection = TextDirection.Content),
-                Color.White, weight = FontWeight.Medium, align = TextAlign.Center,
+                c.serviceText, weight = FontWeight.Medium, align = TextAlign.Center,
             )
         }
     }

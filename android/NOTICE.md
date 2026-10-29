@@ -11,6 +11,8 @@ includes artwork from Telegram for iOS.
 | TDLib (Telegram Database Library) | [tdlib/td](https://github.com/tdlib/td) | BSL-1.0 |
 | Kotlin coroutines client + prebuilt Android TDLib | [g000sha256/tdl-coroutines](https://github.com/g000sha256/tdl-coroutines) | Apache-2.0 |
 | Wallpaper gradient algorithm (`features/chat/Wallpaper.kt`) | Ported from Telegram-iOS `SoftwareGradientBackground.swift` | GPL-2.0 |
+| Chat pattern artwork (downloaded at runtime, not in this repository) | Telegram-iOS `submodules/TelegramUI/Resources/fqv01SQemVIBAAAApND8LDRUhRU.tgv` | GPL-2.0 |
+| Theme palettes (`core/design/TelegramThemes.kt`) | Ported from Telegram-iOS `TelegramPresentationData` default themes | GPL-2.0 |
 | Glass components in `core/glass/` | Adapted from [Kyant0/AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass) | Apache-2.0 |
 | Inter font (`app/src/main/res/font/inter.ttf`) | [rsms/inter](https://github.com/rsms/inter) | SIL OFL 1.1 (`INTER_OFL.txt`) |
 | Paperclip glyph (`ui/components/IosIcons.kt`) | [Feather Icons](https://feathericons.com) | MIT |

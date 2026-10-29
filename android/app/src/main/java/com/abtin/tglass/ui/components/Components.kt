@@ -170,7 +170,7 @@ fun Badge(count: Int, muted: Boolean = false, modifier: Modifier = Modifier, men
         T(
             if (mention) "@" else formatCount(count),
             TgTheme.type.footnote.copy(fontSize = 13.sp, lineHeight = 16.sp),
-            Color.White,
+            if (muted) c.mutedBadgeText else c.badgeText,
             weight = FontWeight.SemiBold,
         )
     }
@@ -240,7 +240,7 @@ fun Section(
     Column(modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         if (header != null) {
             T(
-                header.uppercase(), TgTheme.type.footnote, c.secondaryText,
+                header.uppercase(), TgTheme.type.footnote, c.sectionHeader,
                 modifier = Modifier.padding(start = 16.dp, bottom = 7.dp, top = 4.dp),
             )
         }
@@ -252,7 +252,7 @@ fun Section(
             content = content,
         )
         if (footer != null) {
-            T(footer, TgTheme.type.footnote, c.secondaryText, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 7.dp))
+            T(footer, TgTheme.type.footnote, c.sectionHeader, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 7.dp))
         }
     }
 }

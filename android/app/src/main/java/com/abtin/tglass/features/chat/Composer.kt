@@ -362,7 +362,7 @@ fun Composer(
                     p != null -> VoiceDraft(p, previewKey(p))
                     else -> Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 2.dp), verticalAlignment = Alignment.Bottom) {
                         Box(Modifier.weight(1f).padding(vertical = 9.dp), contentAlignment = Alignment.CenterStart) {
-                            if (text.isEmpty()) T("Message", TgTheme.type.body, c.secondaryText, maxLines = 1)
+                            if (text.isEmpty()) T("Message", TgTheme.type.body, c.inputPlaceholder, maxLines = 1)
                             // Apple emoji drawn over the (transparent) system glyphs.
                             val (emojiField, emojiTransformation) = com.abtin.tglass.core.emoji.rememberAppleEmojiField(maxLines = 8)
                             val fieldTransformation = remember(entities, emojiTransformation, c.accent, c.text) {
@@ -391,7 +391,7 @@ fun Composer(
                         }
                         Box(Modifier.height(ComposerHeight).width(40.dp).fadeClickable(onClick = onTogglePanel), contentAlignment = Alignment.Center) {
                             Crossfade(panelOpen, label = "panelIcon") { open ->
-                                Icon(if (open) IosIcons.Keyboard else ComposerIcons.Smiley, c.secondaryText, if (open) 22.dp else 23.dp)
+                                Icon(if (open) IosIcons.Keyboard else ComposerIcons.Smiley, c.inputIcon, if (open) 22.dp else 23.dp)
                             }
                         }
                     }
@@ -512,7 +512,7 @@ fun Composer(
                         },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(if (editing != null && preview == null) IosIcons.Checkmark else IosIcons.ArrowUp, Color.White, 21.dp)
+                        Icon(if (editing != null && preview == null) IosIcons.Checkmark else IosIcons.ArrowUp, c.onAccent, 21.dp)
                     }
                 }
                 if (recording) {
