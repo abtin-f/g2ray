@@ -1,6 +1,6 @@
 package com.abtin.tglass.core.navigation
 
-import androidx.activity.compose.BackHandler
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
@@ -101,6 +101,8 @@ class Navigator(initial: Route, private val scope: CoroutineScope) {
 
     val top: Route get() = stack.last().route
 
+    internal val isBusy: Boolean get() = busy
+
     fun push(route: Route) {
         val e = Entry(route, ids++)
         stack.add(e)
@@ -199,7 +201,17 @@ fun IOSNavHost(navigator: Navigator, content: @Composable (Route) -> Unit) {
     val edge = with(density) { 28.dp.toPx() }
     val dim = if (TgTheme.colors.isDark) 0.5f else 0.12f
 
-    BackHandler(enabled = stack.size > 1) { navigator.pop() }
+    // System Back / back gesture: with the predictive-back gesture the page follows the finger (same transition as the
+    // edge swipe); a plain Back press (3-button navigation) sends no progress and just animates the pop.
+    PredictiveBackHandler(enabled = stack.size > 1) { progress ->
+        if (navigator.isBusy) return@PredictiveBackHandler
+        try {
+            progress.collect { navigator.dragTo(it.progress * 0.7f) }
+            navigator.settle(pop = true)
+        } catch (e: kotlin.coroutines.cancellation.CancellationException) {
+            navigator.settle(pop = false)
+        }
+    }
 
     BoxWithConstraints(
         Modifier

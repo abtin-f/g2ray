@@ -116,7 +116,7 @@ fun WelcomeScreen() {
     val context = LocalContext.current
     val c = TgTheme.colors
     val t = rememberInfiniteTransition(label = "logo")
-    val bob by t.animateFloat(-6f, 6f, infiniteRepeatable(tween(1800), RepeatMode.Reverse), label = "bob")
+    val bobState = if (settings.animations) t.animateFloat(-6f, 6f, infiniteRepeatable(tween(1800), RepeatMode.Reverse), label = "bob") else null
     var phase by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -148,7 +148,7 @@ fun WelcomeScreen() {
                 GlassBox(
                     onClick = {},
                     shape = Capsule(),
-                    modifier = Modifier.size(196.dp).graphicsLayer { translationY = bob * density },
+                    modifier = Modifier.size(196.dp).graphicsLayer { translationY = (bobState?.value ?: 0f) * density },
                 ) {
                     AnimatedContent(
                         targetState = page,

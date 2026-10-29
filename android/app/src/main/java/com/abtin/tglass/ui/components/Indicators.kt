@@ -1,5 +1,6 @@
 package com.abtin.tglass.ui.components
 
+import com.abtin.tglass.core.design.LocalAppSettings
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.StartOffset
 import androidx.compose.animation.core.animateFloat
@@ -38,8 +39,8 @@ fun VerifiedBadge(size: Dp = 16.dp, color: Color = TgTheme.colors.verified, modi
 @Composable
 fun TypingDots(color: Color, dot: Dp = 4.dp, modifier: Modifier = Modifier) {
     val screenVisible by LocalScreenVisible.current
-    if (!screenVisible) {
-        // Covered by another screen: same size, no running animation.
+    if (!screenVisible || !LocalAppSettings.current.animations) {
+        // Covered by another screen, or Power Saving animations are off: same size, no running animation.
         Row(modifier, horizontalArrangement = Arrangement.spacedBy(dot * 0.6f), verticalAlignment = Alignment.CenterVertically) {
             repeat(3) { Box(Modifier.size(dot).clip(CircleShape).background(color)) }
         }

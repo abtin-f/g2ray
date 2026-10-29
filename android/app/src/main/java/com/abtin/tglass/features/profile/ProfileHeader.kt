@@ -250,7 +250,7 @@ internal fun ProfileHeaderItem(
         if (showGifts) {
             val t = rememberInfiniteTransition(label = "gifts")
             // No running animation while another screen covers this one.
-            val bob = if (screenVisible) t.animateFloat(-1f, 1f, infiniteRepeatable(tween(2400), RepeatMode.Reverse), label = "bob") else null
+            val bob = if (screenVisible && com.abtin.tglass.core.design.LocalAppSettings.current.animations) t.animateFloat(-1f, 1f, infiniteRepeatable(tween(2400), RepeatMode.Reverse), label = "bob") else null
             gifts.take(GiftSpots.size).forEachIndexed { i, g ->
                 val (dx, dy) = GiftSpots[i]
                 Box(
