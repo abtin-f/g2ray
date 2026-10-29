@@ -150,7 +150,16 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
     var searching by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     var editing by rememberSaveable { mutableStateOf(false) }
-    val selected = remember { mutableStateListOf<Long>() }
+    val selected = androidx.compose.runtime.saveable.rememberSaveable(
+        saver = androidx.compose.runtime.saveable.listSaver<androidx.compose.runtime.snapshots.SnapshotStateList<Long>, Long>(
+            save = { it.toList() },
+            restore = { mutableStateListOf<Long>().apply { addAll(it) } },
+        ),
+    ) { mutableStateListOf<Long>() }
+    // Back leaves search / Edit mode first instead of closing the tab.
+    androidx.activity.compose.BackHandler(enabled = searching || editing) {
+        if (searching) { searching = false; query = ""; focus.clearFocus() } else { editing = false; selected.clear() }
+    }
     val listState = rememberLazyListState()
 
     LaunchedEffect(searching, editing) { tabBar.hidden = searching || editing }
@@ -297,7 +306,7 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
                 // iOS 26 (ios-10): a full-width "Search" capsule between the header and the folder tabs.
                 item(key = "search") { ListSearchCapsule { searching = true } }
                 item(key = "folders") {
-                    if (folders.size > 1) FolderTabs(folders, folder, { folder = it }, unreadFor = { f -> repo.chatsInFolder(f).count { ch -> (ch.unread > 0 || ch.markedUnread) && !ch.muted } })
+                    if (folders.size > 1) FolderTabs(folders, folder, { folder = it }, unreadFor = { f -> if (!repo.isLive && folders[f] == "Unread") 0 else repo.chatsInFolder(f).count { ch -> (ch.unread > 0 || ch.markedUnread) && !ch.muted } })
                 }
                 if (archived.isNotEmpty() && folder == 0 && !editing) {
                     item(key = "archive") {
@@ -352,8 +361,9 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
             }
         }
 
-        // Header
-        if (searching) {
+        // Header (cross-fades between the title bar and the search field)
+        androidx.compose.animation.Crossfade(searching, animationSpec = androidx.compose.animation.core.tween(160), label = "chatsHeader") { isSearch ->
+        if (isSearch) {
             Column(Modifier.fillMaxWidth()) {
                 Box {
                     ScrollEdgeBlur(top + 68.dp)
@@ -418,6 +428,7 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
                     )
                 }
             }
+        }
         }
 
         // Edit-mode toolbar (spec §19 style)
@@ -560,7 +571,7 @@ private fun FolderTabs(folders: List<String>, selected: Int, onSelect: (Int) -> 
                 ) {
                     T(f, TgTheme.type.subheadline, if (sel) c.text else c.secondaryText, weight = FontWeight.Medium, maxLines = 1)
                     val count = unreadFor(i)
-                    if (count > 0 && f != "Unread") {
+                    if (count > 0) {
                         Spacer(Modifier.width(5.dp))
                         Box(
                             Modifier.height(16.dp).defaultMinSize(minWidth = 16.dp).clip(Capsule()).background(if (sel) c.accent else c.mutedBadge).padding(horizontal = 5.dp),

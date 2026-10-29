@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -119,6 +120,8 @@ fun ChatRow(
     val last = repo.lastMessage(chat.id)
     val bg = if (chat.pinned) c.pinnedRow else c.background
     // Formatted once per timestamp, not on every recomposition.
+    // Edit mode slides the selection circle in and shifts the row by its width (animated, like iOS).
+    val editInset by androidx.compose.animation.core.animateDpAsState(if (editing) 32.dp else 0.dp, label = "editInset")
     val time = remember(last?.date) { last?.let { formatListDate(it.date) } }
     val dateStyle = TgTheme.type.subheadline.copy(fontSize = (size.previewSp - 1f).sp)
     // The row layout never mirrors (avatar left, time right) even when the phone language is RTL;
@@ -133,15 +136,18 @@ fun ChatRow(
                 .padding(start = 10.dp, end = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (editing) {
-                Box(
-                    Modifier
-                        .padding(end = 10.dp)
-                        .size(22.dp)
-                        .clip(CircleShape)
-                        .then(if (selected) Modifier.background(c.accent) else Modifier.border(1.5.dp, c.tertiaryText, CircleShape)),
-                    contentAlignment = Alignment.Center,
-                ) { if (selected) Icon(IosIcons.Checkmark, Color.White, 14.dp) }
+            if (editInset > 0.dp) {
+                Box(Modifier.width(editInset)) {
+                    Box(
+                        Modifier
+                            .align(Alignment.CenterStart)
+                            .requiredSize(22.dp)
+                            .graphicsLayer { alpha = (editInset.toPx() / 32.dp.toPx()).coerceIn(0f, 1f) }
+                            .clip(CircleShape)
+                            .then(if (selected) Modifier.background(c.accent) else Modifier.border(1.5.dp, c.tertiaryText, CircleShape)),
+                        contentAlignment = Alignment.Center,
+                    ) { if (selected) Icon(IosIcons.Checkmark, Color.White, 14.dp) }
+                }
             }
             ChatAvatar(chat, repo, size.avatar.dp, showStory = true)
             Spacer(Modifier.width(10.dp))
@@ -193,7 +199,7 @@ fun ChatRow(
                 }
             }
         }
-        Separator(Modifier.align(Alignment.BottomStart), startPadding = (10 + size.avatar + 10 + if (editing) 32 else 0).dp)
+        Separator(Modifier.align(Alignment.BottomStart), startPadding = (10 + size.avatar + 10).dp + editInset)
     }
     }
 }
@@ -283,8 +289,13 @@ fun SwipeableRow(
         // Only the sign is read here; the per-frame width of the revealed buttons is read inside SwipeActionButtons,
         // so dragging a row doesn't recompose the row content itself.
         val side by remember { androidx.compose.runtime.derivedStateOf { if (offset.value < 0f) -1 else if (offset.value > 0f) 1 else 0 } }
-        if (side < 0) SwipeActionButtons(offset, trailing, atEnd = true)
-        else if (side > 0) SwipeActionButtons(offset, leading, atEnd = false)
+        // The swipe geometry is absolute (left reveals the trailing actions), whatever the system layout direction.
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+            if (side < 0) SwipeActionButtons(offset, trailing, atEnd = true)
+            else if (side > 0) SwipeActionButtons(offset, leading, atEnd = false)
+        }
+        // Edit mode (or a disabled row) always returns the row to zero.
+        androidx.compose.runtime.LaunchedEffect(enabled) { if (!enabled) offset.snapTo(0f) }
         Box(
             Modifier
                 .offset { androidx.compose.ui.unit.IntOffset(offset.value.roundToInt(), 0) }
@@ -318,7 +329,17 @@ fun SwipeableRow(
                         }
                     } else Modifier
                 )
-        ) { content() }
+        ) {
+            content()
+            // A tap on a row that is held open closes it instead of opening the chat (iOS).
+            if (side != 0) {
+                Box(
+                    Modifier.matchParentSize().pointerInput(Unit) {
+                        androidx.compose.foundation.gestures.detectTapGestures { scope.launch { offset.animateTo(0f, spring(0.8f, 500f)) } }
+                    }
+                )
+            }
+        }
     }
 }
 
