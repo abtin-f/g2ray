@@ -864,7 +864,8 @@ fun ChatScreen(chatId: Long) {
             ) {
                 // Scroll-to-bottom
                 val showDown by remember { derivedStateOf { listState.firstVisibleItemIndex > 2 } }
-                AnimatedVisibility(showDown || newestMissing, enter = scaleIn() + fadeIn(), exit = scaleOut() + fadeOut(), modifier = Modifier.align(Alignment.End).floatAbove().padding(end = 12.dp)) {
+                // From half size, not 0: a glass element under a zero-scale layer gets a degenerate backdrop transform.
+                AnimatedVisibility(showDown || newestMissing, enter = scaleIn(initialScale = 0.5f) + fadeIn(), exit = scaleOut(targetScale = 0.5f) + fadeOut(), modifier = Modifier.align(Alignment.End).floatAbove().padding(end = 12.dp)) {
                     Box(Modifier.padding(top = if (chat.unread > 0) 10.dp else 0.dp)) {
                         GlassIconButton(IosIcons.ChevronDown, { scrollToBottom() }, size = ChatBarHeight, iconSize = 22.dp)
                         if (chat.unread > 0) {

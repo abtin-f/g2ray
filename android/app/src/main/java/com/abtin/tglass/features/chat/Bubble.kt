@@ -355,6 +355,9 @@ private fun Modifier.bubbleFill(shape: Shape, colors: BubbleColors): Modifier {
             }
             drawOutline(outline, brush)
         }
+        // The fill is redrawn every gradient step while scrolling (up to every frame on a fast fling): with the content in
+        // a layer of its own only the outline is re-recorded, not the texts, reactions and icons of the bubble.
+        .graphicsLayer { }
 }
 
 /** Counts the emoji of an emoji-only text (0 if it has anything else or more than 3). */

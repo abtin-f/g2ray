@@ -41,15 +41,21 @@ private fun decodeFile(path: String, maxPx: Int): ImageBitmap? = runCatching {
     var sample = 1
     while (bounds.outWidth / (sample * 2) >= maxPx && bounds.outHeight / (sample * 2) >= maxPx) sample *= 2
     BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample })?.asImageBitmap()
+        // Starts the GPU upload on the render thread now, instead of in the first frame that draws it (a "slow bitmap
+        // upload" hitch when a picture scrolls into view).
+        ?.also { it.prepareToDraw() }
 }.getOrNull()
 
 /** Loads a local image file off the main thread, downscaled to roughly [maxPx]. */
 @Composable
 fun rememberFileImage(path: String?, maxPx: Int): ImageBitmap? {
     val key = path?.let { "$it@$maxPx" }
-    val state = produceState(key?.let { BitmapCache.get(it) }, key) {
+    // Already decoded (a row scrolled back into view): no coroutine at all.
+    val cached = if (key != null) BitmapCache.get(key) else null
+    if (cached != null) return cached
+    val state = produceState<ImageBitmap?>(null, key) {
         if (key == null || path == null || value != null) return@produceState
-        value = withContext(Dispatchers.IO) { decodeFile(path, maxPx) }?.also { BitmapCache.put(key, it) }
+        value = withContext(Dispatchers.IO) { com.abtin.tglass.core.perf.perfSection("decodeImage") { decodeFile(path, maxPx) } }?.also { BitmapCache.put(key, it) }
     }
     return state.value
 }
@@ -115,7 +121,7 @@ fun TgImage(image: ImageRef?, modifier: Modifier = Modifier, maxPx: Int = 1280, 
     if (image == null) return
     val repo = LocalRepository.current
     val path = repo.filePath(image)
-    LaunchedEffect(image.fileId, path) { if (path == null) repo.requestImage(image) }
+    if (path == null) LaunchedEffect(image.fileId) { repo.requestImage(image) }
     val full = rememberFileImage(path, maxPx)
     val mini = rememberMini(image.fileId, image.mini)
     // Starts at 1 when the bitmap was already cached, so revisited images don't flash.

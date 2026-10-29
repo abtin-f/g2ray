@@ -141,7 +141,14 @@ internal fun VideoNoteMessage(
     val active = VideoNotePlayback.activeKey == key
     // Scrolled away (the list item is disposed) or deleted: stop the sound.
     DisposableEffect(key) { onDispose { if (VideoNotePlayback.activeKey == key) VideoNotePlayback.activeKey = null } }
-    val note = if (path != null) rememberNotePlayer(path, key) else null
+    // The muted loop's ExoPlayer (built and prepared on the main thread) is only created once the message has stayed on
+    // screen a moment: flinging past round videos no longer builds and releases a player + decoder for each of them.
+    var settled by remember(key) { mutableStateOf(false) }
+    if (!settled && !active) LaunchedEffect(key) {
+        kotlinx.coroutines.delay(350)
+        settled = true
+    }
+    val note = if (path != null && (settled || active)) rememberNotePlayer(path, key) else null
 
     if (note != null) {
         LaunchedEffect(note, active) {
@@ -187,8 +194,8 @@ internal fun VideoNoteMessage(
     fun onTap() {
         when {
             video == null -> {}
-            note == null -> repo.requestImage(video)
-            !active -> {
+            path == null -> repo.requestImage(video)
+            note == null || !active -> {
                 VideoNotePlayback.activeKey = key
                 if (!m.outgoing && !v.viewed) repo.openMessageContent(m.chatId, m.id)
             }
@@ -247,7 +254,7 @@ internal fun VideoNoteMessage(
                 }
             }
             when {
-                video != null && note == null -> {
+                video != null && path == null -> {
                     // Downloading
                     val p = repo.fileProgress(video)
                     Box(Modifier.size(48.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.45f)), contentAlignment = Alignment.Center) {

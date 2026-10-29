@@ -821,11 +821,25 @@ class TdRepository(context: Context) : TelegramRepository {
                     historyComplete += chatId
                     break
                 }
-                batch.forEach { addMessage(it) }
+                if (!prependOlder(list, batch)) batch.forEach { addMessage(it) }
             }
         } finally {
             historyLoading -= chatId
         }
+    }
+
+    /**
+     * An older page ("load older" while scrolling up) goes in with one list operation. Added one by one, every message
+     * scanned the whole observed list twice and shifted it, 50 times per page, on the main thread mid-scroll.
+     * False (nothing done) when the page is not entirely before the loaded messages.
+     */
+    private fun prependOlder(list: SnapshotStateList<UiMessage>, batch: List<Message>): Boolean {
+        val first = list.firstOrNull()?.id ?: return false
+        if (batch.any { it.id > first }) return false
+        val older = batch.filter { it.id < first }.map { mapMessage(it) }.distinctBy { it.id }.sortedBy { it.id }
+        batch.forEach { if (it.id == first) addMessage(it) }
+        if (older.isNotEmpty()) list.addAll(0, older)
+        return true
     }
 
     private fun markRead(chatId: Long) {
@@ -843,7 +857,8 @@ class TdRepository(context: Context) : TelegramRepository {
     private fun addMessage(m: Message) {
         val list = messageStore[m.chatId] ?: return
         val ui = mapMessage(m)
-        val existing = list.indexOfFirst { it.id == m.id }
+        // From the end: new / edited messages are almost always the recent ones.
+        val existing = list.indexOfLast { it.id == m.id }
         if (existing >= 0) {
             list[existing] = ui
             return
