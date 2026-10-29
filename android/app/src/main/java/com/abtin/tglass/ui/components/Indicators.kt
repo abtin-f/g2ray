@@ -27,10 +27,10 @@ import com.abtin.tglass.core.navigation.LocalScreenVisible
 
 /** Telegram's verified badge: accent "flower" background with a white check. */
 @Composable
-fun VerifiedBadge(size: Dp = 16.dp, color: Color = TgTheme.colors.accent, modifier: Modifier = Modifier) {
+fun VerifiedBadge(size: Dp = 16.dp, color: Color = TgTheme.colors.verified, modifier: Modifier = Modifier) {
     Box(modifier.size(size), contentAlignment = Alignment.Center) {
         Icon(TgIcons.IcVerifiedBg, color, size)
-        Icon(TgIcons.IcVerifiedFg, Color.White, size)
+        Icon(TgIcons.IcVerifiedFg, TgTheme.colors.verifiedFg, size)
     }
 }
 

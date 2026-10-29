@@ -1388,7 +1388,7 @@ fun ServicePill(text: String, modifier: Modifier = Modifier) {
             T(
                 text,
                 TgTheme.type.footnote.copy(fontSize = 13.sp, lineHeight = 17.sp, textDirection = TextDirection.Content),
-                Color.White, weight = FontWeight.Medium, align = TextAlign.Center,
+                c.serviceText, weight = FontWeight.Medium, align = TextAlign.Center,
             )
         }
     }

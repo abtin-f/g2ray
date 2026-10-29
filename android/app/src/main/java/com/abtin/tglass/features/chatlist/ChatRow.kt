@@ -156,7 +156,7 @@ fun ChatRow(
                         }
                         if (chat.muted) {
                             Spacer(Modifier.width(2.dp))
-                            Icon(TgIcons.IcMutedPeer, c.secondaryText.copy(alpha = 0.8f), 15.dp)
+                            Icon(TgIcons.IcMutedPeer, c.muteIcon, 15.dp)
                         }
                     }
                     Spacer(Modifier.width(6.dp))
@@ -170,7 +170,7 @@ fun ChatRow(
                         Icon(icon, tint, 15.dp)
                         Spacer(Modifier.width(3.dp))
                     }
-                    if (time != null) T(time, dateStyle, c.secondaryText, maxLines = 1)
+                    if (time != null) T(time, dateStyle, c.chatListSecondary, maxLines = 1)
                 }
                 Spacer(Modifier.height(1.dp))
                 // Second line: preview (2 lines) with the badges at the trailing edge, level with its first line.
@@ -187,7 +187,7 @@ fun ChatRow(
                             }
                             chat.unread > 0 -> Badge(chat.unread, muted = chat.muted)
                             chat.markedUnread -> Box(Modifier.size(20.dp).clip(CircleShape).background(if (chat.muted) c.mutedBadge else c.accent))
-                            chat.pinned -> Icon(TgIcons.MsgPinned, c.mutedBadge, 15.dp)
+                            chat.pinned -> Icon(TgIcons.MsgPinned, c.pinnedIcon, 15.dp)
                         }
                     }
                 }
@@ -207,8 +207,8 @@ private fun ChatPreviewText(chat: Chat, repo: TelegramRepository, last: com.abti
     when {
         chat.typing != null -> TypingText(chat.typing, style, c.accent, Modifier.padding(top = 2.dp))
         chat.draft != null -> Row {
-            T("Draft: ", style, c.destructive, maxLines = 1)
-            com.abtin.tglass.core.emoji.EmojiText(chat.draft ?: "", style, c.secondaryText, maxLines = 2)
+            T("Draft: ", style, c.draftText, maxLines = 1)
+            com.abtin.tglass.core.emoji.EmojiText(chat.draft ?: "", style, c.chatListSecondary, maxLines = 2)
         }
         last == null -> T("", style)
         chat.type == ChatType.Group && last.content !is MessageContent.Service -> {
@@ -239,14 +239,14 @@ private fun PreviewLine(m: com.abtin.tglass.data.Message, style: androidx.compos
             }
             Spacer(Modifier.width(5.dp))
             com.abtin.tglass.core.emoji.EmojiText(
-                content.caption ?: if (content.video) "Video" else "Photo", style, c.secondaryText, maxLines = 1,
+                content.caption ?: if (content.video) "Video" else "Photo", style, c.chatListSecondary, maxLines = 1,
                 custom = if (content.caption != null) com.abtin.tglass.core.emoji.customEmojiSpans(content.captionEntities) else emptyList(),
             )
         }
         is MessageContent.Voice -> Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(TgIcons.IcVoiceSmall, c.secondaryText, 18.dp)
+            Icon(TgIcons.IcVoiceSmall, c.chatListSecondary, 18.dp)
             Spacer(Modifier.width(3.dp))
-            T("Voice message", style, c.secondaryText, maxLines = 1)
+            T("Voice message", style, c.chatListSecondary, maxLines = 1)
         }
         is MessageContent.VideoNote -> Row(verticalAlignment = Alignment.CenterVertically) {
             if (content.thumb != null) {
@@ -255,9 +255,9 @@ private fun PreviewLine(m: com.abtin.tglass.data.Message, style: androidx.compos
                 }
                 Spacer(Modifier.width(5.dp))
             }
-            T("Video message", style, c.secondaryText, maxLines = 1)
+            T("Video message", style, c.chatListSecondary, maxLines = 1)
         }
-        else -> com.abtin.tglass.core.emoji.EmojiText(m.preview, style, c.secondaryText, maxLines = lines, custom = com.abtin.tglass.core.emoji.customEmojiSpans(m))
+        else -> com.abtin.tglass.core.emoji.EmojiText(m.preview, style, c.chatListSecondary, maxLines = lines, custom = com.abtin.tglass.core.emoji.customEmojiSpans(m))
     }
 }
 
