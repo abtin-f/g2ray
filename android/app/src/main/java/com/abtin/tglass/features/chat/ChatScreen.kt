@@ -42,6 +42,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBackIos
@@ -91,6 +92,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -250,8 +253,8 @@ fun ChatScreen(chatId: Long) {
     val reversed = messages.asReversed()
     // Media albums become one list item (one bubble with a grid).
     // Derived: rebuilt only when the message list changes (not on every keystroke of the composer).
-    val items by remember(chatId, repo) { derivedStateOf { buildChatItems(repo.messages(chatId)) } }
-    val reversedItems = items.asReversed()
+    val items by remember(chatId, repo) { derivedStateOf { com.abtin.tglass.core.perf.perfSection("buildChatItems") { buildChatItems(repo.messages(chatId).toList()) } } }
+    val reversedItems = remember(items) { items.asReversed() }
     fun itemIndexOf(id: Long) = reversedItems.indexOfFirst { it.contains(id) }
     val isGroup = chat.type == ChatType.Group
     val isChannel = chat.type == ChatType.Channel
@@ -302,7 +305,7 @@ fun ChatScreen(chatId: Long) {
         }
     }
     // Reverse layout: the oldest loaded message is the last item, so near-the-end means "load older".
-    val nearTop by remember { derivedStateOf { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index?.let { it >= listState.layoutInfo.totalItemsCount - 6 } == true } }
+    val nearTop by remember { derivedStateOf { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index?.let { it >= listState.layoutInfo.totalItemsCount - 15 } == true } }
     LaunchedEffect(nearTop, messages.size) { if (nearTop && messages.isNotEmpty()) repo.loadOlderMessages(chatId) }
     // After a jump to an old message (search result, reply, link) the history between it and the newest messages
     // is missing: load it page by page (newer messages) when that spot comes near the screen while scrolling down.
@@ -528,7 +531,7 @@ fun ChatScreen(chatId: Long) {
         }
         openInBrowser(url)
     }
-    val linkHandler: (com.abtin.tglass.data.Entity, String) -> Unit = { e, value ->
+    val linkHandlerImpl: (com.abtin.tglass.data.Entity, String) -> Unit = { e, value ->
         when (e.type) {
             com.abtin.tglass.data.EntityType.Url -> openUrl(value)
             com.abtin.tglass.data.EntityType.TextUrl -> openUrl(e.url ?: value)
@@ -543,6 +546,13 @@ fun ChatScreen(chatId: Long) {
                 toast.show("$value copied")
             }
         }
+    }
+    // LocalLinkHandler is a *static* CompositionLocal: providing a new instance recomposes everything below it, and every
+    // bubble also rebuilt its rich text (the handler is a key of it). The closure above changes with every message or
+    // chat update, so the provided handler is one stable lambda that calls the latest closure.
+    val linkHandlerState = rememberUpdatedState(linkHandlerImpl)
+    val linkHandler: (com.abtin.tglass.data.Entity, String) -> Unit = remember {
+        { e: com.abtin.tglass.data.Entity, value: String -> linkHandlerState.value(e, value) }
     }
 
     fun copy(m: Message) {
@@ -707,6 +717,30 @@ fun ChatScreen(chatId: Long) {
     }
     // ---- end Message menu ----
 
+    // ---- Row callbacks ----
+    // One object for the screen's lifetime, re-pointed at the latest closures on every composition. Rows only hold this
+    // stable instance, so a chat / typing / online / composer change no longer recomposes every visible row through
+    // freshly captured lambdas.
+    val rowActions = remember { ChatRowActions() }
+    rowActions.tap = { ids ->
+        if (selecting) {
+            if (ids.any { it in selected }) selected.removeAll(ids) else selected.addAll(ids)
+            if (selected.isEmpty()) selecting = false
+        }
+    }
+    rowActions.longPress = { m, b -> if (!selecting) { Haptics.longPress(view); openMenu(m, b) } }
+    rowActions.swipeReply = { m -> replyToId = m.id; editingId = null; focusRequester.requestFocus() }
+    rowActions.replyClick = { m -> m.replyToId?.let { jumpToAny(it) } }
+    rowActions.react = { m, e -> react(m, e) }
+    rowActions.vote = { m, options -> repo.votePoll(chatId, m.id, options) }
+    rowActions.viewResults = { m -> focus.clearFocus(); keyboard?.hide(); pollResults = PollResultsTarget(chatId, m.id) }
+    rowActions.media = { id -> nav.push(Route.Media(chatId, id)) }
+    rowActions.sender = { userId -> nav.push(Route.UserProfile(userId)) }
+    rowActions.share = { ids -> forward(ids) }
+    rowActions.inlineButton = { m, r, col, b -> onInlineButton(m, r, col, b) }
+    rowActions.busy = { id, r, col -> "$id:$r:$col" in busyButtons }
+    // ---- end Row callbacks ----
+
     val videoNoteRecorder = com.abtin.tglass.core.media.rememberVideoNoteRecorder()
 
     androidx.compose.runtime.CompositionLocalProvider(
@@ -714,81 +748,29 @@ fun ChatScreen(chatId: Long) {
         com.abtin.tglass.core.emoji.LocalReactionEffects provides reactionEffects,
     ) {
         Box(Modifier.fillMaxSize()) {
-            // Z0: wallpaper + messages (the glass source)
-            Box(Modifier.fillMaxSize().layerBackdrop(backdrop)) {
+            // Z0: wallpaper + messages (the glass source). In a layer of its own: redrawing anything else on the screen
+            // (header, composer, overlays) then never re-records the backdrop, which would make every glass element
+            // re-render its blur even though nothing under it changed.
+            Box(Modifier.fillMaxSize().graphicsLayer { }.layerBackdrop(backdrop)) {
                 ChatWallpaper(phase = wallpaperPhase)
-                LazyColumn(
-                    state = listState,
-                    reverseLayout = true,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(
-                        top = with(density) { headerHeight.toDp() } + 8.dp,
-                        bottom = with(density) { bottomHeight.toDp() } + 4.dp,
-                    ),
-                ) {
-                    itemsIndexed(
-                        reversedItems,
-                        key = { _, it -> it.key },
-                        // Bubbles of the same kind reuse each other's compositions when scrolling.
-                        contentType = { _, it -> if (it.head.content is MessageContent.Service) "service" else it.head.content::class },
-                    ) { rIdx, item ->
-                        val idx = items.size - 1 - rIdx
-                        val prev = items.getOrNull(idx - 1)?.last
-                        val group = groupForItems(items, idx, isGroup)
-                        val m = item.head
-                        val ids = remember(item) { item.messages.map { it.id } }
-                        Column(Modifier.animateItem()) {
-                            if (prev == null || !sameDay(prev.date, item.first.date)) ServicePill(formatDay(item.first.date))
-                            if (firstUnreadId != null && item.contains(firstUnreadId)) UnreadDivider()
-                            if (m.content is MessageContent.Service) {
-                                ServicePill((m.content as MessageContent.Service).text)
-                            } else {
-                                MessageRow(
-                                    appear = m.date > openedAt,
-                                    // Telegram iOS draws every channel post as an incoming bubble (left, with tail), even the admin's own.
-                                    m = if (isChannel) m.asChannelPost() else m,
-                                    group = group,
-                                    repo = repo,
-                                    isGroup = isGroup,
-                                    isChannel = isChannel,
-                                    maxBubble = maxBubble,
-                                    replyTo = m.replyToId?.let { r ->
-                                        repo.findMessage(chatId, r).also { found ->
-                                            if (found == null) LaunchedEffect(r) { repo.requestMessage(chatId, r) }
-                                        }
-                                    },
-                                    selecting = selecting,
-                                    selected = ids.any { it in selected },
-                                    highlighted = item.contains(highlightId),
-                                    album = if (item.messages.size > 1) (if (isChannel) item.messages.map { it.asChannelPost() } else item.messages) else emptyList(),
-                                    onAlbumItemClick = { id -> nav.push(Route.Media(chatId, id)) },
-                                    onSenderClick = if (isGroup && repo.user(m.senderId) != null) ({ nav.push(Route.UserProfile(m.senderId)) }) else null,
-                                    onShare = if (isChannel) ({ forward(ids) }) else null,
-                                    onTap = {
-                                        if (selecting) {
-                                            if (ids.any { it in selected }) selected.removeAll(ids) else selected.addAll(ids)
-                                            if (selected.isEmpty()) selecting = false
-                                        }
-                                    },
-                                    onLongPress = { b -> if (!selecting) { Haptics.longPress(view); openMenu(m, b) } },
-                                    onSwipeReply = { replyToId = m.id; editingId = null; focusRequester.requestFocus() },
-                                    onReplyClick = { m.replyToId?.let { jumpToAny(it) } },
-                                    onReact = { e -> react(m, e) },
-                                    onVote = { o -> repo.votePoll(chatId, m.id, listOf(o)) },
-                                    pollActions = if (m.content is MessageContent.Poll) PollActions(
-                                        vote = { ids -> repo.votePoll(chatId, m.id, ids) },
-                                        viewResults = { focus.clearFocus(); keyboard?.hide(); pollResults = PollResultsTarget(chatId, m.id) },
-                                    ) else null,
-                                    onMedia = { nav.push(Route.Media(chatId, m.id)) },
-                                    keyboard = repo.inlineKeyboard(chatId, m.id),
-                                    busyButton = { r, col -> "${m.id}:$r:$col" in busyButtons },
-                                    onInlineButton = { r, col, b -> onInlineButton(m, r, col, b) },
-                                )
-                            }
-                            Spacer(Modifier.height(if (group.groupedBottom) 2.dp else 6.dp))
-                        }
-                    }
-                }
+                ChatMessageList(
+                    listState = listState,
+                    items = items,
+                    reversedItems = reversedItems,
+                    topPadding = with(density) { headerHeight.toDp() } + 8.dp,
+                    bottomPadding = with(density) { bottomHeight.toDp() } + 4.dp,
+                    chatId = chatId,
+                    repo = repo,
+                    isGroup = isGroup,
+                    isChannel = isChannel,
+                    maxBubble = maxBubble,
+                    firstUnreadId = firstUnreadId,
+                    openedAt = openedAt,
+                    selecting = selecting,
+                    selected = selected,
+                    highlightId = highlightId,
+                    actions = rowActions,
+                )
             }
 
             // Big reaction effects: a plain Lottie overlay above the list layer (nothing glass in here)
@@ -882,7 +864,7 @@ fun ChatScreen(chatId: Long) {
             ) {
                 // Scroll-to-bottom
                 val showDown by remember { derivedStateOf { listState.firstVisibleItemIndex > 2 } }
-                AnimatedVisibility(showDown || newestMissing, enter = scaleIn() + fadeIn(), exit = scaleOut() + fadeOut(), modifier = Modifier.align(Alignment.End).padding(end = 12.dp)) {
+                AnimatedVisibility(showDown || newestMissing, enter = scaleIn() + fadeIn(), exit = scaleOut() + fadeOut(), modifier = Modifier.align(Alignment.End).floatAbove().padding(end = 12.dp)) {
                     Box(Modifier.padding(top = if (chat.unread > 0) 10.dp else 0.dp)) {
                         GlassIconButton(IosIcons.ChevronDown, { scrollToBottom() }, size = ChatBarHeight, iconSize = 22.dp)
                         if (chat.unread > 0) {
@@ -1082,6 +1064,163 @@ fun ChatScreen(chatId: Long) {
 @Composable
 private fun ScopedRead(content: @Composable () -> Unit) = content()
 
+/** Lays its content out right above this spot without taking up any height (it floats over what is above it). */
+private fun Modifier.floatAbove(): Modifier = layout { measurable, constraints ->
+    val p = measurable.measure(constraints.copy(minHeight = 0))
+    layout(p.width, 0) { p.placeRelative(0, -p.height) }
+}
+
+/**
+ * What the message rows call back into the chat screen. One instance per screen (remembered); the screen re-points the
+ * handlers at its latest closures on every composition, so rows hold a stable object and can skip recomposition.
+ */
+private class ChatRowActions {
+    var tap: (List<Long>) -> Unit = {}
+    var longPress: (Message, Rect) -> Unit = { _, _ -> }
+    var swipeReply: (Message) -> Unit = {}
+    var replyClick: (Message) -> Unit = {}
+    var react: (Message, String) -> Unit = { _, _ -> }
+    var vote: (Message, List<Int>) -> Unit = { _, _ -> }
+    var viewResults: (Message) -> Unit = {}
+    var media: (Long) -> Unit = {}
+    var sender: (Long) -> Unit = {}
+    var share: (List<Long>) -> Unit = {}
+    var inlineButton: (Message, Int, Int, com.abtin.tglass.data.InlineButton) -> Unit = { _, _, _, _ -> }
+    var busy: (Long, Int, Int) -> Boolean = { _, _, _ -> false }
+}
+
+/**
+ * The message list, a composable of its own with stable parameters: chat / typing / online / composer changes of the
+ * screen skip it entirely, and a change of the messages recomposes only the rows whose data changed.
+ */
+@Composable
+private fun ChatMessageList(
+    listState: LazyListState,
+    items: List<ChatItem>,
+    reversedItems: List<ChatItem>,
+    topPadding: Dp,
+    bottomPadding: Dp,
+    chatId: Long,
+    repo: TelegramRepository,
+    isGroup: Boolean,
+    isChannel: Boolean,
+    maxBubble: Dp,
+    firstUnreadId: Long?,
+    openedAt: Long,
+    selecting: Boolean,
+    selected: List<Long>,
+    highlightId: Long,
+    actions: ChatRowActions,
+) {
+    LazyColumn(
+        state = listState,
+        reverseLayout = true,
+        // Own layer: rows coming and going re-record only the list, not the backdrop box around it.
+        modifier = Modifier.fillMaxSize().graphicsLayer { },
+        contentPadding = PaddingValues(top = topPadding, bottom = bottomPadding),
+    ) {
+        itemsIndexed(
+            reversedItems,
+            key = { _, it -> it.key },
+            // Bubbles of the same kind reuse each other's compositions when scrolling.
+            contentType = { _, it -> it.contentType },
+        ) { rIdx, item ->
+            val idx = items.size - 1 - rIdx
+            val prev = items.getOrNull(idx - 1)?.last
+            Column(Modifier.animateItem()) {
+                ChatListItem(
+                    messages = item.messages,
+                    showDay = prev == null || !sameDay(prev.date, item.first.date),
+                    showUnread = firstUnreadId != null && item.contains(firstUnreadId),
+                    group = groupForItems(items, idx, isGroup),
+                    appear = item.head.date > openedAt,
+                    chatId = chatId,
+                    repo = repo,
+                    isGroup = isGroup,
+                    isChannel = isChannel,
+                    maxBubble = maxBubble,
+                    selecting = selecting,
+                    selected = item.messages.any { it.id in selected },
+                    highlighted = item.contains(highlightId),
+                    actions = actions,
+                )
+            }
+        }
+    }
+}
+
+/** One list entry: day separator, unread divider, then the service pill or the message row (an album is one row). */
+@Composable
+private fun ChatListItem(
+    messages: List<Message>,
+    showDay: Boolean,
+    showUnread: Boolean,
+    group: BubbleGroup,
+    appear: Boolean,
+    chatId: Long,
+    repo: TelegramRepository,
+    isGroup: Boolean,
+    isChannel: Boolean,
+    maxBubble: Dp,
+    selecting: Boolean,
+    selected: Boolean,
+    highlighted: Boolean,
+    actions: ChatRowActions,
+) {
+    val first = messages.first()
+    val head = if (messages.size == 1) first else messages.firstOrNull { it.text != null } ?: first
+    if (showDay) ServicePill(formatDay(first.date))
+    if (showUnread) UnreadDivider()
+    val content = head.content
+    if (content is MessageContent.Service) {
+        ServicePill(content.text)
+    } else {
+        // Telegram iOS draws every channel post as an incoming bubble (left, with tail), even the admin's own.
+        val shown = remember(head, isChannel) { if (isChannel) head.asChannelPost() else head }
+        val album = remember(messages, isChannel) {
+            if (messages.size > 1) (if (isChannel) messages.map { it.asChannelPost() } else messages) else emptyList()
+        }
+        val ids = remember(messages) { messages.map { it.id } }
+        val replyTo = head.replyToId?.let { r ->
+            repo.findMessage(chatId, r).also { found ->
+                if (found == null) LaunchedEffect(r) { repo.requestMessage(chatId, r) }
+            }
+        }
+        val pollActions = if (content is MessageContent.Poll) remember(head, actions) {
+            PollActions(vote = { o -> actions.vote(head, o) }, viewResults = { actions.viewResults(head) })
+        } else null
+        MessageRow(
+            appear = appear,
+            m = shown,
+            group = group,
+            repo = repo,
+            isGroup = isGroup,
+            isChannel = isChannel,
+            maxBubble = maxBubble,
+            replyTo = replyTo,
+            selecting = selecting,
+            selected = selected,
+            highlighted = highlighted,
+            album = album,
+            onAlbumItemClick = { id -> actions.media(id) },
+            onSenderClick = if (isGroup && repo.user(head.senderId) != null) ({ actions.sender(head.senderId) }) else null,
+            onShare = if (isChannel) ({ actions.share(ids) }) else null,
+            onTap = { actions.tap(ids) },
+            onLongPress = { b -> actions.longPress(head, b) },
+            onSwipeReply = { actions.swipeReply(head) },
+            onReplyClick = { actions.replyClick(head) },
+            onReact = { e -> actions.react(head, e) },
+            onVote = { o -> actions.vote(head, listOf(o)) },
+            pollActions = pollActions,
+            onMedia = { actions.media(head.id) },
+            keyboard = repo.inlineKeyboard(chatId, head.id),
+            busyButton = { r, col -> actions.busy(head.id, r, col) },
+            onInlineButton = { r, col, b -> actions.inlineButton(head, r, col, b) },
+        )
+    }
+    Spacer(Modifier.height(if (group.groupedBottom) 2.dp else 6.dp))
+}
+
 fun groupFor(messages: List<Message>, idx: Int, isGroup: Boolean): BubbleGroup {
     val m = messages.getOrNull(idx) ?: return BubbleGroup(false, false, false, false)
     val top = groupable(messages.getOrNull(idx - 1), m)
@@ -1103,6 +1242,7 @@ class ChatItem(val messages: List<Message>) {
     val head: Message get() = if (messages.size == 1) messages[0] else messages.firstOrNull { it.text != null } ?: messages[0]
     val key: Any get() = if (messages.size > 1) "album-${first.id}" else first.id
     fun contains(id: Long) = messages.any { it.id == id }
+    val contentType: Any get() = head.content.let { c -> if (c is MessageContent.Service) "service" else c::class }
 }
 
 /** Groups consecutive messages with the same TDLib media album id (at most 10, like Telegram). */
@@ -1199,20 +1339,20 @@ private fun MessageRow(
     val key = "msg-${m.id}"
     // New messages rise from the composer (outgoing) or pop in (incoming) with a spring.
     val enter = remember { Animatable(if (appear) 0f else 1f) }
-    LaunchedEffect(Unit) { if (enter.value < 1f) enter.animateTo(1f, spring(dampingRatio = 0.78f, stiffness = 380f)) }
+    // Effects only where needed: rows scrolling into view used to launch two coroutines each for nothing.
+    if (appear) LaunchedEffect(Unit) { if (enter.value < 1f) enter.animateTo(1f, spring(dampingRatio = 0.78f, stiffness = 380f)) }
 
-    LaunchedEffect(m.id) {
-        if (com.abtin.tglass.DebugLaunch.autoMenuMessageId == m.id) {
-            kotlinx.coroutines.delay(1500)
-            com.abtin.tglass.DebugLaunch.autoMenuMessageId = null
-            onLongPress(currentBounds())
-        }
+    if (com.abtin.tglass.DebugLaunch.autoMenuMessageId == m.id) LaunchedEffect(m.id) {
+        kotlinx.coroutines.delay(1500)
+        com.abtin.tglass.DebugLaunch.autoMenuMessageId = null
+        onLongPress(currentBounds())
     }
 
     Box(
         Modifier
             .fillMaxWidth()
-            .graphicsLayer {
+            // The entrance layer only for messages that arrive while the chat is open (no extra layer per row otherwise).
+            .then(if (!appear) Modifier else Modifier.graphicsLayer {
                 val p = enter.value
                 if (p < 1f) {
                     alpha = p.coerceIn(0f, 1f)
@@ -1221,7 +1361,7 @@ private fun MessageRow(
                     scaleX = sc; scaleY = sc
                     transformOrigin = TransformOrigin(if (m.outgoing) 1f else 0f, 1f)
                 }
-            }
+            })
             .then(if (highlighted) Modifier.background(c.accent.copy(alpha = 0.18f)) else if (selected) Modifier.background(c.accent.copy(alpha = 0.10f)) else Modifier)
             .pointerInput(selecting) {
                 if (selecting) return@pointerInput
@@ -1287,7 +1427,9 @@ private fun MessageRow(
             if (m.outgoing) Spacer(Modifier.weight(1f))
             val bubble: @Composable () -> Unit = { Box(
                 Modifier
-                    .onGloballyPositioned { coords[0] = it }
+                    // onPlaced, not onGloballyPositioned: the latter is dispatched for every row on every scroll frame;
+                    // the coordinates object is live, so bounds computed from it on long press are still current.
+                    .onPlaced { coords[0] = it }
                     .graphicsLayer { alpha = if (menu.activeKey == key) 0f else 1f }
                     .messageLongPress(enabled = !selecting) { onLongPress(currentBounds()) }
                     .pointerInput(selecting) {
