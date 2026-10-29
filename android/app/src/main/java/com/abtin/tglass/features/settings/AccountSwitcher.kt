@@ -1,5 +1,6 @@
 package com.abtin.tglass.features.settings
 
+import com.abtin.tglass.core.design.pressLight
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -207,7 +208,7 @@ private fun AccountMenu(repo: TelegramRepository, backdrop: com.kyant.backdrop.B
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .iosClickable(highlight = if (c.isDark) Color.White.copy(0.1f) else Color.Black.copy(0.06f)) {
+                    .iosClickable(highlight = c.pressLight) {
                         if (busy) return@iosClickable
                         onClose()
                         repo.addAccount()
@@ -240,7 +241,7 @@ private fun AccountMenuRow(a: AccountInfo, checked: Boolean, index: Int, onClick
                 alpha = appear.value.coerceIn(0f, 1f)
                 translationY = (1f - appear.value) * 10.dp.toPx()
             }
-            .iosClickable(highlight = if (c.isDark) Color.White.copy(0.1f) else Color.Black.copy(0.06f), onClick = onClick)
+            .iosClickable(highlight = c.pressLight, onClick = onClick)
             .height(52.dp)
             .padding(start = 14.dp, end = 14.dp),
         verticalAlignment = Alignment.CenterVertically,

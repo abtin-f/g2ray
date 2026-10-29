@@ -286,6 +286,65 @@ private fun interFamily(opticalSize: Float) = FontFamily(
 val InterText = interFamily(32f)
 val InterDisplay = interFamily(32f)
 
+/**
+ * Vazirmatn (Non-Latin build, variable, SIL OFL): Persian / Arabic script. Inter has no Arabic glyphs, so Android
+ * would pick a system fallback (Noto Naskh / Roboto-era Arabic) with mismatched weights and metrics. Runs of Arabic
+ * script are set in this family by [withPersianFont]; weights are pinned like Inter's so bold / semibold text matches.
+ */
+@OptIn(ExperimentalTextApi::class)
+val PersianFamily = FontFamily(
+    listOf(400, 500, 600, 700).map { w ->
+        Font(R.font.vazirmatn, weight = FontWeight(w), variationSettings = FontVariation.Settings(FontVariation.weight(w)))
+    }
+)
+
+private fun isArabicScript(ch: Char): Boolean {
+    val c = ch.code
+    return c in 0x0600..0x06FF || c in 0x0750..0x077F || c in 0x08A0..0x08FF || c in 0xFB50..0xFDFF || c in 0xFE70..0xFEFF
+}
+
+/** True if [s] contains Persian / Arabic script. A cheap scan; most text is Latin and returns at once. */
+fun hasArabicScript(s: CharSequence): Boolean {
+    for (i in 0 until s.length) if (isArabicScript(s[i])) return true
+    return false
+}
+
+/**
+ * Adds a [PersianFamily] span over every Arabic-script run of [text] (a ZWNJ / ZWJ inside a run stays in it), at
+ * [offset] in this builder. Weight, size and color come from the surrounding style, so mixed Persian / English
+ * lines keep one line height (all [TgTypography] styles use a fixed lineHeight).
+ */
+fun androidx.compose.ui.text.AnnotatedString.Builder.addPersianSpans(text: CharSequence, offset: Int = 0) {
+    var i = 0
+    val n = text.length
+    while (i < n) {
+        if (!isArabicScript(text[i])) { i++; continue }
+        var j = i + 1
+        while (j < n && (isArabicScript(text[j]) || ((text[j] == '\u200C' || text[j] == '\u200D') && j + 1 < n && isArabicScript(text[j + 1])))) j++
+        addStyle(androidx.compose.ui.text.SpanStyle(fontFamily = PersianFamily), offset + i, offset + j)
+        i = j
+    }
+}
+
+/** [this] with Persian runs in [PersianFamily]; returns [this] unchanged when it has no Arabic script. */
+fun androidx.compose.ui.text.AnnotatedString.withPersianFont(): androidx.compose.ui.text.AnnotatedString {
+    if (!hasArabicScript(text)) return this
+    val src = this
+    return androidx.compose.ui.text.buildAnnotatedString {
+        append(src)
+        addPersianSpans(src.text)
+    }
+}
+
+/** A plain string as an AnnotatedString with Persian runs in [PersianFamily]. */
+fun String.withPersianFont(): androidx.compose.ui.text.AnnotatedString {
+    val src = this
+    return androidx.compose.ui.text.buildAnnotatedString {
+        append(src)
+        if (hasArabicScript(src)) addPersianSpans(src)
+    }
+}
+
 /** Apple's SF Pro tracking per point size (HIG Dynamic Type tables), in points. */
 private val SfTracking = listOf(
     11f to 0.06f, 12f to 0f, 13f to -0.08f, 14f to -0.15f, 15f to -0.23f, 16f to -0.31f, 17f to -0.43f,

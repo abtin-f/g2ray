@@ -230,22 +230,23 @@ fun ActiveCallScreen(userId: Long, video: Boolean) {
         while (true) { delay(1000); seconds++ }
     }
     val t = rememberInfiniteTransition(label = "callBg")
-    val shift by t.animateFloat(0f, 1f, infiniteRepeatable(tween(6000), RepeatMode.Reverse), label = "shift")
-    val pulse by t.animateFloat(1f, 1.12f, infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "pulse")
+    val anim = com.abtin.tglass.core.design.LocalAppSettings.current.animations
+    val shiftState = if (anim) t.animateFloat(0f, 1f, infiniteRepeatable(tween(6000), RepeatMode.Reverse), label = "shift") else null
+    val pulseState = if (anim) t.animateFloat(1f, 1.12f, infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "pulse") else null
     Box(
         // Gradient position read at draw time: the background animates without recomposing the call screen.
         Modifier.fillMaxSize().drawBehind {
             drawRect(
                 Brush.linearGradient(
                     listOf(Color(0xFF20A4D7), Color(0xFF3F8BEA), Color(0xFF8148EC)),
-                    start = androidx.compose.ui.geometry.Offset(0f, 1000f * shift),
-                    end = androidx.compose.ui.geometry.Offset(1200f, 2400f - 800f * shift),
+                    start = androidx.compose.ui.geometry.Offset(0f, 1000f * (shiftState?.value ?: 0f)),
+                    end = androidx.compose.ui.geometry.Offset(1200f, 2400f - 800f * (shiftState?.value ?: 0f)),
                 )
             )
         }
     ) {
         Column(Modifier.fillMaxSize().statusBarsPadding().padding(top = 80.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(Modifier.graphicsLayer { val s = if (seconds < 0) pulse else 1f; scaleX = s; scaleY = s }) {
+            Box(Modifier.graphicsLayer { val s = if (seconds < 0) (pulseState?.value ?: 1f) else 1f; scaleX = s; scaleY = s }) {
                 Avatar(u.name, u.id, 150.dp)
             }
             Spacer(Modifier.height(24.dp))

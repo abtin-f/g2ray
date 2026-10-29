@@ -1,5 +1,8 @@
 package com.abtin.tglass.ui.components
 
+import com.abtin.tglass.core.design.TgPalette
+import com.abtin.tglass.core.design.TgDimens
+import com.abtin.tglass.core.design.segmentThumb
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -96,7 +99,7 @@ fun Avatar(
 ) {
     val photo = if (saved || icon != null || iconRes != null) null else com.abtin.tglass.features.main.LocalRepository.current.avatar(photoPeer)
     val colors = when {
-        saved -> Color(0xFF72D5FD) to Color(0xFF2A9EF1)
+        saved -> TgPalette.SavedTop to TgPalette.SavedBottom
         iconColors != null -> iconColors
         else -> avatarColors(seed)
     }
@@ -306,7 +309,7 @@ fun Cell(
             modifier
                 .fillMaxWidth()
                 .then(if (onClick != null) Modifier.iosClickable(onClick = onClick) else Modifier)
-                .heightIn(min = if (subtitle != null) 58.dp else 44.dp)
+                .heightIn(min = if (subtitle != null) TgDimens.CellMinSubtitle else TgDimens.CellMin)
                 .padding(start = 16.dp, end = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -349,7 +352,7 @@ fun SegmentedControl(
     val c = TgTheme.colors
     BoxWithConstraints(
         modifier
-            .height(32.dp)
+            .height(TgDimens.Segmented)
             .clip(Capsule())
             .background(c.searchField)
             .padding(2.dp)
@@ -362,7 +365,7 @@ fun SegmentedControl(
                 .width(segment)
                 .fillMaxHeight()
                 .clip(Capsule())
-                .background(if (c.isDark) Color(0xFF636366) else Color.White)
+                .background(c.segmentThumb)
         )
         Row(Modifier.fillMaxWidth().fillMaxHeight()) {
             items.forEachIndexed { i, s ->
@@ -399,7 +402,7 @@ fun ChipTabs(
             val sel = i == selected
             Box(
                 Modifier
-                    .height(30.dp)
+                    .height(TgDimens.ChipTab)
                     .clip(Capsule())
                     .background(if (sel) c.accent.copy(alpha = if (c.isDark) 0.28f else 0.12f) else Color.Transparent)
                     .clickable(remember { MutableInteractionSource() }, null) { onSelect(i) }
@@ -421,7 +424,7 @@ fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifi
     Box(
         modifier
             .fillMaxWidth()
-            .height(50.dp)
+            .height(TgDimens.PrimaryButton)
             .clip(Capsule())
             .background(if (enabled) c.accent else c.accent.copy(alpha = 0.4f))
             .then(if (active) Modifier.bounceClickable(onClick) else Modifier),

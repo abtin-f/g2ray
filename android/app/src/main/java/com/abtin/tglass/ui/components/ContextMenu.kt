@@ -1,5 +1,9 @@
 package com.abtin.tglass.ui.components
 
+import com.abtin.tglass.core.design.TgDimens
+import com.abtin.tglass.core.design.subtleFill
+import com.abtin.tglass.core.design.glassHairline
+import com.abtin.tglass.core.design.pressOverlay
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
@@ -356,13 +360,13 @@ private fun MenuList(actions: List<MenuAction>, backdrop: Backdrop, enabled: Boo
     val c = TgTheme.colors
     val quick = actions.filter { it.quick }.take(4)
     val rows = actions.filterNot { it in quick }
-    val highlight = if (c.isDark) Color.White.copy(0.12f) else Color.Black.copy(0.08f)
-    val hairline = if (c.isDark) Color.White.copy(0.16f) else Color.Black.copy(0.12f)
+    val highlight = c.pressOverlay
+    val hairline = c.glassHairline
     Column(
         Modifier
-            .width(250.dp)
+            .width(TgDimens.MenuWidth)
             .glass(
-                shape = RoundedRectangle(26.dp),
+                shape = RoundedRectangle(TgDimens.MenuCorner),
                 // Menu body: frosted panel (iOS 26 menus are blur-only; the reaction bar above is liquid).
                 style = com.abtin.tglass.core.glass.GlassStyle.Blur,
                 backdrop = backdrop,
@@ -412,7 +416,7 @@ private fun MenuList(actions: List<MenuAction>, backdrop: Backdrop, enabled: Boo
                     .padding(horizontal = 6.dp)
                     .clip(Capsule())
                     .then(if (enabled) Modifier.iosClickable(highlight = highlight) { onClick(a) } else Modifier)
-                    .height(44.dp)
+                    .height(TgDimens.MenuRow)
                     .padding(start = 14.dp, end = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -501,7 +505,7 @@ private fun ReactionsControl(
                     Modifier
                         .size(30.dp)
                         .clip(Capsule())
-                        .background(if (c.isDark) Color.White.copy(0.12f) else Color.Black.copy(0.06f))
+                        .background(c.subtleFill)
                         .clickable(remember { MutableInteractionSource() }, null, onClick = onExpand),
                     contentAlignment = Alignment.Center,
                 ) {

@@ -1,5 +1,6 @@
 package com.abtin.tglass.features.settings
 
+import com.abtin.tglass.core.design.TgPalette
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
@@ -88,17 +89,17 @@ private class FolderChatType(
 )
 
 private val IncludeTypes = listOf(
-    FolderChatType("Contacts", Icons.Rounded.Person, Color(0xFF007AFF), { it.includeContacts }, { d, v -> d.copy(includeContacts = v) }),
-    FolderChatType("Non-Contacts", Icons.Rounded.PersonOutline, Color(0xFF32ADE6), { it.includeNonContacts }, { d, v -> d.copy(includeNonContacts = v) }),
-    FolderChatType("Groups", Icons.Rounded.Group, Color(0xFF34C759), { it.includeGroups }, { d, v -> d.copy(includeGroups = v) }),
-    FolderChatType("Channels", Icons.Rounded.Campaign, Color(0xFFFF9500), { it.includeChannels }, { d, v -> d.copy(includeChannels = v) }),
-    FolderChatType("Bots", Icons.Rounded.SmartToy, Color(0xFFAF52DE), { it.includeBots }, { d, v -> d.copy(includeBots = v) }),
+    FolderChatType("Contacts", Icons.Rounded.Person, TgPalette.Blue, { it.includeContacts }, { d, v -> d.copy(includeContacts = v) }),
+    FolderChatType("Non-Contacts", Icons.Rounded.PersonOutline, TgPalette.Teal, { it.includeNonContacts }, { d, v -> d.copy(includeNonContacts = v) }),
+    FolderChatType("Groups", Icons.Rounded.Group, TgPalette.Green, { it.includeGroups }, { d, v -> d.copy(includeGroups = v) }),
+    FolderChatType("Channels", Icons.Rounded.Campaign, TgPalette.Orange, { it.includeChannels }, { d, v -> d.copy(includeChannels = v) }),
+    FolderChatType("Bots", Icons.Rounded.SmartToy, TgPalette.Purple, { it.includeBots }, { d, v -> d.copy(includeBots = v) }),
 )
 
 private val ExcludeTypes = listOf(
-    FolderChatType("Muted", Icons.Rounded.NotificationsOff, Color(0xFFFF3B30), { it.excludeMuted }, { d, v -> d.copy(excludeMuted = v) }),
-    FolderChatType("Read", Icons.Rounded.DoneAll, Color(0xFF34C759), { it.excludeRead }, { d, v -> d.copy(excludeRead = v) }),
-    FolderChatType("Archived", Icons.Rounded.Archive, Color(0xFF8E8E93), { it.excludeArchived }, { d, v -> d.copy(excludeArchived = v) }),
+    FolderChatType("Muted", Icons.Rounded.NotificationsOff, TgPalette.Red, { it.excludeMuted }, { d, v -> d.copy(excludeMuted = v) }),
+    FolderChatType("Read", Icons.Rounded.DoneAll, TgPalette.Green, { it.excludeRead }, { d, v -> d.copy(excludeRead = v) }),
+    FolderChatType("Archived", Icons.Rounded.Archive, TgPalette.Gray, { it.excludeArchived }, { d, v -> d.copy(excludeArchived = v) }),
 )
 
 /** Settings → Chat Folders for a real account: the account's folders plus "Create New Folder". */

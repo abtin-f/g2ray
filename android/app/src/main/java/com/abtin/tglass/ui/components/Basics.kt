@@ -34,6 +34,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.abtin.tglass.core.design.TgTheme
+import com.abtin.tglass.core.design.hasArabicScript
+import com.abtin.tglass.core.design.withPersianFont
 
 /** Plain text with iOS defaults. */
 @Composable
@@ -47,18 +49,18 @@ fun T(
     align: TextAlign? = null,
     onTextLayout: ((TextLayoutResult) -> Unit)? = null,
 ) {
-    BasicText(
-        text = text,
-        modifier = modifier,
-        style = style.copy(
-            color = color,
-            fontWeight = weight ?: style.fontWeight,
-            textAlign = align ?: style.textAlign,
-        ),
-        maxLines = maxLines,
-        overflow = TextOverflow.Ellipsis,
-        onTextLayout = onTextLayout,
+    val resolved = style.copy(
+        color = color,
+        fontWeight = weight ?: style.fontWeight,
+        textAlign = align ?: style.textAlign,
     )
+    // Arabic-script text gets the Persian font (Inter has none); Latin text keeps the plain-String fast path.
+    val persian = remember(text) { if (hasArabicScript(text)) text.withPersianFont() else null }
+    if (persian != null) {
+        BasicText(text = persian, modifier = modifier, style = resolved, maxLines = maxLines, overflow = TextOverflow.Ellipsis, onTextLayout = onTextLayout)
+    } else {
+        BasicText(text = text, modifier = modifier, style = resolved, maxLines = maxLines, overflow = TextOverflow.Ellipsis, onTextLayout = onTextLayout)
+    }
 }
 
 @Composable

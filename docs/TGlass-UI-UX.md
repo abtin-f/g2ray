@@ -469,3 +469,11 @@
 | کارایی | `core/perf/PerfOverlay.kt`, `core/perf/Trace.kt` |
 
 (همهٔ مسیرها زیر `android/app/src/main/java/com/abtin/tglass/` هستند.)
+
+## Design tokens, Persian font, back (added after 0.18)
+
+- `core/design/Dimens.kt` (`TgDimens`): nav bar, glass button, primary button, menu, cell and segmented sizes shared by `ui/components`.
+- `core/design/Tokens.kt`: derived colors (`pressOverlay`, `pressLight`, `glassHairline`, `subtleFill`, `alertSurface`, `segmentThumb`, `toastSurface`, `bannerSurface`) and `TgPalette` (fixed iOS system colors for Settings tiles, folders, storage).
+- Persian / Arabic: Inter has no Arabic glyphs, so Arabic-script runs get the bundled Vazirmatn (Non-Latin variable, OFL) through `withPersianFont()` / `addPersianSpans` (applied in `T` and `appendWithAppleEmoji`). Weights 400-700 are pinned like Inter's; all `TgTypography` styles use a fixed line height so mixed lines stay even.
+- Back: `PredictiveBackHandler` in `IOSNavHost` drives the same interactive pop as the edge swipe (`enableOnBackInvokedCallback` is on).
+- Infinite animations in the shared screens (typing dots, welcome logo, profile gifts, call background) stop when Power Saving turns animations off.

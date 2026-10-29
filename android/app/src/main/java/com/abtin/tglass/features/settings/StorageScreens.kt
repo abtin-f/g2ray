@@ -1,5 +1,6 @@
 package com.abtin.tglass.features.settings
 
+import com.abtin.tglass.core.design.TgPalette
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.compose.foundation.background
@@ -102,7 +103,7 @@ object AutoDownloadPrefs {
     }
 }
 
-private val StorageColors = listOf(Color(0xFF007AFF), Color(0xFF34C759), Color(0xFFFF9500))
+private val StorageColors = listOf(TgPalette.Blue, TgPalette.Green, TgPalette.Orange)
 
 // ---- Storage Usage ----
 

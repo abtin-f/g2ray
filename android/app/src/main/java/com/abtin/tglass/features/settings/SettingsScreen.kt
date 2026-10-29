@@ -1,5 +1,6 @@
 package com.abtin.tglass.features.settings
 
+import com.abtin.tglass.core.design.TgPalette
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -134,14 +135,14 @@ enum class Page(val title: String) {
     PersonalChannel("Personal Channel"),
 }
 
-private val Red = Color(0xFFFF3B30)
-private val Orange = Color(0xFFFF9500)
-private val Yellow = Color(0xFFFFCC00)
-private val Green = Color(0xFF34C759)
-private val Teal = Color(0xFF32ADE6)
-private val Blue = Color(0xFF007AFF)
-private val Purple = Color(0xFFAF52DE)
-private val Gray = Color(0xFF8E8E93)
+private val Red = TgPalette.Red
+private val Orange = TgPalette.Orange
+private val Yellow = TgPalette.Yellow
+private val Green = TgPalette.Green
+private val Teal = TgPalette.Teal
+private val Blue = TgPalette.Blue
+private val Purple = TgPalette.Purple
+private val Gray = TgPalette.Gray
 
 /** Spec §37: Settings tab. */
 @Composable
@@ -176,7 +177,7 @@ fun SettingsScreen(backdrop: LayerBackdrop) {
                     photoPeer = me.id,
                     subtitle = listOfNotNull(me.phone.takeIf { it.isNotBlank() }, me.username?.let { "@$it" }).joinToString(" • "),
                     collapse = collapse,
-                    badge = { if (me.premium) Icon(TgIcons.IcPremiumPeer, Color(0xFFAF52DE), 22.dp) },
+                    badge = { if (me.premium) Icon(TgIcons.IcPremiumPeer, Purple, 22.dp) },
                 )
             }
             item {
@@ -547,7 +548,7 @@ private fun LazyListScope.devices() {
         val c = TgTheme.colors
         val current = repo.sessions.firstOrNull { it.current }
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(Modifier.size(90.dp).clip(RoundedRectangle(22.dp)).background(Brush.linearGradient(listOf(Color(0xFF72D5FD), Color(0xFF2A9EF1)))), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(90.dp).clip(RoundedRectangle(22.dp)).background(Brush.linearGradient(listOf(TgPalette.SavedTop, TgPalette.SavedBottom))), contentAlignment = Alignment.Center) {
                 Icon(TgIcons.SetDevices, Color.White, 64.dp)
             }
             Spacer(Modifier.height(12.dp))

@@ -32,6 +32,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import com.abtin.tglass.core.design.addPersianSpans
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TransformedText
@@ -78,6 +79,18 @@ fun AnnotatedString.Builder.appendWithAppleEmoji(
     keepText: (start: Int, end: Int) -> Boolean = { _, _ -> false },
     custom: List<CustomEmojiSpan> = emptyList(),
     tappable: Boolean = false,
+) {
+    val base = length
+    appendWithAppleEmojiRaw(text, keepText, custom, tappable)
+    // Persian / Arabic runs get their own font (Inter has no Arabic glyphs).
+    if (com.abtin.tglass.core.design.hasArabicScript(text)) addPersianSpans(text, base)
+}
+
+private fun AnnotatedString.Builder.appendWithAppleEmojiRaw(
+    text: String,
+    keepText: (start: Int, end: Int) -> Boolean,
+    custom: List<CustomEmojiSpan>,
+    tappable: Boolean,
 ) {
     val customs = ArrayList<CustomEmojiSpan>()
     for (c in custom.sortedBy { it.start }) {

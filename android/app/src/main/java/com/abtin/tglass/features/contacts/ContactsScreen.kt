@@ -41,6 +41,7 @@ import com.abtin.tglass.core.navigation.Route
 import com.abtin.tglass.data.User
 import com.abtin.tglass.features.main.LocalRepository
 import com.abtin.tglass.ui.components.Avatar
+import com.abtin.tglass.ui.components.EmptyState
 import com.abtin.tglass.ui.components.GlassTextButton
 import com.abtin.tglass.ui.components.GlassTopBar
 import com.abtin.tglass.ui.components.Icon
@@ -120,6 +121,10 @@ fun ContactsScreen(backdrop: LayerBackdrop, isTab: Boolean) {
                 }
             }
             item { ActionRow(TgIcons.CtAddMember, "Add Contact") { nav.push(Route.NewContact) } }
+            if (contacts.isEmpty()) item(key = "empty") {
+                if (query.isNotBlank()) EmptyState("🔍", "No Results", "There were no results for \"${query.trim()}\".\nTry a new search.")
+                else EmptyState("👤", "No Contacts", "Your contacts will appear here.")
+            }
             items(contacts, key = { it.id }) { u ->
                 ContactRow(u, onLongClick = { contactOptions(u) }) { nav.push(Route.Chat(repo.privateChatWith(u.id))) }
             }
@@ -185,6 +190,10 @@ fun NewMessageScreen() {
                 item { ActionRow(TgIcons.CtCreateGroup, "New Group") { nav.push(Route.NewGroup) } }
                 item { ActionRow(TgIcons.CtAddMember, "New Contact") { nav.push(Route.NewContact) } }
                 item { ActionRow(TgIcons.CtCreateChannel, "New Channel") { nav.push(Route.NewChannel) } }
+                if (contacts.isEmpty()) item(key = "empty") {
+                    if (query.isNotBlank()) EmptyState("🔍", "No Results", "There were no results for \"${query.trim()}\".\nTry a new search.")
+                    else EmptyState("👤", "No Contacts", "Your contacts will appear here.")
+                }
                 var letter = ' '
                 contacts.forEach { u ->
                     val l = u.name.firstOrNull()?.uppercaseChar() ?: '#' 

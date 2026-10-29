@@ -1,5 +1,6 @@
 package com.abtin.tglass.features.media
 
+import com.abtin.tglass.core.design.subtleFill
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
@@ -161,7 +162,7 @@ fun ChatPickerSheet(
                             .align(Alignment.CenterStart)
                             .size(36.dp)
                             .clip(Capsule())
-                            .background(if (c.isDark) Color.White.copy(0.12f) else Color.Black.copy(0.06f))
+                            .background(c.subtleFill)
                             .fadeClickable(onClick = onDismiss),
                         contentAlignment = Alignment.Center,
                     ) { Icon(IosIcons.Close, c.text, 16.dp) }

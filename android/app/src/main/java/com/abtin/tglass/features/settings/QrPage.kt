@@ -1,5 +1,6 @@
 package com.abtin.tglass.features.settings
 
+import com.abtin.tglass.core.design.TgPalette
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -72,8 +73,8 @@ private fun MyQrCode() {
             Box(Modifier.size(232.dp), contentAlignment = Alignment.Center) {
                 when {
                     matrix != null -> QrImage(matrix, Modifier.size(232.dp))
-                    !loaded -> ActivityIndicator(26.dp, Color(0xFF8E8E93))
-                    else -> T("No public link", TgTheme.type.subheadline, Color(0xFF8E8E93), align = TextAlign.Center)
+                    !loaded -> ActivityIndicator(26.dp, TgPalette.Gray)
+                    else -> T("No public link", TgTheme.type.subheadline, TgPalette.Gray, align = TextAlign.Center)
                 }
             }
             Spacer(Modifier.height(14.dp))
