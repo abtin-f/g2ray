@@ -1425,7 +1425,7 @@ private fun UnreadDivider() {
             .background(if (c.isDark) Color(0xFF1B1B1B).copy(alpha = 0.9f) else Color.White.copy(alpha = 0.9f)).padding(vertical = 4.dp), // serviceMessage.unreadBarFillColor
         contentAlignment = Alignment.Center,
     ) {
-        T("Unread Messages", TgTheme.type.footnote.copy(fontSize = 13.sp, lineHeight = 16.sp), c.secondaryText, weight = FontWeight.Medium)
+        T("Unread Messages", TgTheme.type.footnote.copy(fontSize = 13.sp, lineHeight = 17.sp), c.secondaryText) // ChatUnreadItem: 25 pt bar, regular 13
     }
 }
 

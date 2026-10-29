@@ -1411,11 +1411,11 @@ fun ServicePill(text: String, modifier: Modifier = Modifier) {
                 .widthIn(max = 300.dp)
                 .clip(RoundedRectangle(11.dp))
                 .background(c.serviceBubble)
-                .padding(horizontal = 9.dp, vertical = 3.dp)
+                .padding(horizontal = 7.dp, vertical = 3.dp) // Telegram-iOS ChatMessageDateHeader: 22 pt tall, 6 pt insets
         ) {
             T(
                 text,
-                TgTheme.type.footnote.copy(fontSize = 13.sp, lineHeight = 17.sp, textDirection = TextDirection.Content),
+                TgTheme.type.footnote.copy(fontSize = 13.sp, lineHeight = 16.sp, textDirection = TextDirection.Content),
                 Color.White, weight = FontWeight.Medium, align = TextAlign.Center,
             )
         }
