@@ -295,8 +295,9 @@ enum class GlassLevel(val title: String) {
 
 /** Chat list density (Settings → Appearance → Chat List). Compact matches Telegram iOS 26. */
 enum class ChatListSize(val title: String, val row: Int, val avatar: Int, val titleSp: Float, val previewSp: Float) {
-    // Compact = Telegram iOS 26 measured on the iPhone: 76 pt pitch, 54 pt avatar, 17 pt name, 15 pt preview.
-    Compact("Compact", 76, 54, 17f, 15f),
+    // Compact = Telegram iOS 26 measured on the owner's iPhone photo (ios-10, pixel-scanned): 69 pt pitch, 55 pt avatar
+    // (avatar / pitch = 44 / 55 px), semibold 16 pt name (Telegram-iOS ChatListItem: 16/17 of the list size), 15 pt preview.
+    Compact("Compact", 69, 55, 16f, 15f),
     Regular("Regular", 82, 60, 17f, 16f),
     Large("Large", 90, 66, 18f, 17f),
 }

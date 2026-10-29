@@ -99,6 +99,8 @@ import androidx.compose.ui.unit.sp
 import com.abtin.tglass.core.design.TgTheme
 import com.abtin.tglass.core.glass.GlassBox
 import com.abtin.tglass.core.glass.GlassIconButton
+import com.abtin.tglass.core.glass.GlassStyle
+import com.abtin.tglass.core.glass.glass
 import com.abtin.tglass.core.navigation.LocalNavigator
 import com.abtin.tglass.core.navigation.Route
 import com.abtin.tglass.data.Chat
@@ -292,6 +294,8 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
             if (searching) {
                 searchResults(repo, query, global, onOpen = { focus.clearFocus(); nav.push(Route.Chat(it)) })
             } else {
+                // iOS 26 (ios-10): a full-width "Search" capsule between the header and the folder tabs.
+                item(key = "search") { ListSearchCapsule { searching = true } }
                 item(key = "folders") {
                     if (folders.size > 1) FolderTabs(folders, folder, { folder = it }, unreadFor = { f -> repo.chatsInFolder(f).count { ch -> (ch.unread > 0 || ch.markedUnread) && !ch.muted } })
                 }
@@ -357,7 +361,7 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
                         Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        GlassBox(onClick = null, shape = Capsule(), modifier = Modifier.weight(1f).height(40.dp), contentAlignment = Alignment.CenterStart) {
+                        GlassBox(onClick = null, shape = Capsule(), modifier = Modifier.weight(1f).height(40.dp), contentAlignment = Alignment.CenterStart, style = GlassStyle.Blur) {
                             SearchField(query, { query = it }, Modifier.fillMaxWidth().padding(horizontal = 6.dp), focusRequester = searchFocus, background = Color.Transparent)
                         }
                         Spacer(Modifier.width(8.dp))
@@ -502,15 +506,38 @@ private fun ChatsTitle(stories: List<Pair<Long, String>>, status: String?, colla
     }
 }
 
+/**
+ * The chat list's search capsule (iPhone photo ios-10: 40 pt tall, full width, magnifier + "Search" centered). It scrolls
+ * with the list (inside the recorded layer), so it is the translucent glass material; tapping it opens search mode.
+ */
+@Composable
+private fun ListSearchCapsule(onClick: () -> Unit) {
+    val c = TgTheme.colors
+    Box(
+        Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 4.dp).height(40.dp)
+            .glass(shape = Capsule(), style = GlassStyle.Translucent, backdrop = null, shadow = false)
+            .fadeClickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(TgIcons.IcSearch, c.secondaryText, 20.dp)
+            Spacer(Modifier.width(6.dp))
+            T("Search", TgTheme.type.body, c.secondaryText, maxLines = 1)
+        }
+    }
+}
+
 /** Folder tabs: text tabs with a glass pill under the selected one and unread counters. */
 @Composable
 private fun FolderTabs(folders: List<String>, selected: Int, onSelect: (Int) -> Unit, unreadFor: (Int) -> Int) {
     val c = TgTheme.colors
     // Telegram iOS 26: the folder tabs sit in one capsule, the selected tab in a lighter pill. The tabs scroll
     // inside the list that the glass bars sample (layerBackdrop), so the capsule must not be a backdrop glass itself:
-    // that would draw the layer into itself and overflow the RenderThread stack (native crash).
+    // that would draw the layer into itself and overflow the RenderThread stack (native crash). So it is the
+    // translucent glass material (no backdrop sampling): fill + rim, like the strip over the black list on iOS.
     Box(
-        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).height(38.dp).clip(Capsule()).background(c.searchField),
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).height(38.dp)
+            .glass(shape = Capsule(), style = GlassStyle.Translucent, backdrop = null, shadow = false),
         contentAlignment = Alignment.CenterStart,
     ) {
     Row(
