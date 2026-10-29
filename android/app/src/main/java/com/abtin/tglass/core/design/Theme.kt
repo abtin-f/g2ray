@@ -279,31 +279,64 @@ private fun interFamily(opticalSize: Float) = FontFamily(
     }
 )
 
-val InterText = interFamily(14f)
+/**
+ * Inter at its text optical size (opsz 14) is ~15-20 % wider than SF Pro at the same point size while cap heights
+ * match; the display cut (opsz 32) is ~10 % wider. Both families use opsz 32 and [iosTracking] closes the rest.
+ */
+val InterText = interFamily(32f)
 val InterDisplay = interFamily(32f)
 
-private fun ios(size: Float, weight: FontWeight = FontWeight.Normal, tracking: TextUnit = 0.sp, lineHeight: Float = size * 1.2f) =
+/** Apple's SF Pro tracking per point size (HIG Dynamic Type tables), in points. */
+private val SfTracking = listOf(
+    11f to 0.06f, 12f to 0f, 13f to -0.08f, 14f to -0.15f, 15f to -0.23f, 16f to -0.31f, 17f to -0.43f,
+    18f to -0.44f, 20f to -0.45f, 22f to -0.26f, 24f to 0.07f, 28f to 0.38f, 34f to 0.40f,
+)
+
+/**
+ * Extra tracking that makes Inter (opsz 32) as wide as SF Pro: measured with the font's real advances against iOS
+ * text widths ("Translate to English" 17 pt = 131 pt, "Message" 17 pt = 61 pt, "ARSLWN HS" 17 pt semibold = 87.5 pt).
+ */
+private const val InterWidthCorrectionEm = -0.02f
+
+/** SF Pro tracking at [size] pt (interpolated) plus the Inter width correction, in em. */
+internal fun iosTracking(size: Float): TextUnit {
+    val t = SfTracking
+    val pt = when {
+        size <= t.first().first -> t.first().second
+        size >= t.last().first -> t.last().second
+        else -> {
+            val i = t.indexOfFirst { it.first >= size }
+            val (s0, v0) = t[i - 1]
+            val (s1, v1) = t[i]
+            v0 + (v1 - v0) * (size - s0) / (s1 - s0)
+        }
+    }
+    return (pt / size + InterWidthCorrectionEm).em
+}
+
+/** An iOS text style at [size] pt; tracking follows the point size of the style before Text Size scaling. */
+private fun ios(size: Float, weight: FontWeight = FontWeight.Normal, baseSize: Float = size, lineHeight: Float = size * 1.2f) =
     TextStyle(
         fontFamily = if (size >= 20f) InterDisplay else InterText,
         fontSize = size.sp,
         fontWeight = weight,
-        letterSpacing = tracking,
+        letterSpacing = iosTracking(baseSize),
         lineHeight = lineHeight.sp,
         lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None),
     )
 
 fun typography(scale: Float) = TgTypography(
-    largeTitle = ios(34f * scale, FontWeight.Bold, 0.01.em),
-    title1 = ios(28f * scale, FontWeight.Bold, 0.01.em),
-    title2 = ios(22f * scale, FontWeight.Bold, (-0.01).em),
-    title3 = ios(20f * scale, FontWeight.SemiBold, (-0.02).em),
-    headline = ios(17f * scale, FontWeight.SemiBold, (-0.025).em, 22f * scale),
-    body = ios(17f * scale, FontWeight.Normal, (-0.022).em, 22f * scale),
-    callout = ios(16f * scale, FontWeight.Normal, (-0.02).em, 21f * scale),
-    subheadline = ios(15f * scale, FontWeight.Normal, (-0.015).em, 20f * scale),
-    footnote = ios(13f * scale, FontWeight.Normal, (-0.005).em, 18f * scale),
-    caption1 = ios(12f * scale, FontWeight.Normal, 0.sp, 16f * scale),
-    caption2 = ios(11f * scale, FontWeight.Normal, 0.005.em, 13f * scale),
+    largeTitle = ios(34f * scale, FontWeight.Bold, 34f),
+    title1 = ios(28f * scale, FontWeight.Bold, 28f),
+    title2 = ios(22f * scale, FontWeight.Bold, 22f),
+    title3 = ios(20f * scale, FontWeight.SemiBold, 20f),
+    headline = ios(17f * scale, FontWeight.SemiBold, 17f, 22f * scale),
+    body = ios(17f * scale, FontWeight.Normal, 17f, 22f * scale),
+    callout = ios(16f * scale, FontWeight.Normal, 16f, 21f * scale),
+    subheadline = ios(15f * scale, FontWeight.Normal, 15f, 20f * scale),
+    footnote = ios(13f * scale, FontWeight.Normal, 13f, 18f * scale),
+    caption1 = ios(12f * scale, FontWeight.Normal, 12f, 16f * scale),
+    caption2 = ios(11f * scale, FontWeight.Normal, 11f, 13f * scale),
 )
 
 /** Kept for callers that only know light / dark (CI screenshot launches). */
