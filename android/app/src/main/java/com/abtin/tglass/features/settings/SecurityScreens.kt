@@ -1,5 +1,6 @@
 package com.abtin.tglass.features.settings
 
+import com.abtin.tglass.core.design.TgPalette
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -139,7 +140,7 @@ private fun TwoStepPage() {
 
     Column(Modifier.fillMaxWidth().padding(bottom = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
-            Modifier.size(90.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Color(0xFF72D5FD), Color(0xFF2A9EF1)))),
+            Modifier.size(90.dp).clip(CircleShape).background(Brush.linearGradient(listOf(TgPalette.SavedTop, TgPalette.SavedBottom))),
             contentAlignment = Alignment.Center,
         ) { Icon(IosIcons.Lock, Color.White, 50.dp) }
         Spacer(Modifier.height(14.dp))

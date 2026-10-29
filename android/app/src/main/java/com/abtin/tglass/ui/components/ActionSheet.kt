@@ -1,5 +1,9 @@
 package com.abtin.tglass.ui.components
 
+import com.abtin.tglass.core.design.TgDimens
+import com.abtin.tglass.core.design.pressLight
+import com.abtin.tglass.core.design.subtleFill
+import com.abtin.tglass.core.design.alertSurface
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.spring
@@ -147,7 +151,7 @@ fun ActionSheetHost(state: ActionSheetState) {
 private fun alertSurface(): Color {
     val c = TgTheme.colors
     // actionSheet.itemBackgroundColor: #1C1C1D @ 80 % (night), white @ 80 % (day).
-    return if (c.isDark) Color(0xFF1C1C1D).copy(alpha = 0.8f) else Color.White.copy(alpha = 0.8f)
+    return c.alertSurface
 }
 
 /** iOS 26 alert: centered glass card, big corner radius, capsule buttons (side by side for two, stacked otherwise). */
@@ -231,8 +235,7 @@ private fun AlertButton(a: SheetAction, isCancel: Boolean, modifier: Modifier, o
     val primary = a.bold && !a.destructive && !isCancel
     val base = when {
         primary -> c.accent
-        c.isDark -> Color.White.copy(alpha = 0.12f)
-        else -> Color.Black.copy(alpha = 0.06f)
+        else -> c.subtleFill
     }
     val fill = if (pressed) (if (primary) c.accent.copy(alpha = 0.8f) else if (c.isDark) Color.White.copy(alpha = 0.2f) else Color.Black.copy(alpha = 0.12f)) else base
     val textColor = when {
@@ -242,7 +245,7 @@ private fun AlertButton(a: SheetAction, isCancel: Boolean, modifier: Modifier, o
     }
     Box(
         modifier
-            .height(48.dp)
+            .height(TgDimens.AlertButton)
             .clip(Capsule())
             .background(fill)
             .clickable(source, null, onClick = onClick)
@@ -296,8 +299,8 @@ private fun SheetButton(a: SheetAction, modifier: Modifier, onClick: () -> Unit)
     val c = TgTheme.colors
     Box(
         modifier
-            .iosClickable(highlight = if (c.isDark) Color.White.copy(0.1f) else Color.Black.copy(0.06f), onClick = onClick)
-            .height(56.dp),
+            .iosClickable(highlight = c.pressLight, onClick = onClick)
+            .height(TgDimens.SheetRow),
         contentAlignment = Alignment.Center,
     ) {
         T(

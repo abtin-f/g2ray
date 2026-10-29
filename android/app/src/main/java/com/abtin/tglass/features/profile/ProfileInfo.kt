@@ -1,5 +1,6 @@
 package com.abtin.tglass.features.profile
 
+import com.abtin.tglass.core.design.TgPalette
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -230,7 +231,7 @@ internal fun QrOverlay(link: String, title: String, seed: Long, onShare: () -> U
             }
             Spacer(Modifier.height(14.dp))
             T(title, TgTheme.type.title3, b, weight = FontWeight.Bold, maxLines = 1, align = TextAlign.Center)
-            T(link.removePrefix("https://"), TgTheme.type.subheadline, Color(0xFF8E8E93), maxLines = 1)
+            T(link.removePrefix("https://"), TgTheme.type.subheadline, TgPalette.Gray, maxLines = 1)
             Spacer(Modifier.height(18.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 QrAction("Copy Link", b, onCopy)

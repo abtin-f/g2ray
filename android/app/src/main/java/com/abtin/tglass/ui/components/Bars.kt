@@ -1,5 +1,6 @@
 package com.abtin.tglass.ui.components
 
+import com.abtin.tglass.core.design.TgDimens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -94,20 +95,20 @@ fun GlassTopBar(
     val nav = LocalNavigator.current
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     Box(modifier.fillMaxWidth()) {
-        ScrollEdgeBlur(top + 76.dp, tint = fade)
+        ScrollEdgeBlur(top + TgDimens.NavBarEdgeBlur, tint = fade)
         Box(
             Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(top = 6.dp)
-                .height(44.dp)
-                .padding(horizontal = 12.dp)
+                .padding(top = TgDimens.NavBarTopGap)
+                .height(TgDimens.NavBarHeight)
+                .padding(horizontal = TgDimens.NavBarSideInset)
         ) {
             Row(Modifier.align(Alignment.CenterStart), verticalAlignment = Alignment.CenterVertically) {
                 if (left != null) left()
                 else if (showBack) BackButton(onBack ?: { nav.pop() })
             }
-            Box(Modifier.align(Alignment.Center).padding(horizontal = 72.dp)) {
+            Box(Modifier.align(Alignment.Center).padding(horizontal = TgDimens.NavTitleInset)) {
                 if (center != null) center()
                 else if (title != null) Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     T(title, TgTheme.type.headline, TgTheme.colors.text, maxLines = 1, align = TextAlign.Center)
@@ -125,7 +126,7 @@ fun GlassTopBar(
 @Composable
 fun BackButton(onClick: () -> Unit, modifier: Modifier = Modifier, badge: Int = 0) {
     if (badge > 0) {
-        GlassBox(onClick = onClick, modifier = modifier.height(40.dp), shape = Capsule()) {
+        GlassBox(onClick = onClick, modifier = modifier.height(TgDimens.GlassButton), shape = Capsule()) {
             Row(Modifier.padding(start = 8.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(IosIcons.ChevronLeft, TgTheme.colors.text, 22.dp)
                 Spacer(Modifier.width(2.dp))
@@ -140,11 +141,11 @@ fun BackButton(onClick: () -> Unit, modifier: Modifier = Modifier, badge: Int = 
 /** Text pill in glass ("Edit", "Done"). */
 @Composable
 fun GlassTextButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, color: Color = TgTheme.colors.text, bold: Boolean = false) {
-    GlassBox(onClick = onClick, modifier = modifier.height(40.dp), shape = Capsule()) {
+    GlassBox(onClick = onClick, modifier = modifier.height(TgDimens.GlassButton), shape = Capsule()) {
         T(
             text, TgTheme.type.body, color,
             weight = if (bold) FontWeight.SemiBold else FontWeight.Medium,
-            modifier = Modifier.padding(horizontal = 13.dp), maxLines = 1,
+            modifier = Modifier.padding(horizontal = TgDimens.GlassTextPadding), maxLines = 1,
         )
     }
 }
@@ -152,13 +153,13 @@ fun GlassTextButton(text: String, onClick: () -> Unit, modifier: Modifier = Modi
 /** Several glass icon buttons fused into one capsule (iOS 26 toolbar group). */
 @Composable
 fun GlassButtonGroup(vararg buttons: Pair<Any, () -> Unit>, modifier: Modifier = Modifier) {
-    GlassBox(onClick = null, modifier = modifier.height(40.dp), shape = Capsule()) {
+    GlassBox(onClick = null, modifier = modifier.height(TgDimens.GlassButton), shape = Capsule()) {
         Row(Modifier.padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically) {
             buttons.forEach { (icon, onClick) ->
                 Box(
                     Modifier
-                        .height(40.dp)
-                        .width(40.dp)
+                        .height(TgDimens.GlassButton)
+                        .width(TgDimens.GlassButton)
                         .fadeClickable(onClick = onClick),
                     contentAlignment = Alignment.Center,
                 ) {

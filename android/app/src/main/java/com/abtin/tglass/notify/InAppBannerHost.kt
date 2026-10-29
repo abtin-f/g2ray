@@ -1,5 +1,6 @@
 package com.abtin.tglass.notify
 
+import com.abtin.tglass.core.design.bannerSurface
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
@@ -78,7 +79,7 @@ fun InAppBannerHost(onOpen: (Long) -> Unit) {
             val press by animateFloatAsState(if (pressed) 1f else 0f, spring(0.6f, 600f), label = "bannerPress")
             // Heavily frosted so the text stays readable over any content: this host is drawn outside the
             // context-menu host, whose recorded app content (not containing this banner) is what gets blurred.
-            val surface = if (c.isDark) Color(0xFF1C1C1E).copy(alpha = 0.72f) else Color(0xFFF9F9FB).copy(alpha = 0.74f)
+            val surface = c.bannerSurface
             Box(
                 Modifier
                     .statusBarsPadding()

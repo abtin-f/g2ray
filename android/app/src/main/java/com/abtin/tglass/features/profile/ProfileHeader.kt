@@ -1,5 +1,6 @@
 package com.abtin.tglass.features.profile
 
+import com.abtin.tglass.core.design.TgPalette
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animate
@@ -229,7 +230,7 @@ internal fun ProfileHeaderItem(
     onAvatarTap: (xFraction: Float) -> Unit,
 ) {
     val repo = LocalRepository.current
-    val (ga, gb) = if (saved) Color(0xFF72D5FD) to Color(0xFF2A9EF1) else avatarColors(seed)
+    val (ga, gb) = if (saved) TgPalette.SavedTop to TgPalette.SavedBottom else avatarColors(seed)
     val small = if (saved) null else repo.avatar(photoPeer)
     val screenVisible by LocalScreenVisible.current
     val avatarBrush = remember(ga, gb) { Brush.verticalGradient(listOf(ga, gb)) }

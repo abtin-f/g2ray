@@ -1,5 +1,6 @@
 package com.abtin.tglass.features.settings
 
+import com.abtin.tglass.core.design.TgPalette
 import android.content.Context
 import android.content.SharedPreferences
 import android.os.SystemClock
@@ -354,7 +355,7 @@ private fun LazyListScope.passcodeItems() {
     item {
         val c = TgTheme.colors
         Column(Modifier.fillMaxWidth().padding(bottom = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(Modifier.size(90.dp).clip(CircleShape).background(Color(0xFFFF9500)), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(90.dp).clip(CircleShape).background(TgPalette.Orange), contentAlignment = Alignment.Center) {
                 Icon(IosIcons.Lock, Color.White, 50.dp)
             }
             Spacer(Modifier.height(14.dp))

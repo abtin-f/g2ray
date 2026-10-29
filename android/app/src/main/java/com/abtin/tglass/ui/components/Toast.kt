@@ -1,5 +1,7 @@
 package com.abtin.tglass.ui.components
 
+import com.abtin.tglass.core.design.TgDimens
+import com.abtin.tglass.core.design.toastSurface
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -83,13 +85,13 @@ fun ToastHost(state: ToastState) {
             state.hide()
         }
     }
-    Box(Modifier.fillMaxSize().statusBarsPadding().padding(top = 60.dp), contentAlignment = Alignment.TopCenter) {
+    Box(Modifier.fillMaxSize().statusBarsPadding().padding(top = TgDimens.ToastTop), contentAlignment = Alignment.TopCenter) {
         AnimatedVisibility(state.visible, enter = slideInVertically { -it } + fadeIn(), exit = slideOutVertically { -it } + fadeOut()) {
             Row(
                 Modifier
                     .shadow(20.dp, Capsule(), clip = false, ambientColor = Color.Black.copy(0.2f), spotColor = Color.Black.copy(0.2f))
                     .clip(Capsule())
-                    .background(if (c.isDark) Color(0xFF2C2C2E) else Color(0xFF333333).copy(alpha = 0.92f))
+                    .background(c.toastSurface)
                     .padding(horizontal = 16.dp, vertical = 11.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
