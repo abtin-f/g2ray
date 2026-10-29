@@ -36,146 +36,150 @@ import java.util.Calendar
 import kotlin.math.max
 import kotlin.math.min
 
-/** Design tokens modelled after Telegram for iOS (spec §2). */
+/**
+ * Design tokens modelled after Telegram for iOS (spec §2). Every value comes from Telegram-iOS
+ * `DefaultDayPresentationTheme.swift` (Classic / Day), `DefaultDarkPresentationTheme.swift` (Night) and
+ * `DefaultDarkTintedPresentationTheme.swift` (Tinted Night); see TelegramThemes.kt for the mapping.
+ */
 @Immutable
 data class TgColors(
     val isDark: Boolean,
-    /** Grouped background (Settings, Profile). */
+    /** list.blocksBackgroundColor: grouped background (Settings, Profile). */
     val groupedBackground: Color,
-    /** Plain list background (Chats, Contacts). */
+    /** list.plainBackgroundColor / chatList.backgroundColor: plain list background (Chats, Contacts). */
     val background: Color,
-    /** Cells inside grouped sections. */
+    /** list.itemBlocksBackgroundColor: cells inside grouped sections. */
     val cell: Color,
+    /** list.itemHighlightedBackgroundColor. */
     val cellPressed: Color,
+    /** list.itemPrimaryTextColor. */
     val text: Color,
+    /** list.itemSecondaryTextColor. */
     val secondaryText: Color,
+    /** list.disclosureArrowColor (chevrons, placeholders, empty check circles). */
     val tertiaryText: Color,
+    /** list.itemBlocksSeparatorColor / itemPlainSeparatorColor. */
     val separator: Color,
+    /** list.itemAccentColor (after the theme's accent customization). */
     val accent: Color,
+    /** list.itemDestructiveColor. */
     val destructive: Color,
     val green: Color,
     val orange: Color,
+    /** chatList.unreadBadgeInactiveBackgroundColor (muted unread counters). */
     val mutedBadge: Color,
+    /** rootController.navigationSearchBar.inputFillColor. */
     val searchField: Color,
+    /** Incoming bubble fill (as seen over the theme's wallpaper). */
     val bubbleIn: Color,
+    /** Outgoing bubble fill; with [bubbleOutGradient] the bottom color of the gradient. */
     val bubbleOut: Color,
-    /** Outgoing bubbles painted with a vertical gradient (Day / Night / Tinted themes). */
+    /** Outgoing bubbles painted with a screen-wide vertical gradient, top to bottom (message.outgoing.bubble.fill). */
     val bubbleOutGradient: List<Color>? = null,
     val bubbleInText: Color,
     val bubbleOutText: Color,
     val bubbleInMeta: Color,
     val bubbleOutMeta: Color,
     val bubbleOutAccent: Color,
+    /** Liquid Glass veil over the blurred backdrop (GlassBackgroundComponent `.panel`). */
     val glassSurface: Color,
+    /** Glass without a backdrop (glass off): rootNavigationBar.opaqueBackgroundColor. */
     val glassOpaque: Color,
+    /** contextMenu.backgroundColor. */
     val menuSurface: Color,
+    /** contextMenu.dimColor. */
     val scrim: Color,
+    /** Wallpaper gradient colors (1–4). */
     val wallpaper: List<Color>,
+    /**
+     * Pattern over the wallpaper: black (light wallpapers) or white (dark ones) at the pattern intensity, blended
+     * like Telegram-iOS (soft light). Transparent = no pattern.
+     */
     val wallpaperPattern: Color,
+    /** Service message / date capsule fill (serviceMessage.components.fill). */
     val serviceBubble: Color,
+    /** chatList.onlineDotColor. */
     val onlineDot: Color = Color(0xFF4CC91F),
+    /** chatList.checkmarkColor (read / sent checks in the chat list). */
     val listCheckmark: Color = Color(0xFF0088FF),
+    /** chatList.pinnedItemBackgroundColor. */
     val pinnedRow: Color = Color(0xFFF7F7F7),
     /**
      * Telegram-iOS dark pattern wallpaper (negative intensity): the screen is black and only the pattern lines show
      * the [wallpaper] gradient, at [wallpaperPattern]'s alpha.
      */
     val wallpaperInverted: Boolean = false,
+    /** Content on an accent fill (secondaryBadgeTextColor: checkbox checks, send arrow, unread counters). */
+    val onAccent: Color = Color.White,
+    /** chatList.unreadBadgeActiveTextColor. */
+    val badgeText: Color = Color.White,
+    /** chatList.unreadBadgeInactiveTextColor. */
+    val mutedBadgeText: Color = Color.White,
+    /** chatList.messageTextColor / dateTextColor. */
+    val chatListSecondary: Color = Color(0xFF8E8E93),
+    /** chatList.muteIconColor. */
+    val muteIcon: Color = Color(0xFFA7A7AD),
+    /** chatList.pinnedBadgeColor. */
+    val pinnedIcon: Color = Color(0xFFB6B6BB),
+    /** chatList.messageDraftTextColor. */
+    val draftText: Color = Color(0xFFDD4B39),
+    /** chatList.verifiedIconFillColor / verifiedIconForegroundColor. */
+    val verified: Color = Color(0xFF0088FF),
+    val verifiedFg: Color = Color.White,
+    /** list.sectionHeaderTextColor / freeTextColor (section headers and footers). */
+    val sectionHeader: Color = Color(0xFF6D6D72),
+    /** list.itemSwitchColors.contentColor. */
+    val switchOn: Color = Color(0xFF35C759),
+    /** serviceMessage primaryText. */
+    val serviceText: Color = Color.White,
+    /** serviceMessage.unreadBarFillColor / unreadBarTextColor. */
+    val unreadBar: Color = Color.White.copy(alpha = 0.9f),
+    val unreadBarText: Color = Color(0xFF86868D),
+    /** chat.inputPanel.inputPlaceholderColor / inputControlColor. */
+    val inputPlaceholder: Color = Color.Black.copy(alpha = 0.4f),
+    val inputIcon: Color = Color.Black.copy(alpha = 0.5f),
+    /** chat.message.incoming / outgoing parted colors. */
+    val bubbleInPalette: BubblePalette,
+    val bubbleOutPalette: BubblePalette,
 )
 
-/** Telegram's default "Classic" day theme: green outgoing bubbles on the green pattern wallpaper. */
-val LightColors = TgColors(
-    isDark = false,
-    groupedBackground = Color(0xFFEFEFF4),
-    background = Color(0xFFFFFFFF),
-    cell = Color(0xFFFFFFFF),
-    cellPressed = Color(0xFFD9D9D9),
-    text = Color(0xFF000000),
-    secondaryText = Color(0xFF8E8E93),
-    tertiaryText = Color(0xFFC7C7CC),
-    separator = Color(0xFFC8C7CC),
-    accent = Color(0xFF0088FF),
-    destructive = Color(0xFFFF3B30),
-    green = Color(0xFF34C759),
-    orange = Color(0xFFFF9500),
-    mutedBadge = Color(0xFFB6B6BB),
-    searchField = Color(0x1F767680),
-    bubbleIn = Color(0xFFFFFFFF),
-    bubbleOut = Color(0xFFE1FFC7),
-    bubbleInText = Color(0xFF000000),
-    bubbleOutText = Color(0xFF000000),
-    bubbleInMeta = Color(0xFF525252).copy(alpha = 0.6f),
-    bubbleOutMeta = Color(0xFF008C09).copy(alpha = 0.8f),
-    bubbleOutAccent = Color(0xFF00A700),
-    // GlassBackgroundComponent .panel (light): white veil (legacy fill white @ 70 %, native tint white @ 10 %).
-    glassSurface = Color(0xFFFFFFFF).copy(alpha = 0.6f),
-    // rootNavigationBar.opaqueBackgroundColor: #F7F7F7 mixed with 14 % white.
-    glassOpaque = Color(0xFFF8F8F8),
-    // contextMenu.backgroundColor.
-    menuSurface = Color(0xFFF9F9F9).copy(alpha = 0.78f),
-    scrim = Color(0xFF000000).copy(alpha = 0.18f),
-    wallpaper = listOf(Color(0xFFDBDDBB), Color(0xFF6BA587), Color(0xFFD5D88D), Color(0xFF88B884)),
-    wallpaperPattern = Color(0xFF000000).copy(alpha = 0.09f),
-    serviceBubble = Color(0xFF000000).copy(alpha = 0.2f),
-)
-
-/** iOS `defaultDarkWallpaperGradientColors` (shown only through the pattern on black, intensity −34). */
-private val NightWallpaperGradient = listOf(Color(0xFF598BF6), Color(0xFF7A5EEF), Color(0xFFD67CFF), Color(0xFFF38B58))
-
 /**
- * Outgoing bubbles of the default Night theme (accent #3E88F7): `[0x0771ff, 0x9047ff, 0xa256bf].reversed()` in
- * customizeDefaultDarkPresentationTheme, top of the screen to bottom: violet → purple → blue (iOS screenshots).
+ * Telegram-iOS `PresentationThemePartedColors` of one bubble side. The fill lives in [TgColors.bubbleIn] /
+ * [TgColors.bubbleOut]; `.clear` (knockout) colors of the source are resolved to the bubble fill.
  */
-private val NightBubbleGradient = listOf(Color(0xFFA256BF), Color(0xFF9047FF), Color(0xFF0771FF))
-
-/** Incoming bubble fill of the Night theme (#1D1D1D); on iOS it picks up a little of the wallpaper gradient. */
-private val NightIncoming = Color(0xFF1D1D1D)
-
-/**
- * Telegram-iOS "Night" (DefaultDarkPresentationTheme.swift): true black backgrounds, #1C1C1D grouped cells,
- * #313135 highlight, #545458 @ 55 % separators, #98989E secondary text, blue-gradient outgoing bubbles.
- */
-val DarkColors = TgColors(
-    isDark = true,
-    groupedBackground = Color(0xFF000000),
-    background = Color(0xFF000000),
-    cell = Color(0xFF1C1C1D),
-    cellPressed = Color(0xFF313135),
-    text = Color(0xFFFFFFFF),
-    secondaryText = Color(0xFF98989E),
-    // disclosureArrowColor: white @ 28 % over the cell.
-    tertiaryText = Color(0xFF5C5C5F),
-    separator = Color(0xFF545458).copy(alpha = 0.55f),
-    accent = Color(0xFF3E88F7),
-    destructive = Color(0xFFEB5545),
-    green = Color(0xFF30D158),
-    orange = Color(0xFFFF9F0A),
-    mutedBadge = Color(0xFF666666),
-    // navigationSearchBar.inputFillColor: white @ 10 % (≈ #1A1A1A on black, like the iOS 26 search capsule).
-    searchField = Color(0xFFFFFFFF).copy(alpha = 0.1f),
-    // #1D1D1D mixed with 10 % of the default wallpaper gradient (#2A262F measured on the iPhone).
-    bubbleIn = Color(0xFF2A262F),
-    bubbleOut = Color(0xFF0771FF),
-    bubbleOutGradient = NightBubbleGradient,
-    bubbleInText = Color(0xFFFFFFFF),
-    bubbleOutText = Color(0xFFFFFFFF),
-    bubbleInMeta = Color(0xFFFFFFFF).copy(alpha = 0.5f),
-    bubbleOutMeta = Color(0xFFFFFFFF).copy(alpha = 0.5f),
-    bubbleOutAccent = Color(0xFFFFFFFF),
-    // iOS 26 dark Liquid Glass (GlassBackgroundComponent .panel: #1C1C1C @ 85 % legacy fill): a grey veil that reads
-    // #1C1C1C over black (measured on the iPhone) and still lets bright content through (the scroll-to-bottom button
-    // over a blue bubble reads dark blue); the rim highlight and shadow come from the glass modifier.
-    glassSurface = Color(0xFF3A3A3C).copy(alpha = 0.5f),
-    // Opaque variant (glass off / no backdrop): list.itemBlocksBackgroundColor #1C1C1D, never pure black.
-    glassOpaque = Color(0xFF1C1C1D),
-    // contextMenu.backgroundColor.
-    menuSurface = Color(0xFF252525).copy(alpha = 0.78f),
-    scrim = Color(0xFF000000).copy(alpha = 0.45f),
-    wallpaper = NightWallpaperGradient.map { it.mixedWith(Color.Black, 0.84f) },
-    wallpaperPattern = Color(0xFF8C7CF0).copy(alpha = 0.22f),
-    serviceBubble = Color(0xFF1F1F1F).copy(alpha = 0.85f),
-    listCheckmark = Color(0xFF3E88F7),
-    pinnedRow = Color(0xFF1C1C1D),
+@Immutable
+data class BubblePalette(
+    /** primaryTextColor. */
+    val text: Color,
+    /** secondaryTextColor: time, "edited", views. */
+    val meta: Color,
+    /** linkTextColor. */
+    val link: Color,
+    /** accentTextColor: reply / forward titles, the side's own name color. */
+    val accent: Color,
+    /** accentControlColor / mediaActiveControlColor: play button, file icon, radio progress. */
+    val control: Color,
+    /** mediaControlInnerBackgroundColor: the glyph drawn on [control]. */
+    val controlGlyph: Color,
+    /** mediaInactiveControlColor: waveform not played yet. */
+    val inactive: Color,
+    val fileTitle: Color,
+    val fileDescription: Color,
+    /** outgoingCheckColor (read / sent checks). */
+    val check: Color,
+    val reactionBg: Color,
+    val reactionFg: Color,
+    val reactionActiveBg: Color,
+    val reactionActiveFg: Color,
+    /** polls.bar. */
+    val pollBar: Color,
+    /** polls.radioButton. */
+    val radio: Color,
+    /** polls.separator. */
+    val separator: Color,
+    val mediaPlaceholder: Color,
+    /** textSelectionColor. */
+    val selection: Color,
 )
 
 // ---- Color math (UIColor.withMultiplied / lightness as used by Telegram-iOS themes) ----
@@ -214,6 +218,26 @@ internal fun Color.multiplied(hue: Float, saturation: Float, brightness: Float):
 
 /** UIColor.lightness (Rec. 709 luma). */
 internal val Color.lightness: Float get() = 0.2126f * red + 0.7152f * green + 0.0722f * blue
+
+/** UIColor.withMultipliedBrightnessBy. */
+internal fun Color.brightnessBy(factor: Float): Color {
+    val (h, s, b) = hsb()
+    return hsbColor(h, s, (b * factor).coerceIn(0f, 1f)).copy(alpha = alpha)
+}
+
+/** UIColor.withMultipliedAlpha. */
+internal fun Color.multipliedAlpha(factor: Float): Color = copy(alpha = (alpha * factor).coerceIn(0f, 1f))
+
+/** UIColor.distance(to:) (the "redmean" color distance Telegram-iOS uses, 0 = equal). */
+internal fun Color.distanceTo(other: Color): Int {
+    val r1 = (red * 255f).toInt(); val g1 = (green * 255f).toInt(); val b1 = (blue * 255f).toInt()
+    val r2 = (other.red * 255f).toInt(); val g2 = (other.green * 255f).toInt(); val b2 = (other.blue * 255f).toInt()
+    val rMean = (r1 + r2) / 2
+    val r = r1 - r2
+    val g = g1 - g2
+    val b = b1 - b2
+    return (((512 + rMean) * r * r) shr 8) + 4 * g * g + (((767 - rMean) * b * b) shr 8)
+}
 
 /** iOS text styles. Letter spacing mimics SF Pro tracking. */
 @Immutable
@@ -301,12 +325,15 @@ enum class ChatListSize(val title: String, val row: Int, val avatar: Int, val ti
     Large("Large", 90, 66, 18f, 17f),
 }
 
-/** The built-in themes of the Appearance carousel (Telegram-iOS: dayClassic, nightAccent, day, night). */
+/**
+ * The built-in themes of the Appearance carousel, in Telegram-iOS order (ThemeSettingsController: dayClassic,
+ * nightAccent, day, night) and with their iOS names.
+ */
 enum class ColorTheme(val title: String, val dark: Boolean) {
     Classic("Classic", false),
     Day("Day", false),
     Night("Night", true),
-    Tinted("Tinted", true),
+    Tinted("Tinted Night", true),
 }
 
 /** Auto-Night Mode (ThemeAutoNightSettingsController): when the night theme replaces the day theme. */
@@ -316,45 +343,12 @@ enum class AutoNight(val title: String) {
     Scheduled("Scheduled"),
 }
 
-/** Accent colors offered under the carousel (PresentationThemeBaseColor) with the Tinted wallpaper of each. */
+/**
+ * A chat wallpaper: 1-4 gradient colors (all equal for a plain color) under Telegram's pattern at [intensity]
+ * percent (Telegram-iOS WallpaperSettings.intensity: negative = the dark "inverted" pattern, 0 = no pattern).
+ */
 @Immutable
-data class AccentPreset(val name: String, val color: Color, val tintedWallpaper: List<Color>)
-
-private fun rgb(vararg c: Long) = c.map { Color(0xFF000000 or it) }
-
-val AccentPresets = listOf(
-    AccentPreset("Blue", Color(0xFF0088FF), rgb(0x1e3557, 0x182036, 0x1c4352, 0x16263a)),
-    AccentPreset("Cyan", Color(0xFF00C2ED), rgb(0x1e3557, 0x151a36, 0x1c4352, 0x2a4541)),
-    AccentPreset("Green", Color(0xFF29B327), rgb(0x2d4836, 0x172b19, 0x364331, 0x103231)),
-    AccentPreset("Pink", Color(0xFFEB6CA4), rgb(0x2c0b22, 0x290020, 0x160a22, 0x3b1834)),
-    AccentPreset("Orange", Color(0xFFF08200), rgb(0x2c211b, 0x442917, 0x22191f, 0x3b2714)),
-    AccentPreset("Purple", Color(0xFF9472EE), rgb(0x3a1c3a, 0x24193c, 0x392e3e, 0x1a1632)),
-    AccentPreset("Red", Color(0xFFD33213), rgb(0x2c211b, 0x44332a, 0x22191f, 0x3b2d36)),
-    AccentPreset("Yellow", Color(0xFFEDB400), rgb(0x2c2512, 0x45360b, 0x221d08, 0x3b2f13)),
-    AccentPreset("Gray", Color(0xFF6D839E), rgb(0x1c2731, 0x1a1c25, 0x27303b, 0x1b1b21)),
-)
-
-/** The accent a theme uses for [index] in [AccentPresets] (index 0 = the theme's own blue). */
-fun themeAccent(theme: ColorTheme, index: Int): Color {
-    val preset = AccentPresets.getOrNull(index)
-    if (preset == null || index == 0) return when (theme) {
-        ColorTheme.Classic, ColorTheme.Day -> Color(0xFF0088FF)
-        ColorTheme.Night -> Color(0xFF3E88F7)
-        ColorTheme.Tinted -> Color(0xFF2EA6FF)
-    }
-    val c = preset.color
-    return when (theme) {
-        ColorTheme.Classic, ColorTheme.Day -> if (c.lightness > 0.705f) {
-            val (h, s, b) = c.hsb(); hsbColor(h, min(1f, s * 1.1f), min(b, 0.6f))
-        } else c
-        ColorTheme.Night -> { val (h, s, b) = c.hsb(); hsbColor(h, s, max(b, 0.55f)) }
-        ColorTheme.Tinted -> c
-    }
-}
-
-/** A chat wallpaper from the gallery: 4 gradient colors (all equal for a plain color). */
-@Immutable
-data class WallpaperOption(val colors: List<Color>, val solid: Boolean = false)
+data class WallpaperOption(val colors: List<Color>, val solid: Boolean = false, val intensity: Int = if (solid) 0 else 50)
 
 /**
  * The user's own chat background for the day or night side (Settings -> Appearance -> Chat Background):
@@ -392,58 +386,13 @@ data class UserBackground(
     }
 }
 
-private fun gradient(vararg c: Long) = WallpaperOption(rgb(*c).let { if (it.size == 3) it + it[1] else it })
-private fun solid(c: Long) = WallpaperOption(List(4) { Color(0xFF000000 or c) }, solid = true)
-
-/**
- * Day wallpapers. Index 0 = the theme's own wallpaper; 1–4 keep the order of earlier versions so a saved
- * choice survives the update. The rest are Telegram-iOS accent wallpapers and plain colors.
- */
-val DayWallpapers: List<WallpaperOption?> = listOf(
-    null,
-    gradient(0xE8C06E, 0xF9EDB5, 0xD0A24F, 0xF5DDA0),
-    gradient(0x7FA381, 0xFFF5C5, 0x336F55, 0xFBE37D),
-    gradient(0xA6C4E6, 0xE3D6F0, 0x8DB0E3, 0xC5B6EE),
-    gradient(0xF2B6C4, 0xFCE3D3, 0xE59AB3, 0xF7C8A6),
-    gradient(0xDBDDBB, 0x6BA587, 0xD5D88D, 0x88B884),
-    gradient(0xA4DBFF, 0x009FDD, 0x527BDD),
-    gradient(0xE4B2EA, 0x8376C2, 0xEAB9D9, 0xB493E6),
-    gradient(0xFEC496, 0xDD6CB9, 0x962FBF, 0x4F5BD5),
-    gradient(0x8ADBF2, 0x888DEC, 0xE39FEA, 0x679CED),
-    gradient(0xEAA36E, 0xF0E486, 0xF29EBF, 0xE8C06E),
-    solid(0xFFFFFF), solid(0xE4E7EB), solid(0xD4DFEA), solid(0xB3CDE1), solid(0x8FB4D6), solid(0xD3E2DA),
-    solid(0xBFD9B7), solid(0xF2E7C4), solid(0xF7D9C4), solid(0xF2C6D3), solid(0xDCCFEF), solid(0x2E3A48),
-)
-
-/** Night wallpapers (index 0 = the theme's own). */
-val NightWallpapers: List<WallpaperOption?> = listOf(
-    null,
-    gradient(0x1E3557, 0x182036, 0x1C4352, 0x16263A),
-    gradient(0x0B1A2B, 0x1C2B3E, 0x0F2031, 0x223246),
-    gradient(0x2D4836, 0x172B19, 0x364331, 0x103231),
-    gradient(0x2C0B22, 0x290020, 0x160A22, 0x3B1834),
-    gradient(0x2C211B, 0x442917, 0x22191F, 0x3B2714),
-    gradient(0x3A1C3A, 0x24193C, 0x392E3E, 0x1A1632),
-    gradient(0x2C2512, 0x45360B, 0x221D08, 0x3B2F13),
-    gradient(0x1C2731, 0x1A1C25, 0x27303B, 0x1B1B21),
-    solid(0x000000), solid(0x1C1C1E), solid(0x121B26), solid(0x17212B), solid(0x1E2A22), solid(0x2A1E26),
-    solid(0x26221A), solid(0x23212E),
-)
-
-/** The wallpaper a theme uses when the user did not pick one. */
-fun themeWallpaper(theme: ColorTheme, accentIndex: Int): WallpaperOption = when (theme) {
-    ColorTheme.Classic -> WallpaperOption(LightColors.wallpaper)
-    ColorTheme.Day -> WallpaperOption(List(4) { Color.White }, solid = true)
-    ColorTheme.Night -> WallpaperOption(DarkColors.wallpaper)
-    ColorTheme.Tinted -> WallpaperOption((AccentPresets.getOrNull(accentIndex) ?: AccentPresets[0]).tintedWallpaper)
-}
-
-/** Everything that decides the palette; [buildColors] turns it into [TgColors]. */
+/** Everything that decides the palette; [buildColors] (TelegramThemes.kt) turns it into [TgColors]. */
 @Immutable
 data class ThemeSpec(
     val theme: ColorTheme,
-    val accentIndex: Int = 0,
-    /** null = the theme's own wallpaper. */
+    /** [AccentOption.key] in [accentOptions] of [theme]; unknown / empty = the theme's default. */
+    val accent: String = "",
+    /** null = the theme's own wallpaper (for the chosen accent). */
     val wallpaper: WallpaperOption? = null,
     val pattern: Boolean = true,
     /** 0..1, 0.5 = Telegram's default intensity. */
@@ -451,105 +400,6 @@ data class ThemeSpec(
     val bubbleGradient: Boolean = true,
     val glassTint: Boolean = false,
 )
-
-/** Builds the palette of a theme like Telegram-iOS `customizeDefault…Theme(accentColor:)` does. */
-fun buildColors(spec: ThemeSpec): TgColors {
-    val theme = spec.theme
-    val custom = spec.accentIndex != 0 && spec.accentIndex in AccentPresets.indices
-    val acc = themeAccent(theme, spec.accentIndex)
-    val base: TgColors = when (theme) {
-        ColorTheme.Classic -> if (!custom) LightColors else {
-            val (h, s, b) = AccentPresets[spec.accentIndex].color.hsb()
-            val bubble = hsbColor(h, if (s > 0f && b > 0f) 0.14f else 0f, 0.79f + b * 0.21f)
-            LightColors.copy(
-                accent = acc, listCheckmark = acc,
-                bubbleOut = bubble, bubbleOutMeta = acc.copy(alpha = 0.8f), bubbleOutAccent = acc,
-            )
-        }
-        ColorTheme.Day -> {
-            // DefaultDayPresentationTheme messageDay.outgoing fill: [#57B2E0, #0088FF].
-            val grad = if (!custom) listOf(Color(0xFF57B2E0), Color(0xFF0088FF)) else listOf(acc.multiplied(0.966f, 0.61f, 0.98f), acc)
-            LightColors.copy(
-                accent = acc, listCheckmark = acc,
-                bubbleOut = acc, bubbleOutGradient = if (spec.bubbleGradient) grad else null,
-                bubbleOutText = Color.White, bubbleOutMeta = Color.White.copy(alpha = 0.65f), bubbleOutAccent = Color.White,
-                wallpaperPattern = Color.Transparent,
-            )
-        }
-        ColorTheme.Night -> {
-            val grad = if (!custom) NightBubbleGradient else listOf(acc.multiplied(0.966f, 0.61f, 0.98f), acc)
-            DarkColors.copy(
-                accent = acc, listCheckmark = acc,
-                bubbleOut = grad.last(), bubbleOutGradient = if (spec.bubbleGradient) grad else null,
-            )
-        }
-        ColorTheme.Tinted -> {
-            val mainBackground = acc.multiplied(1.024f, 0.585f, 0.25f)
-            val selection = acc.multiplied(1.03f, 0.585f, 0.12f)
-            val additionalBackground = acc.multiplied(1.024f, 0.573f, 0.18f)
-            val separator = acc.multiplied(1.033f, 0.426f, 0.34f)
-            val secondary = acc.multiplied(1.019f, 0.109f, 0.59f)
-            val secondaryText = acc.multiplied(0.956f, 0.17f, 1.0f)
-            val input = acc.multiplied(1.029f, 0.609f, 0.19f)
-            val outgoing = acc.multiplied(1.019f, 0.731f, 0.59f)
-            val grad = listOf(outgoing.multiplied(0.966f, 0.61f, 0.98f), outgoing)
-            DarkColors.copy(
-                groupedBackground = additionalBackground,
-                background = additionalBackground,
-                cell = mainBackground,
-                cellPressed = selection,
-                secondaryText = secondaryText.copy(alpha = 0.55f),
-                tertiaryText = secondary,
-                separator = separator,
-                accent = acc,
-                listCheckmark = acc,
-                mutedBadge = secondary,
-                searchField = input,
-                bubbleIn = mainBackground,
-                bubbleOut = outgoing,
-                bubbleOutGradient = if (spec.bubbleGradient) grad else null,
-                bubbleInMeta = secondaryText.copy(alpha = 0.5f),
-                glassSurface = additionalBackground.copy(alpha = 0.45f),
-                glassOpaque = mainBackground.copy(alpha = 0.92f),
-                menuSurface = mainBackground.copy(alpha = 0.82f),
-                pinnedRow = mainBackground,
-                serviceBubble = additionalBackground.copy(alpha = 0.8f),
-                wallpaperPattern = Color.Black.copy(alpha = 0.3f),
-            )
-        }
-    }
-    // Wallpaper and its pattern.
-    val picked = spec.wallpaper
-    val wall = picked ?: themeWallpaper(theme, spec.accentIndex)
-    val avg = wall.colors.map { it.lightness }.average().toFloat()
-    val patternBase = when {
-        wall.solid -> Color.Transparent
-        picked == null -> base.wallpaperPattern
-        avg < 0.35f -> Color.White.copy(alpha = 0.07f)
-        else -> Color.Black.copy(alpha = 0.09f)
-    }
-    // Night's own wallpaper is Telegram's inverted pattern: black with the gradient showing through the doodles.
-    val inverted = theme == ColorTheme.Night && picked == null
-    val invertedPattern = Color.White.copy(alpha = 0.3f)
-    val pattern = when {
-        !spec.pattern -> Color.Transparent
-        inverted -> invertedPattern.copy(alpha = (invertedPattern.alpha * spec.patternIntensity * 2f).coerceIn(0f, 1f))
-        patternBase.alpha == 0f -> Color.Transparent
-        else -> patternBase.copy(alpha = (patternBase.alpha * spec.patternIntensity * 2f).coerceIn(0f, 1f))
-    }
-    val wallColors = if (inverted) NightWallpaperGradient else wall.colors
-    var colors = base.copy(wallpaper = wallColors, wallpaperPattern = pattern, wallpaperInverted = inverted)
-    if (theme == ColorTheme.Night) colors = colors.copy(bubbleIn = NightIncoming.mixedWith(averageColor(wallColors), 0.1f))
-    // White incoming bubbles would vanish on a white wallpaper (Telegram-iOS day: #F1F1F4 without wallpaper).
-    if (!colors.isDark && avg > 0.93f) colors = colors.copy(bubbleIn = Color(0xFFF1F1F4))
-    if (!colors.isDark && avg < 0.3f) colors = colors.copy(serviceBubble = Color.White.copy(alpha = 0.18f))
-    if (spec.glassTint) colors = colors.copy(
-        glassSurface = colors.glassSurface.mixedWith(colors.accent.copy(alpha = colors.glassSurface.alpha), 0.16f),
-        glassOpaque = colors.glassOpaque.mixedWith(colors.accent.copy(alpha = colors.glassOpaque.alpha), 0.08f),
-        menuSurface = colors.menuSurface.mixedWith(colors.accent.copy(alpha = colors.menuSurface.alpha), 0.08f),
-    )
-    return colors
-}
 
 /** User-tunable appearance settings, persisted in SharedPreferences. */
 class AppSettings(context: Context) {
@@ -622,8 +472,8 @@ class AppSettings(context: Context) {
         private set
     var nightTo by mutableIntStateOf(prefs.getInt("nightTo", 7 * 60))
         private set
-    /** Accent index (into [AccentPresets]) of each [ColorTheme]. */
-    private val accents = mutableStateListOf(*Array(ColorTheme.entries.size) { i -> prefs.getInt("accent_${ColorTheme.entries[i].name}", 0) })
+    /** Accent of each [ColorTheme]: an [AccentOption.key] of [accentOptions]. */
+    private val accents = mutableStateListOf(*Array(ColorTheme.entries.size) { i -> loadAccent(ColorTheme.entries[i]) })
     var wallpaperPattern by mutableStateOf(prefs.getBoolean("pattern", true))
         private set
     var patternIntensity by mutableFloatStateOf(prefs.getFloat("patternIntensity", 0.5f))
@@ -641,7 +491,18 @@ class AppSettings(context: Context) {
     var appIcon by mutableIntStateOf(prefs.getInt("appIcon", 0))
         private set
 
-    fun accentIndex(theme: ColorTheme): Int = accents[theme.ordinal]
+    /** The accent key of [theme]; versions before 0.18 stored an index into one shared list of base colors. */
+    private fun loadAccent(theme: ColorTheme): String {
+        val options = accentOptions(theme)
+        val stored = prefs.getString("accentKey_${theme.name}", null)
+        if (stored != null && options.any { it.key == stored }) return stored
+        val legacy = listOf("blue", "cyan", "green", "pink", "orange", "purple", "red", "yellow", "gray")
+        val old = prefs.getInt("accent_${theme.name}", 0)
+        val key = if (old > 0) legacy.getOrNull(old) else null
+        return options.firstOrNull { it.key == key }?.key ?: options[0].key
+    }
+
+    fun accentKey(theme: ColorTheme): String = accents[theme.ordinal]
 
     /** Light / dark summary, for callers that predate color themes. */
     val themeMode: ThemeMode
@@ -705,7 +566,7 @@ class AppSettings(context: Context) {
         nightFrom = from.mod(24 * 60); nightTo = to.mod(24 * 60)
         prefs.edit().putInt("nightFrom", nightFrom).putInt("nightTo", nightTo).apply()
     }
-    fun updateAccent(theme: ColorTheme, index: Int) { accents[theme.ordinal] = index; prefs.edit().putInt("accent_${theme.name}", index).apply() }
+    fun updateAccent(theme: ColorTheme, key: String) { accents[theme.ordinal] = key; prefs.edit().putString("accentKey_${theme.name}", key).apply() }
     fun updateWallpaper(v: Int) { wallpaperIndex = v; prefs.edit().putInt("wallpaper", v).apply() }
     fun updateWallpaperNight(v: Int) { wallpaperNightIndex = v; prefs.edit().putInt("wallpaperNight", v).apply() }
     fun backgroundFor(dark: Boolean): UserBackground = if (dark) bgNight else bgDay
@@ -723,7 +584,7 @@ class AppSettings(context: Context) {
     /** The palette inputs for [theme] with the current wallpaper / pattern / bubble settings. */
     fun themeSpec(theme: ColorTheme): ThemeSpec = ThemeSpec(
         theme = theme,
-        accentIndex = accentIndex(theme),
+        accent = accentKey(theme),
         wallpaper = if (theme.dark) NightWallpapers.getOrNull(wallpaperNightIndex) else DayWallpapers.getOrNull(wallpaperIndex),
         pattern = wallpaperPattern,
         patternIntensity = patternIntensity,

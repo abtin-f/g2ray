@@ -42,7 +42,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.abtin.tglass.R
-import com.abtin.tglass.core.design.AccentPresets
+import com.abtin.tglass.core.design.accentOptions
+import com.abtin.tglass.core.design.accentSwatch
+import com.abtin.tglass.core.design.distanceTo
 import com.abtin.tglass.core.design.AutoNight
 import com.abtin.tglass.core.design.ChatListSize
 import com.abtin.tglass.core.design.ColorTheme
@@ -56,7 +58,6 @@ import com.abtin.tglass.core.design.TgColors
 import com.abtin.tglass.core.design.TgTheme
 import com.abtin.tglass.core.design.WallpaperOption
 import com.abtin.tglass.core.design.buildColors
-import com.abtin.tglass.core.design.themeAccent
 import com.abtin.tglass.core.design.themeWallpaper
 import com.abtin.tglass.core.navigation.LocalNavigator
 import com.abtin.tglass.core.navigation.Route
@@ -130,33 +131,8 @@ internal fun LazyListScope.appearancePage() {
         else listOf(ColorTheme.Classic, ColorTheme.Tinted, ColorTheme.Day, ColorTheme.Night)
         Section(header = if (state.nightShowing) "Color Theme — Night Mode" else "Color Theme") {
             Box(Modifier.padding(10.dp)) { ChatPreview() }
-            Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                themes.forEach { t ->
-                    ThemeThumb(t, selected = state.active == t) { s.selectTheme(t, state.nightShowing) }
-                }
-            }
-            Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 14.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                AccentPresets.indices.forEach { i ->
-                    val color = themeAccent(state.active, i)
-                    val sel = s.accentIndex(state.active) == i
-                    Box(
-                        Modifier
-                            .size(34.dp)
-                            .clip(CircleShape)
-                            .border(if (sel) 2.dp else 0.dp, if (sel) color else Color.Transparent, CircleShape)
-                            .padding(if (sel) 5.dp else 0.dp)
-                            .clip(CircleShape)
-                            .background(color)
-                            .fadeClickable { s.updateAccent(state.active, i) },
-                    )
-                }
-            }
+            ThemeCarousel(themes, state.active) { s.selectTheme(it, state.nightShowing) }
+            AccentRow(state.active)
             Separator(startPadding = 16.dp)
             Cell("Chat Background", onClick = { nav.push(Route.SettingsPage(Page.Wallpaper)) })
             Cell("Your Color", divider = false, trailing = {
@@ -316,35 +292,131 @@ internal fun LazyListScope.appearancePage() {
     }
 }
 
-/** A carousel item: a tiny chat in [theme]'s colors with the theme name under it. */
+
+/**
+ * The theme carousel (Telegram-iOS ThemeSettingsThemeItem): 116 pt items, a 98 x 62 pt preview with the theme's
+ * wallpaper, an outgoing bubble (top right) and an incoming one (bottom left); the selected one gets an accent ring
+ * with a 2 pt gap, and its 12 pt title turns bold and accent-colored.
+ */
 @Composable
-private fun ThemeThumb(theme: ColorTheme, selected: Boolean, onClick: () -> Unit) {
+internal fun ThemeCarousel(themes: List<ColorTheme>, selected: ColorTheme, onSelect: (ColorTheme) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 4.dp),
+    ) {
+        themes.forEach { t -> ThemeCard(t, selected == t) { onSelect(t) } }
+    }
+}
+
+@Composable
+private fun ThemeCard(theme: ColorTheme, selected: Boolean, onClick: () -> Unit) {
     val s = LocalAppSettings.current
     val c = TgTheme.colors
     val spec = s.themeSpec(theme)
     val colors = remember(spec) { buildColors(spec) }
-    Column(Modifier.width(84.dp).fadeClickable(onClick = onClick), horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(
-            Modifier
-                .size(84.dp, 108.dp)
-                .border(if (selected) 2.5.dp else 1.dp, if (selected) c.accent else c.separator, RoundedRectangle(16.dp))
-                .padding(if (selected) 4.dp else 1.dp)
-                .clip(RoundedRectangle(13.dp))
-                .then(if (colors.wallpaperInverted) Modifier.background(Color.Black) else Modifier.background(Brush.linearGradient(colors.wallpaper)))
-                .padding(8.dp),
-        ) {
-            Box(Modifier.align(Alignment.TopStart).size(46.dp, 16.dp).clip(RoundedRectangle(8.dp)).background(colors.bubbleIn))
-            val out = colors.bubbleOutGradient
-            Box(
-                Modifier.align(Alignment.Center).padding(start = 18.dp).size(50.dp, 16.dp).clip(RoundedRectangle(8.dp))
-                    .then(if (out != null) Modifier.background(Brush.verticalGradient(out)) else Modifier.background(colors.bubbleOut))
-            )
-            Box(Modifier.align(Alignment.BottomStart).size(34.dp, 16.dp).clip(RoundedRectangle(8.dp)).background(colors.bubbleIn))
+    val ring = if (c.accent.distanceTo(Color.White) < 50) Color(0xFF999999) else c.accent
+    Column(
+        Modifier.width(116.dp).height(116.dp).fadeClickable(onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Spacer(Modifier.height(14.dp))
+        Box(Modifier.size(98.dp, 62.dp)) {
+            Box(Modifier.matchParentSize().clip(RoundedRectangle(16.dp))) {
+                ProvideColors(colors) { ChatWallpaper() }
+                ThemePreviewBubbles(colors)
+            }
+            if (selected) {
+                Box(
+                    Modifier.matchParentSize()
+                        .border(2.dp, ring, RoundedRectangle(16.dp))
+                        .padding(2.dp)
+                        .border(2.dp, c.cell, RoundedRectangle(14.dp)),
+                )
+            }
         }
-        Spacer(Modifier.height(6.dp))
-        T(theme.title, TgTheme.type.footnote, if (selected) c.accent else c.text, weight = if (selected) FontWeight.SemiBold else null)
+        Spacer(Modifier.height(12.dp))
+        T(
+            theme.title, TgTheme.type.caption1.copy(fontSize = 12.sp, lineHeight = 16.sp), if (selected) c.accent else c.text,
+            weight = if (selected) FontWeight.Bold else null, maxLines = 1,
+        )
     }
 }
+
+/** The two 57 x 16 pt bubbles of the Settings/ThemeBubble image (themeIconImage), filled like the theme's bubbles. */
+@Composable
+private fun ThemePreviewBubbles(colors: TgColors) {
+    androidx.compose.foundation.Canvas(Modifier.fillMaxWidth().height(62.dp)) {
+        val u = density
+        fun bubble(x: Float, y: Float, mirrored: Boolean): androidx.compose.ui.graphics.Path {
+            val w = 57f * u
+            val h = 16f * u
+            val r = 8f * u
+            val p = androidx.compose.ui.graphics.Path()
+            p.addRoundRect(androidx.compose.ui.geometry.RoundRect(x + 2f * u, y, x + w, y + h, androidx.compose.ui.geometry.CornerRadius(r)))
+            // The tail at the bottom corner.
+            val tx = if (mirrored) x + w - 2f * u else x + 2f * u
+            val dir = if (mirrored) 1f else -1f
+            val tail = androidx.compose.ui.graphics.Path().apply {
+                moveTo(tx - dir * 3f * u, y + h - 6f * u)
+                lineTo(tx - dir * 3f * u, y + h)
+                lineTo(tx + dir * 2f * u, y + h)
+                quadraticTo(tx, y + h - 1f * u, tx - dir * 0.5f * u, y + h - 4f * u)
+                close()
+            }
+            p.addPath(tail)
+            return p
+        }
+        val outColors = colors.bubbleOutGradient ?: listOf(colors.bubbleOut)
+        val outTop = 12f * u
+        val outPath = bubble(size.width - 9f * u - 57f * u, outTop, mirrored = true)
+        if (outColors.size > 1) drawPath(outPath, Brush.verticalGradient(outColors, startY = outTop, endY = outTop + 16f * u))
+        else drawPath(outPath, outColors[0])
+        drawPath(bubble(9f * u, 34f * u, mirrored = false), colors.bubbleIn)
+    }
+}
+
+/**
+ * The accent row (ThemeSettingsAccentColorItem): 60 pt items with a 40 pt swatch. Unselected: the accent circle
+ * (38.4 pt) with the bubble colors in a 20 pt center; selected: a 32 pt circle in a 2 pt ring with three dots.
+ */
+@Composable
+internal fun AccentRow(theme: ColorTheme) {
+    val s = LocalAppSettings.current
+    val c = TgTheme.colors
+    val current = s.accentKey(theme)
+    val controlSecondary = if (c.isDark) Color.White.copy(alpha = 0.5f) else Color(0xFFDEDEDE)
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 4.dp, vertical = 4.dp)) {
+        accentOptions(theme).forEach { o ->
+            val sw = remember(theme, o, c.cell, controlSecondary) { accentSwatch(theme, o, c.cell, controlSecondary) }
+            val sel = o.key == current
+            Box(
+                Modifier.size(60.dp, 58.dp).fadeClickable { if (!sel) s.updateAccent(theme, o.key) },
+                contentAlignment = Alignment.Center,
+            ) {
+                androidx.compose.foundation.Canvas(Modifier.size(40.dp)) {
+                    val u = density
+                    val center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
+                    if (sel) {
+                        drawCircle(sw.ring, radius = 19f * u, center = center, style = androidx.compose.ui.graphics.drawscope.Stroke(2f * u))
+                        drawCircle(sw.fill, radius = 16f * u, center = center)
+                        listOf(-7f, 0f, 7f).forEach { dx ->
+                            drawCircle(Color.White, radius = 2f * u, center = androidx.compose.ui.geometry.Offset(center.x + dx * u, center.y))
+                        }
+                    } else {
+                        drawCircle(sw.fill, radius = 16f * 1.2f * u, center = center)
+                        val mid = sw.center
+                        if (mid != null) {
+                            if (mid.size > 1) drawCircle(
+                                Brush.verticalGradient(mid, startY = center.y - 10f * u, endY = center.y + 10f * u),
+                                radius = 10f * u, center = center,
+                            ) else drawCircle(mid[0], radius = 10f * u, center = center)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 
 /** Settings → Appearance → Text Size. */
 internal fun LazyListScope.textSizePage() {
@@ -455,11 +527,11 @@ internal fun LazyListScope.wallpaperPage() {
         val gradients = list.indices.filter { list[it]?.solid != true }
         val solids = list.indices.filter { list[it]?.solid == true }
         Section(header = "Gradients") {
-            WallpaperGrid(gradients, list, selected, theme, s.accentIndex(theme)) { pick(it) }
+            WallpaperGrid(gradients, list, selected, theme, s.accentKey(theme)) { pick(it) }
         }
         Spacer(Modifier.height(24.dp))
         Section(header = "Colors") {
-            WallpaperGrid(solids, list, selected, theme, s.accentIndex(theme)) { pick(it) }
+            WallpaperGrid(solids, list, selected, theme, s.accentKey(theme)) { pick(it) }
         }
         Spacer(Modifier.height(24.dp))
         Section {
@@ -470,28 +542,36 @@ internal fun LazyListScope.wallpaperPage() {
     }
 }
 
+/** Wallpaper gallery: each cell is the real wallpaper (gradient + Telegram pattern) with the theme's palette. */
 @Composable
-private fun WallpaperGrid(indices: List<Int>, list: List<WallpaperOption?>, selected: Int, theme: ColorTheme, accent: Int, onPick: (Int) -> Unit) {
+private fun WallpaperGrid(indices: List<Int>, list: List<WallpaperOption?>, selected: Int, theme: ColorTheme, accent: String, onPick: (Int) -> Unit) {
     val c = TgTheme.colors
+    val s = LocalAppSettings.current
+    val spec = s.themeSpec(theme)
     Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         indices.chunked(3).forEach { row ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 row.forEach { i ->
                     val option = list[i] ?: themeWallpaper(theme, accent)
+                    val cellColors = remember(spec, option) { buildColors(spec.copy(wallpaper = option)) }
                     val sel = i == selected
                     Box(
                         Modifier
                             .weight(1f)
                             .aspectRatio(0.72f)
                             .clip(RoundedRectangle(12.dp))
-                            .background(Brush.linearGradient(option.colors))
                             .border(if (sel) 3.dp else 0.5.dp, if (sel) c.accent else c.separator, RoundedRectangle(12.dp))
                             .fadeClickable { onPick(i) },
                         contentAlignment = Alignment.Center,
                     ) {
-                        if (i == 0) T("Default", TgTheme.type.caption1, if (option.colors.first().let { it.red + it.green + it.blue } > 1.6f) Color.Black.copy(0.6f) else Color.White.copy(0.8f), weight = FontWeight.SemiBold)
+                        ProvideColors(cellColors) { com.abtin.tglass.features.chat.ThemeWallpaper(Modifier.matchParentSize()) }
+                        if (i == 0) {
+                            val light = !option.solid && option.intensity >= 0 && option.colors.first().let { it.red + it.green + it.blue } > 1.6f ||
+                                option.solid && option.colors.first().let { it.red + it.green + it.blue } > 1.6f
+                            T("Default", TgTheme.type.caption1, if (light) Color.Black.copy(0.6f) else Color.White.copy(0.8f), weight = FontWeight.SemiBold)
+                        }
                         if (sel) Box(Modifier.align(Alignment.BottomEnd).padding(6.dp).size(22.dp).clip(CircleShape).background(c.accent), contentAlignment = Alignment.Center) {
-                            Icon(IosIcons.Checkmark, Color.White, 14.dp)
+                            Icon(IosIcons.Checkmark, c.onAccent, 14.dp)
                         }
                     }
                 }
@@ -534,9 +614,9 @@ internal fun LazyListScope.autoNightPage() {
         val s = LocalAppSettings.current
         Spacer(Modifier.height(24.dp))
         Section(header = "Preferred Theme", footer = "The theme used by Night Mode and Auto-Night Mode.") {
-            listOf(ColorTheme.Night, ColorTheme.Tinted).forEachIndexed { i, t ->
-                Cell(t.title, checked = s.nightTheme == t, chevron = false, divider = i == 0, onClick = { s.updateNightTheme(t) })
-            }
+            // ThemeAutoNightSettingsController: the night themes as a carousel (Tinted Night, Night), with accents.
+            ThemeCarousel(listOf(ColorTheme.Tinted, ColorTheme.Night), s.nightTheme) { s.updateNightTheme(it) }
+            AccentRow(s.nightTheme)
         }
     }
 }
