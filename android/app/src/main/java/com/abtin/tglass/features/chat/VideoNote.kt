@@ -144,7 +144,11 @@ internal fun VideoNoteMessage(
     // The muted loop's ExoPlayer (built and prepared on the main thread) is only created once the message has stayed on
     // screen a moment: flinging past round videos no longer builds and releases a player + decoder for each of them.
     var settled by remember(key) { mutableStateOf(false) }
-    if (!settled && !active) LaunchedEffect(key) {
+    if (!settled) LaunchedEffect(key, active) {
+        if (active) {
+            settled = true
+            return@LaunchedEffect
+        }
         kotlinx.coroutines.delay(350)
         settled = true
     }

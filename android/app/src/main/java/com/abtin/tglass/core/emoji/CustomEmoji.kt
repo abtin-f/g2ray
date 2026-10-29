@@ -2,6 +2,7 @@ package com.abtin.tglass.core.emoji
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
@@ -13,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.unit.min
 import com.abtin.tglass.core.design.LocalAppSettings
 import com.abtin.tglass.data.CustomReactions
@@ -34,16 +36,19 @@ import com.abtin.tglass.ui.components.TgsSticker
  */
 @Composable
 fun CustomEmoji(id: Long, size: Dp, modifier: Modifier = Modifier, fallback: String? = null) {
-    CustomEmoji(id, modifier.size(size), fallback)
+    CustomEmojiContent(id, modifier.size(size), fallback, size)
 }
 
 /** [CustomEmoji] filling the size given by [modifier]. */
 @Composable
-fun CustomEmoji(id: Long, modifier: Modifier, fallback: String?) {
+fun CustomEmoji(id: Long, modifier: Modifier, fallback: String?) = CustomEmojiContent(id, modifier, fallback, Dp.Unspecified)
+
+@Composable
+private fun CustomEmojiContent(id: Long, modifier: Modifier, fallback: String?, side: Dp) {
     val repo = LocalRepository.current
     val item = repo.customEmoji(id)
     LaunchedEffect(id, item == null) { if (item == null) repo.loadCustomEmoji(listOf(id)) }
-    StickerArt(item, fallback ?: item?.emoji.orEmpty(), modifier)
+    StickerArt(item, fallback ?: item?.emoji.orEmpty(), modifier, side = side)
 }
 
 /**
@@ -51,11 +56,22 @@ fun CustomEmoji(id: Long, modifier: Modifier, fallback: String?) {
  * otherwise the still picture, and the Apple emoji [fallback] until something is downloaded.
  */
 @Composable
-fun StickerArt(st: StickerItem?, fallback: String, modifier: Modifier, animate: Boolean = true) {
+fun StickerArt(st: StickerItem?, fallback: String, modifier: Modifier, animate: Boolean = true, side: Dp = Dp.Unspecified) {
+    if (side.isSpecified) {
+        // Size known (reaction chips): a plain Box. BoxWithConstraints is a SubcomposeLayout, a sub-composition per emoji.
+        Box(modifier, contentAlignment = Alignment.Center) { StickerArtContent(st, fallback, side, animate) }
+    } else {
+        BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
+            StickerArtContent(st, fallback, min(maxWidth, maxHeight).let { if (it == Dp.Infinity) 20.dp else it }, animate)
+        }
+    }
+}
+
+@Composable
+private fun StickerArtContent(st: StickerItem?, fallback: String, side: Dp, animate: Boolean) {
     val repo = LocalRepository.current
     val animations = LocalAppSettings.current.animations
-    BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
-        val side = min(maxWidth, maxHeight).let { if (it == Dp.Infinity) 20.dp else it }
+    run {
         val image = st?.image
         val imagePath = image?.let { repo.filePath(it) }
         LaunchedEffect(image?.fileId, imagePath) { if (image != null && imagePath == null) repo.requestImage(image) }
