@@ -439,7 +439,7 @@ fun MessageBubble(
                 .drawWithContent {
                     drawContent()
                     // Outgoing media bubbles keep a 1.5 pt outline in the bubble color (iOS 26); the stroke is centered on the edge, the clip keeps the inner half.
-                    if (m.outgoing) drawOutline(shape.createOutline(size, layoutDirection, this), colors.fill, style = Stroke(width = 3.dp.toPx()))
+                    if (m.outgoing) drawOutline(shape.createOutline(this.size, layoutDirection, this), colors.fill, style = Stroke(width = 3.dp.toPx()))
                 },
         ) {
             MediaTile(content, Modifier.fillMaxSize(), onMediaClick)
