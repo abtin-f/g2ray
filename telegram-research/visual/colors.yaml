@@ -1,0 +1,79 @@
+# Source: submodules/TelegramPresentationData/Sources/DefaultDayPresentationTheme.swift (day)
+#         submodules/TelegramPresentationData/Sources/DefaultDarkPresentationTheme.swift (night)
+day:
+  accent: "#0088FF"                     # defaultDayAccentColor (line 56)
+  destructive: "#FF3B30"
+  list:
+    plainBackground: "#FFFFFF"
+    blocksBackground: "#EFEFF4"           # grouped (Settings)
+    itemBlocksBackground: "#FFFFFF"
+    itemPrimaryText: "#000000"
+    itemSecondaryText: "#8E8E93"
+    separator: "#C8C7CC"
+  chatList:
+    pinnedItemBackground: "#F7F7F7"
+    pinnedItemHighlighted: "#E5E5EA"
+    title: "#000000"
+    dateText: "#8E8E93"
+    messageText: "#8E8E93"
+    checkmark: accent                    # day ? accent : #21C004
+    unreadBadgeActive: accent
+    unreadBadgeInactive: "#B6B6BB"       # muted
+    pinnedBadge: "#B6B6BB"
+    onlineDot: "#4CC91F"
+    archiveAvatarPinned: ["#72D5FD", "#2A9EF1"]
+    archiveAvatarUnpinned: ["#DEDEE5", "#C5C6CC"]
+  chat:
+    serviceBackground: "#000000 @ 0.20"  # defaultServiceBackgroundColor (line 54)
+    incoming:
+      fill: "#FFFFFF"
+      highlightedFill: "#D9F4FF"
+      primaryText: "#000000"
+      secondaryText: "#525252 @ 0.6"     # time / meta
+      link: "#004BAD"
+      accentText: accent
+      reactionInactiveBg: "accent @ 0.1"
+      reactionActiveBg: accent
+      fileTitle: "#0B8BED"
+      pollBar: accent
+      mediaPlaceholder: "#E8ECF0"
+    outgoing:
+      fill: "#E1FFC7"                    # classic green
+      primaryText: "#000000"
+      secondaryText: "#008C09 @ 0.8"     # time / meta
+      link: "#004BAD"
+      accentText: "#00A700"
+      accentControl: "#3FC33B"
+      fileTitle: "#3FAA3C"
+      mediaPlaceholder: "#D2F2B6"
+
+night:
+  accent: "#3E88F7"                     # defaultDarkColorPresentationTheme
+  list:
+    plainBackground: "#000000"
+    blocksBackground: "#000000"
+    modalBlocksBackground: "#1C1C1D"
+    itemBlocksBackground: "#1C1C1D"
+    itemPrimaryText: "#FFFFFF"
+    itemSecondaryText: "#98989E"
+    separator: "#545458 @ 0.55"
+  chatList:
+    pinnedItemBackground: "#1C1C1D"
+    dateText: "#8D8E93"
+    messageText: "#8D8E93"
+    unreadBadgeInactive: "#666666"
+    unreadBadgeInactiveText: "#000000"
+    onlineDot: "#4CC91F"
+  chat:
+    incoming:
+      fill: "#1D1D1D"                    # alpha depends on wallpaper
+    outgoing:
+      fill: ["#61BCF9", "#0088FF"]       # gradient
+      primaryText: "#FFFFFF"
+      secondaryText: "#FFFFFF @ 0.5"
+      check: "#FFFFFF"
+
+glass_fallback:                           # GlassBackgroundComponent.swift, legacy (pre-iOS 26) path
+  light: "#FFFFFF @ 0.70"
+  dark: "white mixed with black 0.89 (#1C1C1C) @ 0.85"
+  shadow: { blur: 40, intensity: 0.04, offsetY: 1 }

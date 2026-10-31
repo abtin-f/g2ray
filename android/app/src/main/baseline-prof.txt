@@ -1,0 +1,14 @@
+# Hand-written baseline profile: the app's own packages (and the libraries that sit on the hot paths: Kyant backdrop
+# glass, Lottie, TDLib bindings) are compiled ahead of time on install, so the first frames and the first scrolls do
+# not run in the interpreter / JIT. Wildcards are expanded against the app's dex files by the Android Gradle plugin.
+# H = hot, S = startup, P = post-startup.
+HSPLcom/abtin/tglass/**;->**(**)**
+Lcom/abtin/tglass/**;
+HSPLcom/kyant/backdrop/**;->**(**)**
+Lcom/kyant/backdrop/**;
+HSPLcom/kyant/shapes/**;->**(**)**
+Lcom/kyant/shapes/**;
+HSPLcom/airbnb/lottie/**;->**(**)**
+Lcom/airbnb/lottie/**;
+HSPLdev/g000sha256/tdl/**;->**(**)**
+Ldev/g000sha256/tdl/**;
