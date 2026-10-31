@@ -505,6 +505,9 @@ class AppSettings(context: Context) {
     /** Draws frame rate / slowest frame in a corner (Settings → Power Saving → Performance Overlay). */
     var perfOverlay by mutableStateOf(prefs.getBoolean("perfOverlay", false))
         private set
+    /** Ghost mode: opening a chat does not send read receipts (the repository reads the same "ghostRead" pref). */
+    var ghostRead by mutableStateOf(prefs.getBoolean("ghostRead", false))
+        private set
     var textScale by mutableFloatStateOf(prefs.getFloat("textScale", 1f))
         private set
     /** Interface Scale multiplier on top of the automatic fit to the iPhone's 393-point width (see [ProvideUiScale]). */
@@ -687,6 +690,7 @@ class AppSettings(context: Context) {
 
     fun updateGlass(v: GlassLevel) { glassLevel = v; prefs.edit().putInt("glass", v.ordinal).apply() }
     fun updateAnimations(v: Boolean) { animations = v; prefs.edit().putBoolean("anim", v).apply() }
+    fun updateGhostRead(v: Boolean) { ghostRead = v; prefs.edit().putBoolean("ghostRead", v).apply() }
     fun updatePerfOverlay(v: Boolean) { perfOverlay = v; prefs.edit().putBoolean("perfOverlay", v).apply() }
     fun updateUiScale(v: Float) { uiScale = v; prefs.edit().putFloat("uiScale", v).apply() }
     fun updateTextScale(v: Float) { textScale = v; prefs.edit().putFloat("textScale", v).apply() }

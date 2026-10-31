@@ -467,6 +467,18 @@ private fun LazyListScope.privacy() {
     }
     gap()
     item {
+        val s = LocalAppSettings.current
+        Section(
+            header = "Read Receipts",
+            footer = "When on, opening a chat does not mark its messages as read, so the sender doesn't see \"seen\". " +
+                "Use the chat list swipe (Read) to mark a chat read yourself. Sending a message in a chat still marks it read on Telegram's side. " +
+                "To hide your last seen time, change Last Seen & Online below; if you hide yours, Telegram also hides other people's exact last seen from you.",
+        ) {
+            Cell("Don't Send Read Receipts", chevron = false, divider = false, trailing = { IOSSwitch(s.ghostRead, { s.updateGhostRead(it) }) })
+        }
+    }
+    gap()
+    item {
         val repo = LocalRepository.current
         val sheet = LocalActionSheet.current
         androidx.compose.runtime.LaunchedEffect(Unit) { repo.loadPrivacy() }

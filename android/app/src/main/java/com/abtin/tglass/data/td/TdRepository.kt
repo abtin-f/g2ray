@@ -842,7 +842,12 @@ class TdRepository(context: Context) : TelegramRepository {
         return true
     }
 
+    /** Ghost mode (Settings → Privacy): opening a chat or receiving a message in it must not send a read receipt. */
+    private fun ghostRead(): Boolean =
+        runCatching { app.getSharedPreferences("tglass", Context.MODE_PRIVATE).getBoolean("ghostRead", false) }.getOrDefault(false)
+
     private fun markRead(chatId: Long) {
+        if (ghostRead()) return
         val ids = messages(chatId).filter { !it.outgoing }.takeLast(100).map { it.id }
         val last = chatStates[chatId]?.lastMessage?.id
         val all = (ids + listOfNotNull(last)).distinct()
@@ -961,7 +966,7 @@ class TdRepository(context: Context) : TelegramRepository {
             }
             is UpdateNewMessage -> {
                 addMessage(u.message)
-                if (u.message.chatId in openChats && !u.message.isOutgoing) {
+                if (u.message.chatId in openChats && !u.message.isOutgoing && !ghostRead()) {
                     scope.launch { client.viewMessages(u.message.chatId, longArrayOf(u.message.id), null, true) }
                 }
                 try {
