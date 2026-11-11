@@ -154,7 +154,11 @@ private fun alertSurface(): Color {
     return c.alertSurface
 }
 
-/** iOS 26 alert: centered glass card, big corner radius, capsule buttons (side by side for two, stacked otherwise). */
+/**
+ * iOS 26 alert: centered glass card, big corner radius, capsule buttons (side by side for two, stacked otherwise).
+ * Telegram-iOS AlertComponent: width 300, corner 35, content insets 30 side / 22 top / 21 bottom, content gap 8,
+ * buttons 16 from the sides and 8 apart.
+ */
 @Composable
 private fun IosAlert(r: SheetRequest, backdrop: Backdrop?, state: ActionSheetState, run: (SheetAction) -> Unit) {
     val c = TgTheme.colors
@@ -166,17 +170,17 @@ private fun IosAlert(r: SheetRequest, backdrop: Backdrop?, state: ActionSheetSta
             .fillMaxWidth(0.78f)
             // Swallow taps so the dim layer behind doesn't get them.
             .clickable(remember { MutableInteractionSource() }, null) {}
-            .glass(shape = RoundedRectangle(34.dp), backdrop = backdrop, surface = alertSurface(), blurRadius = 16.dp, lensHeight = 18.dp, lensAmount = 26.dp)
-            .padding(start = 18.dp, end = 18.dp, top = 22.dp, bottom = 16.dp),
+            .glass(shape = RoundedRectangle(35.dp), backdrop = backdrop, surface = alertSurface(), blurRadius = 16.dp, lensHeight = 18.dp, lensAmount = 26.dp)
+            .padding(start = 16.dp, end = 16.dp, top = 22.dp, bottom = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Column(
-            Modifier.fillMaxWidth().heightIn(max = 420.dp).verticalScroll(rememberScrollState()).padding(horizontal = 4.dp),
+            Modifier.fillMaxWidth().heightIn(max = 420.dp).verticalScroll(rememberScrollState()).padding(horizontal = 14.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             r.title?.let { T(it, TgTheme.type.headline.copy(fontSize = 17.sp), c.text, weight = FontWeight.SemiBold, align = TextAlign.Center) }
             r.message?.let {
-                Spacer(Modifier.height(if (r.title != null) 6.dp else 0.dp))
+                Spacer(Modifier.height(if (r.title != null) 8.dp else 0.dp))
                 T(it, TgTheme.type.subheadline.copy(fontSize = 15.sp), c.text.copy(alpha = 0.86f), align = TextAlign.Center)
             }
         }
@@ -194,11 +198,11 @@ private fun IosAlert(r: SheetRequest, backdrop: Backdrop?, state: ActionSheetSta
                 T(cb.title, TgTheme.type.body.copy(fontSize = 16.sp), c.text, maxLines = 2)
             }
         }
-        Spacer(Modifier.height(18.dp))
+        Spacer(Modifier.height(21.dp))
         if (all.size == 2) {
             // Cancel on the left, the action on the right (UIAlertController order).
             val ordered = if (cancel != null) listOf(cancel, r.actions.first()) else all
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ordered.forEach { a -> AlertButton(a, isCancel = a === cancel, Modifier.weight(1f)) { run(a) } }
             }
         } else {
@@ -300,13 +304,14 @@ private fun SheetButton(a: SheetAction, modifier: Modifier, onClick: () -> Unit)
     Box(
         modifier
             .iosClickable(highlight = c.pressLight, onClick = onClick)
-            .height(TgDimens.SheetRow),
+            // Telegram-iOS ActionSheetButtonItem: row 57 pt, regular 20 (medium 20 for the bold action).
+            .height(57.dp),
         contentAlignment = Alignment.Center,
     ) {
         T(
-            a.title, TgTheme.type.body.copy(fontSize = TgTheme.type.body.fontSize * 1.06f),
+            a.title, TgTheme.type.body.copy(fontSize = 20.sp, lineHeight = 25.sp),
             if (a.destructive) c.destructive else c.accent,
-            weight = if (a.bold) FontWeight.SemiBold else null,
+            weight = if (a.bold) FontWeight.Medium else null,
             maxLines = 1,
         )
     }

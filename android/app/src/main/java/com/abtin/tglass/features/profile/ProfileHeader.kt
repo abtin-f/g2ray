@@ -170,24 +170,27 @@ internal class HeaderGeometry(
 )
 
 /**
- * Profile buttons: round 48pt glass buttons (22pt glyph) with an 11pt label under each, spread evenly
- * across the width. [ButtonSize] is the height of the whole row (circle + gap + label).
+ * Profile buttons (Telegram-iOS PeerInfoHeaderNode / PeerInfoHeaderButtonNode): equal-width rounded-rect glass
+ * tiles, [ButtonSize] = 58 pt high, corner 16, 8 pt apart, 16 pt from the sides; the 40 pt icon sits 1 pt from the
+ * top and the lowercase regular 11 pt label is inside the tile, 9 pt from its bottom.
  */
-internal val ButtonCircle = 48.dp
-internal val ButtonSize = 66.dp
+internal val ButtonSize = 58.dp
+internal val ButtonCorner = 16.dp
 internal val ButtonGap = 8.dp
 
 internal fun headerGeometry(width: Dp, statusTop: Dp, p: Float, pull: Dp, hasMusic: Boolean): HeaderGeometry {
     val size0 = 100.dp + (pull * 0.35f).coerceAtMost(44.dp)
     val top0 = statusTop + 40.dp + pull * 0.6f
     val name0 = top0 + size0 + 12.dp
-    val buttons0 = name0 + 62.dp
+    // Title 28 pt (line 34) + status 17 pt (line 22) + 12 pt to the tiles; the tiles end 16 pt above the header's
+    // bottom edge (PeerInfoHeaderNode: backgroundHeight - 16 - buttonSize.height).
+    val buttons0 = name0 + 70.dp
     val photoH = width * 1.1f + pull
-    val buttons1 = photoH - ButtonSize - 26.dp
-    val name1 = buttons1 - 66.dp
+    val buttons1 = photoH - ButtonSize - 16.dp
+    val name1 = buttons1 - 70.dp
     val buttonsTop = lerp(buttons0, buttons1, p)
     val musicTop = buttonsTop + ButtonSize + 12.dp
-    val height = (if (hasMusic) musicTop + 34.dp else buttonsTop + ButtonSize) + 14.dp
+    val height = (if (hasMusic) musicTop + 34.dp else buttonsTop + ButtonSize) + 16.dp
     return HeaderGeometry(
         avatarTop = lerp(top0, 0.dp, p),
         avatarWidth = lerp(size0, width, p),
@@ -350,15 +353,16 @@ internal fun ProfileHeaderItem(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 com.abtin.tglass.core.emoji.EmojiText(
-                    name, TgTheme.type.title2.copy(fontSize = 26.sp, lineHeight = 31.sp), pal.title,
-                    weight = FontWeight.SemiBold, maxLines = 1, align = TextAlign.Center,
+                    // PeerInfoHeaderNode: title medium 28, status regular 17.
+                    name, TgTheme.type.title2.copy(fontSize = 28.sp, lineHeight = 34.sp), pal.title,
+                    weight = FontWeight.Medium, maxLines = 1, align = TextAlign.Center,
                     modifier = Modifier.weight(1f, fill = false),
                 )
                 badges()
             }
             if (subtitle != null) {
-                Spacer(Modifier.height(2.dp))
-                T(subtitle, TgTheme.type.subheadline, if (online) pal.online else pal.subtitle, maxLines = 1)
+                Spacer(Modifier.height(1.dp))
+                T(subtitle, TgTheme.type.body.copy(fontSize = 17.sp, lineHeight = 22.sp), if (online) pal.online else pal.subtitle, maxLines = 1)
             }
         }
         if (musicLine != null) {
@@ -423,10 +427,10 @@ internal fun GiftGlyph(g: ProfileGift, size: Dp) {
 internal class ProfileAction(val icon: Int, val label: String, val onClick: () -> Unit)
 
 /**
- * Size to draw a profile-button drawable at so every glyph comes out ~24dp like Telegram iOS: the
- * `tg_pi_*` icons are a ~20-unit glyph in a 40-unit viewport, the video camera fills ~24 of its 30 units.
+ * Size to draw a profile-button drawable at: the `tg_pi_*` icons are Telegram's own 40-unit images (a ~20-unit
+ * glyph), drawn at 40 pt like PeerInfoHeaderButtonNode's iconSize; the video camera fills ~24 of its 30 units.
  */
-private fun profileIconSize(icon: Int): Dp = if (icon == com.abtin.tglass.ui.components.TgIcons.PiVideo) 26.dp else 42.dp
+private fun profileIconSize(icon: Int): Dp = if (icon == com.abtin.tglass.ui.components.TgIcons.PiVideo) 25.dp else 40.dp
 
 /**
  * The row of glass buttons (call, video, mute, search, more). Drawn above the list — outside the
@@ -444,29 +448,24 @@ internal fun ProfileActionsOverlay(actions: List<ProfileAction>, paletteState: S
         horizontalArrangement = Arrangement.spacedBy(ButtonGap, Alignment.CenterHorizontally),
     ) {
         actions.forEach { a ->
-            Column(
+            Box(
                 Modifier
                     .weight(1f)
                     .height(ButtonSize)
-                    .then(if (enabled) Modifier.bounceClickable(a.onClick) else Modifier),
-                horizontalAlignment = Alignment.CenterHorizontally,
+                    .then(if (enabled) Modifier.bounceClickable(a.onClick) else Modifier)
+                    .profileGlass(com.kyant.shapes.RoundedRectangle(ButtonCorner), palette.button, palette.buttonSolid),
             ) {
-                Box(
-                    Modifier
-                        .size(ButtonCircle)
-                        .profileGlass(com.kyant.shapes.Capsule(), palette.button, palette.buttonSolid),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    // The drawables carry their own padding: draw them unbounded so the glyph comes out ~22dp.
+                // 40 pt icon box, 1 pt from the top. The drawables carry their own padding: drawn unbounded.
+                Box(Modifier.align(Alignment.TopCenter).padding(top = 1.dp).size(40.dp), contentAlignment = Alignment.Center) {
                     Icon(
                         a.icon, palette.buttonIcon, profileIconSize(a.icon),
                         modifier = Modifier.wrapContentSize(unbounded = true),
                         contentDescription = a.label,
                     )
                 }
-                Spacer(Modifier.height(4.dp))
                 T(
                     a.label.lowercase(), TgTheme.type.caption2.copy(fontSize = 11.sp, lineHeight = 13.sp), palette.buttonIcon,
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 9.dp, start = 2.dp, end = 2.dp),
                     maxLines = 1, align = TextAlign.Center,
                 )
             }

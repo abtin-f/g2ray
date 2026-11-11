@@ -145,7 +145,9 @@ fun CallsScreen(backdrop: LayerBackdrop, isTab: Boolean) {
                             .iosClickable(onLongClick = deleteOne) {
                                 if (editing) deleteOne() else nav.push(Route.Chat(repo.privateChatWith(u.id)))
                             }
-                            .height(62.dp)
+                            // Telegram-iOS CallListCallItem: avatar 40, title medium 17, status regular 14, date
+                            // regular 15, row = title + status + 2 x 8 pt, about 56 pt.
+                            .height(56.dp)
                             .padding(start = 14.dp, end = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -156,15 +158,15 @@ fun CallsScreen(backdrop: LayerBackdrop, isTab: Boolean) {
                                 }
                             }
                         }
-                        Avatar(u.name, u.id, 42.dp)
+                        Avatar(u.name, u.id, 40.dp)
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
-                            com.abtin.tglass.core.emoji.EmojiText(u.name, TgTheme.type.headline, if (call.missed) c.destructive else c.text, maxLines = 1)
+                            com.abtin.tglass.core.emoji.EmojiText(u.name, TgTheme.type.body, if (call.missed) c.destructive else c.text, maxLines = 1, weight = FontWeight.Medium)
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(if (call.video) TgIcons.ClOutgoingVideo else TgIcons.ClOutgoing, c.secondaryText, 16.dp, Modifier.graphicsLayer { if (!call.outgoing) rotationZ = 180f })
                                 Spacer(Modifier.width(4.dp))
                                 val kind = if (call.video) "Video" else if (call.outgoing) "Outgoing" else "Incoming"
-                                T(if (call.durationSec > 0) "$kind (${formatDuration(call.durationSec)})" else kind, TgTheme.type.subheadline, c.secondaryText, maxLines = 1)
+                                T(if (call.durationSec > 0) "$kind (${formatDuration(call.durationSec)})" else kind, TgTheme.type.subheadline.copy(fontSize = 14.sp, lineHeight = 18.sp), c.secondaryText, maxLines = 1)
                             }
                         }
                         T(formatListDate(call.date), TgTheme.type.subheadline, c.secondaryText)
@@ -174,7 +176,7 @@ fun CallsScreen(backdrop: LayerBackdrop, isTab: Boolean) {
                             }
                         } else Spacer(Modifier.width(8.dp))
                     }
-                    Separator(Modifier.align(Alignment.BottomStart), startPadding = if (editing) 102.dp else 68.dp)
+                    Separator(Modifier.align(Alignment.BottomStart), startPadding = if (editing) 100.dp else 66.dp)
                 }
             }
         }

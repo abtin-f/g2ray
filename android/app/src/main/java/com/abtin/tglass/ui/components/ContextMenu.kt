@@ -393,7 +393,7 @@ private fun MenuList(actions: List<MenuAction>, backdrop: Backdrop, enabled: Boo
                         Box(Modifier.size(26.dp), contentAlignment = Alignment.Center) {
                             when (val icon = a.icon) {
                                 is Int -> Icon(icon, color, 24.dp)
-                                is ImageVector -> Icon(icon, color, 22.dp)
+                                is ImageVector -> Icon(icon, color, 24.dp)
                             }
                         }
                         Spacer(Modifier.height(3.dp))
@@ -425,7 +425,7 @@ private fun MenuList(actions: List<MenuAction>, backdrop: Backdrop, enabled: Boo
                 Box(Modifier.width(32.dp), contentAlignment = Alignment.Center) {
                     when (val icon = a.icon) {
                         is Int -> Icon(icon, color, 24.dp)
-                        is ImageVector -> Icon(icon, color, 22.dp)
+                        is ImageVector -> Icon(icon, color, 24.dp)
                     }
                 }
                 Spacer(Modifier.width(8.dp))
