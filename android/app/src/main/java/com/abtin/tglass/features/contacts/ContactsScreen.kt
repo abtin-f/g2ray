@@ -142,33 +142,58 @@ private fun ActionRow(icon: Int, title: String, onClick: () -> Unit) {
     val c = TgTheme.colors
     Box {
         Row(
-            Modifier.fillMaxWidth().iosClickable(onClick = onClick).height(50.dp).padding(horizontal = 22.dp),
+            Modifier.fillMaxWidth().iosClickable(onClick = onClick).height(50.dp).padding(start = 19.dp, end = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // The icon is centered on the avatar column (x 14..54) and the title starts at the contacts' text x, 65.
             Icon(icon, c.accent, 30.dp)
-            Spacer(Modifier.width(22.dp))
+            Spacer(Modifier.width(16.dp))
             T(title, TgTheme.type.body, c.accent)
         }
-        Separator(Modifier.align(Alignment.BottomStart), startPadding = 70.dp)
+        Separator(Modifier.align(Alignment.BottomStart), startPadding = 65.dp)
     }
 }
 
+/**
+ * Contact row (Telegram-iOS ContactsPeerItem): avatar 40 at x 14, text and separator at x 65, name regular 17 with
+ * the last name (the sort key; the whole name when there is no last name) in medium 17, status regular 13,
+ * row = title + status + 2 x 8 pt, about 52 pt.
+ */
 @Composable
 fun ContactRow(u: User, onLongClick: (() -> Unit)? = null, onClick: () -> Unit) {
     val c = TgTheme.colors
     Box {
         Row(
-            Modifier.fillMaxWidth().iosClickable(onLongClick = onLongClick, onClick = onClick).height(58.dp).padding(horizontal = 14.dp),
+            Modifier.fillMaxWidth().iosClickable(onLongClick = onLongClick, onClick = onClick).height(52.dp).padding(start = 14.dp, end = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Avatar(u.name, u.id, 42.dp)
-            Spacer(Modifier.width(12.dp))
+            Avatar(u.name, u.id, 40.dp)
+            Spacer(Modifier.width(11.dp))
             Column {
-                com.abtin.tglass.core.emoji.EmojiText(u.name, TgTheme.type.headline, c.text, maxLines = 1)
-                T(u.status, TgTheme.type.subheadline, if (u.online) c.accent else c.secondaryText, maxLines = 1)
+                val name = u.name
+                val emojiName = com.abtin.tglass.core.emoji.rememberAppleEmojiText(name)
+                val styledName = remember(emojiName, u.lastName) {
+                    val last = u.lastName.trim()
+                    val from = if (last.isNotEmpty() && emojiName.text.endsWith(last)) emojiName.text.length - last.length else 0
+                    androidx.compose.ui.text.AnnotatedString.Builder(emojiName).apply {
+                        addStyle(androidx.compose.ui.text.SpanStyle(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium), from, emojiName.text.length)
+                    }.toAnnotatedString()
+                }
+                val nameInline = remember(emojiName) { com.abtin.tglass.core.emoji.appleEmojiInlineContent(emojiName) }
+                androidx.compose.foundation.text.BasicText(
+                    text = styledName,
+                    style = TgTheme.type.body.copy(
+                        color = c.text, fontWeight = androidx.compose.ui.text.font.FontWeight.Normal,
+                        textDirection = androidx.compose.ui.text.style.TextDirection.Content,
+                    ),
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    maxLines = 1,
+                    inlineContent = nameInline,
+                )
+                T(u.status, TgTheme.type.footnote, if (u.online) c.accent else c.secondaryText, maxLines = 1)
             }
         }
-        Separator(Modifier.align(Alignment.BottomStart), startPadding = 70.dp)
+        Separator(Modifier.align(Alignment.BottomStart), startPadding = 65.dp)
     }
 }
 
