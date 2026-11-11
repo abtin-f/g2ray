@@ -91,8 +91,8 @@ import com.kyant.shapes.Capsule
 import com.kyant.shapes.RoundedRectangle
 import java.io.File
 
-/** Diameter of a round video message in the chat (Telegram-iOS). */
-private val NoteSize = 220.dp
+/** Diameter of a round video message in the chat (Telegram-iOS compact layout: instantVideo dimensions 212 x 212). */
+private val NoteSize = 212.dp
 
 /** Diameter while it plays with sound: Telegram-iOS enlarges the circle. */
 private val NoteSizePlaying = 276.dp
