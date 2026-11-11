@@ -128,7 +128,7 @@ fun MainScreen() {
                 val unread by remember(repo) { androidx.compose.runtime.derivedStateOf { repo.chats.filter { !it.archived && !it.muted }.sumOf { it.unread } } }
                 // Only whether there is a badge matters for composing the overlay copy; the count itself is read in the overlay.
                 val hasUnread by remember(repo) { androidx.compose.runtime.derivedStateOf { unread > 0 } }
-                // Measured on Telegram iOS 26: 62pt capsule (54 + 2×4), then an 8pt gap and a 62pt search circle; 12pt side margins.
+                // Telegram-iOS TabBarComponent: 64pt capsule (56 + 2×4), then an 8pt gap and a search circle as tall as the bar.
                 Row(
                     Modifier
                         .navigationBarsPadding()
@@ -156,7 +156,7 @@ fun MainScreen() {
                     GlassIconButton(
                         TgIcons.IcSearch,
                         onClick = { tab = 2; tabBar.searchRequests++ },
-                        size = 62.dp,
+                        size = 64.dp,
                         iconSize = 24.dp,
                         contentDescription = "Search",
                     )
@@ -189,38 +189,40 @@ private fun androidx.compose.foundation.layout.RowScope.TabItem(
                 }
             } else if (badge() > 0) {
                 // Drawn above the selection pill so it stays red instead of being tinted blue.
-                TabBadge(badge(), Modifier.align(Alignment.TopCenter).offset(x = 15.dp, y = (-4).dp).wrapContentSize(unbounded = true))
+                // TabBarComponent: the badge starts 11.5 right of the item center, 2 below the top of the 56pt item.
+                TabBadge(badge(), Modifier.align(Alignment.TopStart).offset(x = 33.5.dp, y = (-5).dp).wrapContentSize(Alignment.TopStart, unbounded = true))
             }
         }
         T(
             label,
-            TgTheme.type.caption2.copy(fontSize = 10.5.sp, lineHeight = 13.sp),
+            // TabBarComponent: 10pt medium, semibold on the selected tab (the tinted copy under the lens).
+            TgTheme.type.caption2.copy(fontSize = 10.sp, lineHeight = 12.sp),
             if (overlay) Color.Transparent else c.text,
             maxLines = 1,
-            weight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+            weight = if (layer == LiquidBottomTabLayer.Tinted) androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Medium,
         )
     }
 }
 
-/** iOS tab bar badge: a red capsule (UITabBarItem.badgeValue), not the blue chat-list counter. */
+/** iOS tab bar badge (TabBarBadgeView): red capsule, medium 12 label with 2pt vertical / 4pt horizontal insets. */
 @Composable
 private fun TabBadge(count: Int, modifier: Modifier = Modifier) {
     val c = TgTheme.colors
     Box(
         modifier
-            .defaultMinSize(minWidth = 16.dp)
-            .height(16.dp)
+            .defaultMinSize(minWidth = 18.dp)
+            .height(18.dp)
             .clip(Capsule())
             .background(c.destructive)
-            .padding(horizontal = 5.dp),
+            .padding(horizontal = 4.dp),
         contentAlignment = Alignment.Center,
     ) {
         T(
             com.abtin.tglass.ui.components.formatCount(count),
-            TgTheme.type.footnote.copy(fontSize = 11.sp, lineHeight = 13.sp),
+            TgTheme.type.caption1.copy(fontSize = 12.sp, lineHeight = 14.sp),
             Color.White,
             maxLines = 1,
-            weight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+            weight = androidx.compose.ui.text.font.FontWeight.Medium,
         )
     }
 }

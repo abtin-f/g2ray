@@ -199,7 +199,10 @@ fun IOSNavHost(navigator: Navigator, content: @Composable (Route) -> Unit) {
     val stack = navigator.stack
     val density = LocalDensity.current
     val edge = with(density) { 28.dp.toPx() }
-    val dim = if (TgTheme.colors.isDark) 0.5f else 0.12f
+    // Telegram-iOS NavigationTransitionCoordinator: the screen under a pushed one is dimmed by 0.1 black in every
+    // theme (UIKit parallax dim); a modal sheet keeps the stronger dim.
+    val pushDim = 0.1f
+    val modalDim = if (TgTheme.colors.isDark) 0.5f else 0.12f
 
     // System Back / back gesture: with the predictive-back gesture the page follows the finger (same transition as the
     // edge swipe); a plain Back press (3-button navigation) sends no progress and just animates the pop.
@@ -265,8 +268,9 @@ fun IOSNavHost(navigator: Navigator, content: @Composable (Route) -> Unit) {
                                 // a full-screen shadow layer was being kept and redrawn for nothing).
                                 if (!entry.modal && o > 0f && stack.size > 1) {
                                     shadowElevation = 12.dp.toPx()
-                                    ambientShadowColor = Color.Black.copy(0.15f)
-                                    spotShadowColor = Color.Black.copy(0.2f)
+                                    // UIKit card shadow: black, radius 12, opacity 0.04.
+                                    ambientShadowColor = Color.Black.copy(0.04f)
+                                    spotShadowColor = Color.Black.copy(0.06f)
                                 }
                             } else {
                                 val topEntry = visible.last()
@@ -283,7 +287,7 @@ fun IOSNavHost(navigator: Navigator, content: @Composable (Route) -> Unit) {
                             if (!isTop) {
                                 val topEntry = visible.last()
                                 val progress = 1f - topEntry.offset.value
-                                if (progress > 0f) drawRect(Color.Black.copy(alpha = dim * progress))
+                                if (progress > 0f) drawRect(Color.Black.copy(alpha = (if (topEntry.modal) modalDim else pushDim) * progress))
                             }
                         }
                 ) {
