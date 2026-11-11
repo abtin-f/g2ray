@@ -60,6 +60,14 @@ object IosIcons {
         width = 2f,
     )
 
+    /** mic (outline): the composer's record button in Telegram for iOS 26. */
+    val MicOutline = icon(
+        "micOutline",
+        "M12 2.6a3.2 3.2 0 0 0-3.2 3.2v5.6a3.2 3.2 0 0 0 6.4 0V5.8A3.2 3.2 0 0 0 12 2.6z",
+        "M5.6 11.2a6.4 6.4 0 0 0 12.8 0", "M12 17.6v3.4",
+        width = 1.8f,
+    )
+
     /** arrow.up (send button glyph). */
     val ArrowUp = icon("arrowUp", "M12 19.5V5M5.5 11.5 12 5l6.5 6.5", width = 2.6f)
     val ArrowDown = icon("arrowDown", "M12 4.5V19M5.5 12.5 12 19l6.5-6.5", width = 2.6f)

@@ -858,10 +858,11 @@ fun ChatScreen(chatId: Long) {
                         Box(Modifier.weight(1f).padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
                             val (subtitle, active) = chatSubtitle(chat, repo)
                             // Telegram-iOS ChatTitleView: semibold 17 title, regular 13 status, no gap between them, in a
-                            // 44 pt glass capsule that extends 12 pt past the text on both sides.
+                            // 44 pt glass capsule that extends 12 pt past the text on both sides. On the iPhone photos
+                            // (440 pt screen) the capsule is never narrower than ~178 pt, whatever the title length.
                             val statusStyle = TgTheme.type.caption1.copy(fontSize = 13.sp, lineHeight = 16.sp)
                             GlassBox(onClick = { nav.push(Route.Profile(chatId)) }, modifier = Modifier.height(ChatNavHeight)) {
-                                Column(Modifier.padding(horizontal = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Column(Modifier.widthIn(min = 178.dp).padding(horizontal = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         com.abtin.tglass.core.emoji.EmojiText(
                                             chat.title, TgTheme.type.headline.copy(fontSize = 17.sp, lineHeight = 20.sp), c.text,

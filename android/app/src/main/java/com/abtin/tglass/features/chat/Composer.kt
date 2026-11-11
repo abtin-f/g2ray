@@ -507,7 +507,7 @@ fun Composer(
                             GlassBox(onClick = null, shape = Capsule(), modifier = Modifier.size(ComposerHeight)) {
                                 Crossfade(videoMode, label = "micMode") { v ->
                                     Box(Modifier.size(ComposerHeight), contentAlignment = Alignment.Center) {
-                                        Icon(if (v) IosIcons.Video else IosIcons.Mic, c.text, if (v) 23.dp else 21.dp)
+                                        Icon(if (v) IosIcons.Video else IosIcons.MicOutline, c.text, if (v) 23.dp else 24.dp)
                                     }
                                 }
                             }
