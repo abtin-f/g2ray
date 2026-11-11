@@ -280,11 +280,13 @@ private fun interFamily(opticalSize: Float) = FontFamily(
 )
 
 /**
- * Inter at its text optical size (opsz 14) is ~15-20 % wider than SF Pro at the same point size while cap heights
- * match; the display cut (opsz 32) is ~10 % wider. Both families use opsz 32 and [iosTracking] closes the rest.
+ * Inter with Apple's tracking table ([iosTracking]) is as wide as SF Pro when its optical size follows the point
+ * size, like SF Pro Text / Display do. Shaped with the font's real advances at 17 pt (iOS widths on the 440 pt
+ * reference iPhone): "Translate to English" 146.1 (iOS ~147), "Message" 69.1 (68), "ARSLWN HS" semibold 97.5 (98)
+ * at opsz 17. Text sizes use opsz 17, titles (20 pt and up) the display cut.
  */
-val InterText = interFamily(32f)
-val InterDisplay = interFamily(32f)
+val InterText = interFamily(17f)
+val InterDisplay = interFamily(28f)
 
 /**
  * Vazirmatn (Non-Latin build, variable, SIL OFL): Persian / Arabic script. Inter has no Arabic glyphs, so Android
@@ -352,10 +354,10 @@ private val SfTracking = listOf(
 )
 
 /**
- * Extra tracking that makes Inter (opsz 32) as wide as SF Pro: measured with the font's real advances against iOS
- * text widths ("Translate to English" 17 pt = 131 pt, "Message" 17 pt = 61 pt, "ARSLWN HS" 17 pt semibold = 87.5 pt).
+ * Extra tracking on top of Apple's table. Zero: at opsz 17 Inter already matches the iOS widths within 1 % (see
+ * [InterText]); the old -0.02 em was fitted to widths read off the photos at the wrong (393 pt) scale.
  */
-private const val InterWidthCorrectionEm = -0.02f
+private const val InterWidthCorrectionEm = 0f
 
 /** SF Pro tracking at [size] pt (interpolated) plus the Inter width correction, in em. */
 internal fun iosTracking(size: Float): TextUnit {
@@ -409,13 +411,14 @@ enum class GlassLevel(val title: String) {
     Off("Off (Opaque)"),
 }
 
-/** Chat list density (Settings → Appearance → Chat List). Compact matches Telegram iOS 26. */
+/**
+ * Chat list density (Settings → Appearance → Chat List). Telegram-iOS ChatListItem scales the row with the list text
+ * size: avatar min(60, 60/17 of it), name semibold 16/17, preview 15/17, date 14/17, row = name line + 3 preview-size
+ * lines - 8. Regular is text size 17 (row/avatar = 55.5/44 px on the owner's photo ios-10 = 76/60), Large is 19.
+ */
 enum class ChatListSize(val title: String, val row: Int, val avatar: Int, val titleSp: Float, val previewSp: Float) {
-    // Compact = Telegram iOS 26 measured on the owner's iPhone photo (ios-10, pixel-scanned): 69 pt pitch, 55 pt avatar
-    // (avatar / pitch = 44 / 55 px), semibold 16 pt name (Telegram-iOS ChatListItem: 16/17 of the list size), 15 pt preview.
-    Compact("Compact", 69, 55, 16f, 15f),
-    Regular("Regular", 82, 60, 17f, 16f),
-    Large("Large", 90, 66, 18f, 17f),
+    Regular("Regular", 76, 60, 16f, 15f),
+    Large("Large", 82, 60, 17f, 16f),
 }
 
 /**
@@ -510,7 +513,7 @@ class AppSettings(context: Context) {
         private set
     var textScale by mutableFloatStateOf(prefs.getFloat("textScale", 1f))
         private set
-    /** Interface Scale multiplier on top of the automatic fit to the iPhone's 393-point width (see [ProvideUiScale]). */
+    /** Interface Scale multiplier on top of the automatic fit to the iPhone's 440-point width (see [ProvideUiScale]). */
     var uiScale by mutableFloatStateOf(prefs.getFloat("uiScale", 1f))
         private set
     var bubbleRadius by mutableFloatStateOf(prefs.getFloat("bubbleRadius", 16f))
@@ -537,7 +540,7 @@ class AppSettings(context: Context) {
     /** Glass banner at the top for messages in other chats while the app is open. */
     var inAppPreview by mutableStateOf(prefs.getBoolean("inAppPreview", true))
         private set
-    var chatListSize by mutableStateOf(ChatListSize.entries.getOrElse(prefs.getInt("chatListSize", 0)) { ChatListSize.Compact })
+    var chatListSize by mutableStateOf(ChatListSize.entries.getOrElse(prefs.getInt("chatListSize", 0)) { ChatListSize.Regular })
         private set
     var autoplayVideo by mutableStateOf(prefs.getBoolean("autoplayVideo", true))
         private set
@@ -713,11 +716,14 @@ private val LocalTgColors = staticCompositionLocalOf { LightColors }
 private val LocalTgTypography = staticCompositionLocalOf { typography(1f) }
 val LocalThemeState = staticCompositionLocalOf { ThemeState(ColorTheme.Classic, autoNightTriggered = false, nightShowing = false) }
 
-/** Width of the iPhone the design is taken from (Telegram iOS screenshots, 393 pt). */
-private const val ReferenceWidthDp = 393f
+/**
+ * Width of the iPhone the design is compared with: the owner's reference photos are from a 440 pt wide iPhone
+ * (Pro Max; avatar 60 pt = 13.5 % of the width), so iOS source constants in points keep their on-screen proportion.
+ */
+private const val ReferenceWidthDp = 440f
 
 /**
- * Every dp in the app was measured on the 393 pt wide iPhone. Android phones are 360–430 dp wide at whatever
+ * Every dp in the app is an iOS point on the 440 pt wide iPhone. Android phones are 360–430 dp wide at whatever
  * "Display size" the owner picked, so the same dp looks too big on a narrow / zoomed phone. This scales the
  * density so the layout is always [ReferenceWidthDp] dp wide (times the user's Interface Scale), and keeps the
  * system font scale inside a sane range so a huge system font cannot blow the controls up.

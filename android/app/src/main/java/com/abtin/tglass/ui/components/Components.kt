@@ -172,7 +172,8 @@ fun Badge(count: Int, muted: Boolean = false, modifier: Modifier = Modifier, men
     ) {
         T(
             if (mention) "@" else formatCount(count),
-            TgTheme.type.footnote.copy(fontSize = 13.sp, lineHeight = 16.sp),
+            // Telegram-iOS ChatListItem badgeFont: semibold 12, monospaced digits, in a 20 pt capsule.
+            TgTheme.type.caption1.copy(fontSize = 12.sp, lineHeight = 14.sp, fontFeatureSettings = "tnum"),
             if (muted) c.mutedBadgeText else c.badgeText,
             weight = FontWeight.SemiBold,
         )
@@ -260,9 +261,9 @@ fun Section(
     }
 }
 
-/** Colored rounded-square settings icon (iOS: 29pt tile, ~7pt corners). */
+/** Colored rounded-square settings icon (iOS: 30pt tile, ~7pt corners). */
 @Composable
-fun SettingsIcon(icon: Any, color: Color, size: Dp = 29.dp) {
+fun SettingsIcon(icon: Any, color: Color, size: Dp = 30.dp) {
     Box(
         Modifier
             .size(size)
@@ -303,13 +304,14 @@ fun Cell(
     onClick: (() -> Unit)? = null,
 ) {
     val c = TgTheme.colors
+    // PeerInfoScreenDisclosureItem: text at 16 + 29 + 16 = 61, separator one point before it.
     val textStart = if (icon != null || leading != null) 60.dp else 16.dp
     Box(Modifier.fillMaxWidth()) {
         Row(
             modifier
                 .fillMaxWidth()
                 .then(if (onClick != null) Modifier.iosClickable(onClick = onClick) else Modifier)
-                .heightIn(min = if (subtitle != null) TgDimens.CellMinSubtitle else TgDimens.CellMin)
+                .heightIn(min = if (subtitle != null) TgDimens.CellMinSubtitle else if (icon != null) TgDimens.CellMinIcon else TgDimens.CellMin)
                 .padding(start = 16.dp, end = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -318,7 +320,7 @@ fun Cell(
                 Spacer(Modifier.width(14.dp))
             } else if (icon != null) {
                 SettingsIcon(icon, iconColor)
-                Spacer(Modifier.width(14.dp))
+                Spacer(Modifier.width(15.dp))
             }
             Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
                 T(title, TgTheme.type.body, titleColor, maxLines = 1)
@@ -337,7 +339,7 @@ fun Cell(
                 Icon(IosIcons.ChevronRight, c.tertiaryText, 14.dp)
             }
         }
-        if (divider) Separator(Modifier.align(Alignment.BottomStart), startPadding = textStart)
+        if (divider) Separator(Modifier.align(Alignment.BottomStart), startPadding = textStart, endPadding = TgDimens.CellSeparatorEnd)
     }
 }
 

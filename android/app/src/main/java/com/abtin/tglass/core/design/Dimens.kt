@@ -4,7 +4,7 @@ import androidx.compose.ui.unit.dp
 
 /**
  * Shared layout constants in iOS points (1 dp == 1 pt, see ProvideUiScale). One name per role, so bars, buttons,
- * sheets and menus stay consistent across screens. Chat and chat-list internals keep their own measured values.
+ * sheets and menus stay consistent across screens. Chat and chat-list internals keep their own values (iOS source constants).
  */
 object TgDimens {
     /** Height of the floating control row inside a GlassTopBar (UINavigationBar = 44). */
@@ -38,9 +38,16 @@ object TgDimens {
     val MenuCorner = 26.dp
     val MenuHairlineInset = 20.dp
 
-    /** Minimum list cell heights (UITableViewCell 44; with a subtitle 58). */
-    val CellMin = 44.dp
-    val CellMinSubtitle = 58.dp
+    /**
+     * Minimum list cell heights, iOS 26 glass item lists: disclosure / switch rows 52 (ItemListDisclosureItem
+     * vertical inset 15, ItemListSwitchItem 52), with a detail line 66 (inset 13); rows with an icon tile are the
+     * Settings rows, text height + 32 = 54 (PeerInfoScreenDisclosureItem).
+     */
+    val CellMin = 52.dp
+    val CellMinIcon = 54.dp
+    val CellMinSubtitle = 66.dp
+    /** Right inset of the row separators inside a grouped section (glass style). */
+    val CellSeparatorEnd = 16.dp
 
     /** Segmented control height and chip-tab height. */
     val Segmented = 32.dp

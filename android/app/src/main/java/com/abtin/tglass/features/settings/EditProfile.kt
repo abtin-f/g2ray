@@ -364,7 +364,7 @@ private fun ProfileField(value: String, onValue: (String) -> Unit, placeholder: 
             }
             if (trailingHint != null) T(trailingHint, TgTheme.type.footnote, c.tertiaryText)
         }
-        if (divider) Separator(Modifier.align(Alignment.BottomStart), startPadding = 16.dp)
+        if (divider) Separator(Modifier.align(Alignment.BottomStart), startPadding = 16.dp, endPadding = 16.dp)
     }
 }
 

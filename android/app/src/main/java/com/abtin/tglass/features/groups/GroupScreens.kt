@@ -590,7 +590,7 @@ private fun FormField(
                 cursorBrush = SolidColor(c.accent),
             )
         }
-        if (divider) Separator(Modifier.align(Alignment.BottomStart), startPadding = 16.dp)
+        if (divider) Separator(Modifier.align(Alignment.BottomStart), startPadding = 16.dp, endPadding = 16.dp)
     }
 }
 

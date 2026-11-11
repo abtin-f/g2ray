@@ -171,10 +171,10 @@ fun Modifier.bounceClickable(onClick: () -> Unit): Modifier {
 }
 
 @Composable
-fun Separator(modifier: Modifier = Modifier, startPadding: Dp = 0.dp) {
+fun Separator(modifier: Modifier = Modifier, startPadding: Dp = 0.dp, endPadding: Dp = 0.dp) {
     Box(
         modifier
-            .padding(start = startPadding)
+            .padding(start = startPadding, end = endPadding)
             .fillMaxWidth()
             .height(0.33.dp)
             .background(TgTheme.colors.separator)

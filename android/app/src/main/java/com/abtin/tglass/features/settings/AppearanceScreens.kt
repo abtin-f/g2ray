@@ -278,7 +278,7 @@ internal fun LazyListScope.appearancePage() {
     item {
         val s = LocalAppSettings.current
         val nav = LocalNavigator.current
-        Section(header = "Chat List", footer = "Compact matches Telegram for iPhone. Larger sizes show bigger photos and text.") {
+        Section(header = "Chat List", footer = "Regular matches Telegram for iPhone. Large shows bigger text in taller rows.") {
             Box(Modifier.padding(12.dp)) {
                 SegmentedControl(ChatListSize.entries.map { it.title }, s.chatListSize.ordinal, { s.updateChatListSize(ChatListSize.entries[it]) }, Modifier.fillMaxWidth())
             }

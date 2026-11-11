@@ -297,6 +297,6 @@ internal fun FormField(
                 )
             }
         }
-        if (divider) Separator(Modifier.align(Alignment.BottomStart), startPadding = 16.dp)
+        if (divider) Separator(Modifier.align(Alignment.BottomStart), startPadding = 16.dp, endPadding = 16.dp)
     }
 }

@@ -134,7 +134,7 @@ fun ChatRow(
                 .fillMaxWidth()
                 .iosClickable(onLongClick = onLongClick, onClick = onClick)
                 .height(size.row.dp)
-                .padding(start = 10.dp, end = 12.dp),
+                .padding(start = 16.dp, end = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (editInset > 0.dp) {
@@ -151,12 +151,15 @@ fun ChatRow(
                 }
             }
             ChatAvatar(chat, repo, size.avatar.dp, showStory = true)
+            // Telegram-iOS ChatListItem: avatar at 16, text column at 16 + 60 + 8 + 2 = 86, 16 from the right edge;
+            // the content starts 8 below the row top.
             Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f).fillMaxHeight().padding(top = if (size == com.abtin.tglass.core.design.ChatListSize.Compact) 8.dp else 9.dp, bottom = 6.dp)) {
+            val titleLine = size.titleSp + 5f
+            Column(Modifier.weight(1f).fillMaxHeight().padding(top = 8.dp, bottom = 6.dp)) {
                 // Top line (ChatListItem): [name verified mute .......... status-check time]
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                        com.abtin.tglass.core.emoji.EmojiText(chat.title, TgTheme.type.headline.copy(fontSize = size.titleSp.sp, lineHeight = (size.titleSp + 4f).sp, textDirection = TextDirection.Content), c.text, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                        com.abtin.tglass.core.emoji.EmojiText(chat.title, TgTheme.type.headline.copy(fontSize = size.titleSp.sp, lineHeight = titleLine.sp, textDirection = TextDirection.Content), c.text, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
                         if (chat.verified) {
                             Spacer(Modifier.width(3.dp))
                             VerifiedBadge(16.dp)
@@ -179,13 +182,16 @@ fun ChatRow(
                     }
                     if (time != null) T(time, dateStyle, c.chatListSecondary, maxLines = 1)
                 }
-                Spacer(Modifier.height(1.dp))
-                // Second line: preview (2 lines) with the badges at the trailing edge, level with its first line.
+                // Below: preview (2 lines) with the badges at the trailing edge. iOS bottom-aligns the 20 pt badge to
+                // the content rect, which ends 13 above the row bottom (level with the second preview line).
                 Row(Modifier.weight(1f)) {
                     Column(Modifier.weight(1f)) {
                         ChatPreviewText(chat, repo, last)
                     }
-                    Row(Modifier.padding(start = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        Modifier.padding(start = 6.dp, top = (size.row - 13f - 20f - 8f - titleLine).coerceAtLeast(0f).dp).height(20.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         when {
                             chat.mentions > 0 -> {
                                 Badge(0, mention = true)
@@ -200,7 +206,7 @@ fun ChatRow(
                 }
             }
         }
-        Separator(Modifier.align(Alignment.BottomStart), startPadding = (10 + size.avatar + 10).dp + editInset)
+        Separator(Modifier.align(Alignment.BottomStart), startPadding = (16 + size.avatar + 10).dp + editInset)
     }
     }
 }

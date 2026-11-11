@@ -518,14 +518,14 @@ private fun ChatsTitle(stories: List<Pair<Long, String>>, status: String?, colla
 }
 
 /**
- * The chat list's search capsule (iPhone photo ios-10: 40 pt tall, full width, magnifier + "Search" centered). It scrolls
+ * The chat list's search capsule (Telegram-iOS glass search bar: 44 pt tall, 16 pt side insets, magnifier + "Search" centered). It scrolls
  * with the list (inside the recorded layer), so it is the translucent glass material; tapping it opens search mode.
  */
 @Composable
 private fun ListSearchCapsule(onClick: () -> Unit) {
     val c = TgTheme.colors
     Box(
-        Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 4.dp).height(40.dp)
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 4.dp).height(44.dp)
             .glass(shape = Capsule(), style = GlassStyle.Translucent, backdrop = null, shadow = false)
             .fadeClickable(onClick = onClick),
         contentAlignment = Alignment.Center,
@@ -547,26 +547,26 @@ private fun FolderTabs(folders: List<String>, selected: Int, onSelect: (Int) -> 
     // that would draw the layer into itself and overflow the RenderThread stack (native crash). So it is the
     // translucent glass material (no backdrop sampling): fill + rim, like the strip over the black list on iOS.
     Box(
-        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).height(38.dp)
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).height(40.dp)
             .glass(shape = Capsule(), style = GlassStyle.Translucent, backdrop = null, shadow = false),
         contentAlignment = Alignment.CenterStart,
     ) {
     Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 4.dp),
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 3.dp),
         horizontalArrangement = Arrangement.spacedBy(0.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         folders.forEachIndexed { i, f ->
             val sel = i == selected
             val bg by animateColorAsState(if (sel) c.text.copy(alpha = if (c.isDark) 0.14f else 0.07f) else Color.Transparent, label = "folderBg")
-            // The whole 38 pt strip is the tap target; only the 30 pt capsule is drawn.
-            Box(Modifier.height(38.dp).fadeClickable { onSelect(i) }, contentAlignment = Alignment.Center) {
+            // The whole 40 pt strip is the tap target; the selection capsule is inset 3 (HorizontalTabsComponent).
+            Box(Modifier.height(40.dp).fadeClickable { onSelect(i) }, contentAlignment = Alignment.Center) {
                 Row(
                     Modifier
-                        .height(30.dp)
+                        .height(34.dp)
                         .clip(Capsule())
                         .background(bg)
-                        .padding(horizontal = 12.dp),
+                        .padding(horizontal = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     T(f, TgTheme.type.subheadline, if (sel) c.text else c.secondaryText, weight = FontWeight.Medium, maxLines = 1)
@@ -574,9 +574,9 @@ private fun FolderTabs(folders: List<String>, selected: Int, onSelect: (Int) -> 
                     if (count > 0) {
                         Spacer(Modifier.width(5.dp))
                         Box(
-                            Modifier.height(16.dp).defaultMinSize(minWidth = 16.dp).clip(Capsule()).background(if (sel) c.accent else c.mutedBadge).padding(horizontal = 5.dp),
+                            Modifier.height(17.dp).defaultMinSize(minWidth = 17.dp).clip(Capsule()).background(if (sel) c.accent else c.mutedBadge).padding(horizontal = 5.dp),
                             contentAlignment = Alignment.Center,
-                        ) { T("$count", TgTheme.type.caption1.copy(fontSize = 12.sp, lineHeight = 14.sp), Color.White, weight = FontWeight.SemiBold) }
+                        ) { T("$count", TgTheme.type.caption1.copy(fontSize = 12.sp, lineHeight = 14.sp), Color.White, weight = FontWeight.Medium) }
                     }
                 }
             }
@@ -722,16 +722,16 @@ private fun ArchiveRow(archived: List<Chat>, repo: TelegramRepository, onClick: 
                 .fillMaxWidth()
                 .iosClickable(onLongClick = onLongClick, onClick = onClick)
                 .height(size.row.dp)
-                .padding(start = 10.dp, end = 12.dp),
+                .padding(start = 16.dp, end = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Avatar("Archive", 0, size.avatar.dp, iconRes = TgIcons.IcArchiveLarge, iconColors = Color(0xFFDEDEE5) to Color(0xFFC5C6CC))
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    T("Archived Chats", TgTheme.type.headline.copy(fontSize = size.titleSp.sp, lineHeight = (size.titleSp + 4f).sp), c.text, maxLines = 1, modifier = Modifier.weight(1f))
+                    T("Archived Chats", TgTheme.type.headline.copy(fontSize = size.titleSp.sp, lineHeight = (size.titleSp + 5f).sp), c.text, maxLines = 1, modifier = Modifier.weight(1f))
                     archived.firstOrNull()?.let { repo.lastMessage(it.id) }?.let {
-                        T(formatListDate(it.date), TgTheme.type.subheadline.copy(fontSize = (size.previewSp - 0.5f).sp), c.secondaryText, maxLines = 1)
+                        T(formatListDate(it.date), TgTheme.type.subheadline.copy(fontSize = (size.previewSp - 1f).sp), c.secondaryText, maxLines = 1)
                     }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -750,7 +750,7 @@ private fun ArchiveRow(archived: List<Chat>, repo: TelegramRepository, onClick: 
                 }
             }
         }
-        Separator(Modifier.align(Alignment.BottomStart), startPadding = (10 + size.avatar + 10).dp)
+        Separator(Modifier.align(Alignment.BottomStart), startPadding = (16 + size.avatar + 10).dp)
     }
 }
 
