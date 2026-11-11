@@ -81,7 +81,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
 
-/** Height of the composer's controls (Telegram-iOS 26 ChatTextInputPanelNode: 40 pt attach / mic buttons, 40 pt minimal field = 5 + 31 + 4). */
+/**
+ * Height of the composer's side controls (Telegram-iOS 26 ChatTextInputPanelNode: menuButtonHeight 40, attach / mic
+ * buttons 40). The text field itself is [ComposerFieldMinHeight] (42 = 33 + insets 5 + 4); the 40 pt buttons are
+ * centered on the field's last 42 pt, i.e. 1 pt above the bottom.
+ */
 internal val ComposerHeight = 40.dp
 
 /**
@@ -330,6 +334,7 @@ fun Composer(
             // "+" (attachments); hidden while recording, a red trash can while a recorded voice is waiting to be sent.
             AnimatedVisibility(
                 !recording && preview == null,
+                modifier = Modifier.padding(bottom = 1.dp),
                 enter = fadeIn() + scaleIn(initialScale = 0.5f) + expandHorizontally(expandFrom = Alignment.Start),
                 exit = fadeOut() + scaleOut(targetScale = 0.5f) + shrinkHorizontally(shrinkTowards = Alignment.Start),
             ) {
@@ -352,18 +357,20 @@ fun Composer(
             // The Message field, the recording status or the recorded voice.
             GlassBox(
                 onClick = null,
-                shape = RoundedRectangle(ComposerHeight / 2),
+                shape = RoundedRectangle(ComposerFieldMinHeight / 2),
                 // iOS 26: the text field is a frosted panel; the attach / mic circles are liquid glass.
                 style = com.abtin.tglass.core.glass.GlassStyle.Blur,
-                modifier = Modifier.weight(1f).heightIn(min = ComposerHeight),
+                modifier = Modifier.weight(1f).heightIn(min = ComposerFieldMinHeight),
                 contentAlignment = Alignment.CenterStart,
             ) {
                 val p = preview
                 when {
                     recording -> RecordingStatus(elapsed, locked, dragX.value, cancelDistance, onCancel = { Haptics.tap(view); finishRecording(false) })
                     p != null -> VoiceDraft(p, previewKey(p))
-                    else -> Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 2.dp), verticalAlignment = Alignment.Bottom) {
-                        Box(Modifier.weight(1f).padding(vertical = 9.dp), contentAlignment = Alignment.CenterStart) {
+                    // ChatTextInputPanelNode textInputViewInternalInsets: top 5, left 12, bottom 4, right 11 around a text
+                    // area of at least 33 pt; the accessory buttons sit 4 pt from the field's right edge.
+                    else -> Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp), verticalAlignment = Alignment.Bottom) {
+                        Box(Modifier.weight(1f).padding(top = 5.dp, bottom = 4.dp).heightIn(min = 33.dp), contentAlignment = Alignment.CenterStart) {
                             if (text.isEmpty()) T("Message", TgTheme.type.body, c.inputPlaceholder, maxLines = 1)
                             // Apple emoji drawn over the (transparent) system glyphs.
                             val (emojiField, emojiTransformation) = com.abtin.tglass.core.emoji.rememberAppleEmojiField(maxLines = 8)
@@ -392,11 +399,11 @@ fun Composer(
                             )
                         }
                         if (onGift != null && text.isEmpty() && editing == null) {
-                            Box(Modifier.height(ComposerHeight).width(36.dp).fadeClickable(onClick = onGift), contentAlignment = Alignment.Center) {
+                            Box(Modifier.height(ComposerFieldMinHeight).width(36.dp).fadeClickable(onClick = onGift), contentAlignment = Alignment.Center) {
                                 Icon(ComposerIcons.Gift, c.inputIcon, 23.dp)
                             }
                         }
-                        Box(Modifier.height(ComposerHeight).width(40.dp).fadeClickable(onClick = onTogglePanel), contentAlignment = Alignment.Center) {
+                        Box(Modifier.height(ComposerFieldMinHeight).width(40.dp).fadeClickable(onClick = onTogglePanel), contentAlignment = Alignment.Center) {
                             Crossfade(panelOpen, label = "panelIcon") { open ->
                                 // Telegram iOS: the sticker glyph while the field is empty, the smiley once there is text.
                                 Icon(if (open) IosIcons.Keyboard else if (text.isEmpty()) ComposerIcons.Sticker else ComposerIcons.Smiley, c.inputIcon, if (open) 22.dp else 23.dp)
@@ -409,7 +416,7 @@ fun Composer(
 
             // Mic / send
             val sendMode = text.isNotBlank() || editing != null || preview != null
-            Box(Modifier.size(ComposerHeight), contentAlignment = Alignment.Center) {
+            Box(Modifier.padding(bottom = 1.dp).size(ComposerHeight), contentAlignment = Alignment.Center) {
                 androidx.compose.animation.AnimatedVisibility(
                     !sendMode && !(recording && locked),
                     enter = fadeIn() + scaleIn(initialScale = 0.4f),

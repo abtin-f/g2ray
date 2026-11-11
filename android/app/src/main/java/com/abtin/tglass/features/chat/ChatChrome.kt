@@ -48,50 +48,66 @@ import com.abtin.tglass.ui.components.formatCount
 import com.kyant.shapes.Capsule
 import com.kyant.shapes.RoundedRectangle
 
-/** Height of the chat screen's glass bars and header controls (Telegram-iOS: 40 pt). */
+/**
+ * Height of the chat screen's glass bars: composer side buttons (ChatTextInputPanelNode menuButtonHeight 40), the
+ * translate panel (ChatTranslationPanelNode panelHeight 40) and the floating round buttons.
+ */
 val ChatBarHeight = 40.dp
+
+/**
+ * Height of the chat header controls: back capsule, title pill and avatar (Telegram-iOS NavigationBarComponent
+ * capsules 44 pt with radius 22; ChatTitleView background 44 pt; ChatAvatarNavigationNode 44 x 44).
+ */
+val ChatNavHeight = 44.dp
+
+/** Side inset of the chat header row and its panels (HeaderPanelContainerComponent sideInset 16). */
+val ChatHeaderSideInset = 16.dp
+
+/** Minimum height of the composer text field (ChatTextInputPanelNode: 33 text + insets 5 + 4 = 42). */
+val ComposerFieldMinHeight = 42.dp
 
 /** Corner radius of the pinned / now-playing panel under the chat header (iOS 26 photos: ~20 pt). */
 val ChatPanelRadius = 20.dp
 
-/** Height of the pinned-message row (Telegram-iOS ChatPinnedMessageTitlePanelNode: 50 pt; iPhone photos ~47-48 pt). */
-val PinnedBarHeight = 48.dp
+/** Height of the pinned-message row (Telegram-iOS ChatPinnedMessageTitlePanelNode panelHeight: 50 pt). */
+val PinnedBarHeight = 50.dp
 
 /**
- * Back control of the chat header: a 40 pt liquid-glass capsule with the chevron and, when other chats have unread
- * messages, a filled light pill with the count in dark text (iOS "‹ 256": 18 pt tall, 14 pt digits; measured on the
- * iPhone photos: capsule 70 × 40, chevron 15 pt from the left edge, pill 8 pt from the right edge).
- * Without a count it is a 40 pt circle.
+ * Back control of the chat header: a 44 pt liquid-glass capsule (NavigationBarComponent: height 44, radius 22) with the
+ * chevron and, when other chats have unread messages, a filled light pill with the count in dark text. The inner
+ * metrics come from the iPhone photos (440 pt wide screen): capsule ~78 × 44 for three digits, pill 20 pt tall with
+ * 15 pt digits, chevron ~17 pt from the left edge, pill 9 pt from the right edge.
+ * Without a count it is a 44 pt circle.
  */
 @Composable
 fun ChatBackPill(onClick: () -> Unit, badge: Int, modifier: Modifier = Modifier) {
     val c = TgTheme.colors
     if (badge <= 0) {
-        GlassBox(onClick = onClick, modifier = modifier.size(ChatBarHeight), shape = Capsule()) {
+        GlassBox(onClick = onClick, modifier = modifier.size(ChatNavHeight), shape = Capsule()) {
             Icon(IosIcons.ChevronLeft, c.text, 24.dp)
         }
         return
     }
-    GlassBox(onClick = onClick, modifier = modifier.height(ChatBarHeight), shape = Capsule()) {
-        Row(Modifier.padding(start = 9.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            // The chevron glyph is 7.5 pt wide inside its 24 pt box: a 19 pt slot puts the pill right after it.
-            Box(Modifier.width(19.dp).height(24.dp), contentAlignment = Alignment.Center) {
+    GlassBox(onClick = onClick, modifier = modifier.height(ChatNavHeight), shape = Capsule()) {
+        Row(Modifier.padding(start = 11.dp, end = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+            // The chevron glyph is 7.5 pt wide inside its 24 pt box: a 20 pt slot puts the pill right after it.
+            Box(Modifier.width(20.dp).height(24.dp), contentAlignment = Alignment.Center) {
                 Icon(IosIcons.ChevronLeft, c.text, 24.dp, Modifier.requiredSize(24.dp))
             }
             Box(
-                Modifier.height(18.dp).widthIn(min = 18.dp).clip(Capsule()).background(c.text.copy(alpha = 0.92f)).padding(horizontal = 6.dp),
+                Modifier.height(20.dp).widthIn(min = 20.dp).clip(Capsule()).background(c.text.copy(alpha = 0.92f)).padding(horizontal = 6.5.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                T(formatCount(badge), TgTheme.type.body.copy(fontSize = 14.sp, lineHeight = 17.sp), c.background, weight = FontWeight.Medium, maxLines = 1)
+                T(formatCount(badge), TgTheme.type.body.copy(fontSize = 15.sp, lineHeight = 18.sp), c.background, weight = FontWeight.Medium, maxLines = 1)
             }
         }
     }
 }
 
-/** Text pill in glass at the chat bar height ("Cancel"). */
+/** Text pill in glass at the chat header height ("Cancel"). */
 @Composable
 fun ChatPillButton(text: String, onClick: (() -> Unit)?, modifier: Modifier = Modifier, color: Color = TgTheme.colors.text, bold: Boolean = false) {
-    GlassBox(onClick = onClick, modifier = modifier.height(ChatBarHeight), shape = Capsule()) {
+    GlassBox(onClick = onClick, modifier = modifier.height(ChatNavHeight), shape = Capsule()) {
         T(
             text, TgTheme.type.body, color,
             weight = if (bold) FontWeight.SemiBold else FontWeight.Medium,
@@ -184,14 +200,14 @@ val TranslateGlyph: ImageVector by lazy {
     }.build()
 }
 
-/** 20 pt ring with three dots ("…") — the more button of the translate bar (iPhone photos: 20 pt, 1.5 pt stroke). */
+/** 22 pt ring with three dots ("…") — the more button of the translate bar (iPhone photos at 440 pt: ~22 pt, 1.5 pt stroke). */
 @Composable
 private fun DotsRing(color: Color) {
-    Canvas(Modifier.size(20.dp)) {
+    Canvas(Modifier.size(22.dp)) {
         drawCircle(color, radius = size.minDimension / 2f - 0.75.dp.toPx(), style = Stroke(width = 1.5.dp.toPx()))
         val r = 1.25.dp.toPx()
         val cy = size.height / 2f
-        val gap = 4.dp.toPx()
+        val gap = 4.5.dp.toPx()
         drawCircle(color, r, Offset(size.width / 2f - gap, cy))
         drawCircle(color, r, Offset(size.width / 2f, cy))
         drawCircle(color, r, Offset(size.width / 2f + gap, cy))
@@ -211,7 +227,7 @@ fun TranslateBar(onTranslate: () -> Unit, onMore: () -> Unit, modifier: Modifier
                 Modifier.align(Alignment.Center).fillMaxHeight().fadeClickable(onClick = onTranslate).padding(horizontal = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(TranslateGlyph, c.text, 22.dp)
+                Icon(TranslateGlyph, c.text, 24.dp)
                 Spacer(Modifier.width(10.dp))
                 T(if (translated) "Show Original" else "Translate to English", TgTheme.type.body.copy(fontSize = 17.sp, lineHeight = 20.sp), c.text, maxLines = 1)
             }
@@ -226,8 +242,8 @@ fun TranslateBar(onTranslate: () -> Unit, onMore: () -> Unit, modifier: Modifier
 // ---- Pinned message bar ----
 
 /**
- * Pinned-message row (iOS 26 photos: ~48 pt tall, 2 pt bar 14 pt from the left, "Pinned Message" medium 15 pt and the
- * text regular 15 pt in the panel's control color, a 12 pt X 8 pt from the right edge): the bar, the title and the
+ * Pinned-message row (ChatPinnedMessageTitlePanelNode: 50 pt tall, 2 pt line 18 pt from the left, text 10 pt after
+ * the line's origin, "Pinned Message" medium 15 pt and the text regular 15 pt in the panel's control color, a 12 pt X): the bar, the title and the
  * text; a pin glyph at the right, or an X ([closable], private / bot / Saved chats) that hides the bar.
  * With [container] it is its own frosted panel; without, it is a row of the panel it shares with the now-playing bar.
  */
@@ -256,8 +272,8 @@ fun PinnedBar(
 @Composable
 private fun PinnedRow(preview: String, closable: Boolean, onClose: () -> Unit, modifier: Modifier) {
     val c = TgTheme.colors
-    Row(modifier.fillMaxWidth().padding(start = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.width(2.dp).height(34.dp).clip(Capsule()).background(c.text))
+    Row(modifier.fillMaxWidth().padding(start = 18.dp, end = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.width(2.dp).height(36.dp).clip(Capsule()).background(c.text))
         Spacer(Modifier.width(8.dp))
         Column(Modifier.weight(1f)) {
             T("Pinned Message", TgTheme.type.subheadline.copy(fontSize = 15.sp, lineHeight = 18.sp), c.text, weight = FontWeight.Medium, maxLines = 1)

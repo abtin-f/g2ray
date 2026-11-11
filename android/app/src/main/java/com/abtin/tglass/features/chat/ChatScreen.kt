@@ -268,8 +268,11 @@ fun ChatScreen(chatId: Long) {
     fun itemIndexOf(id: Long) = reversedItems.indexOfFirst { it.contains(id) }
     val isGroup = chat.type == ChatType.Group
     val isChannel = chat.type == ChatType.Channel
-    // Bubbles hug their content up to ~78 % of the chat width (at most ~320 pt + tail), next to the avatar column in groups.
-    val maxBubble: Dp = ((LocalConfiguration.current.screenWidthDp - (if (isGroup) 38 else 0)) * 0.78f).coerceAtMost(326f).dp
+    // Telegram-iOS ChatMessageItemWidthFill (compactInset 36, compact boundary 500 pt): bubbles hug their content up to
+    // chat width - 36 (about 88 % at 440 pt), minus the 38 pt avatar column (avatarInset 34 + 4) in groups; on wide
+    // layouts (500 pt and up) at most 85 % of the width.
+    val chatWidthDp = LocalConfiguration.current.screenWidthDp
+    val maxBubble: Dp = ((if (chatWidthDp < 500) chatWidthDp - 36f else chatWidthDp * 0.85f) - (if (isGroup) 38f else 0f)).dp
     val pinned = repo.pinnedMessage(chatId)
     // "Translate to English" bar: shown when at least 2 of the last 12 incoming messages are in Arabic script.
     remember { TranslateBarPrefs.init(context) }
@@ -835,7 +838,7 @@ fun ChatScreen(chatId: Long) {
                     .fillMaxWidth()
                     .onSizeChanged { headerHeight = it.height }
                     .statusBarsPadding()
-                    .padding(start = 10.dp, end = 10.dp, top = 4.dp, bottom = 6.dp)
+                    .padding(start = ChatHeaderSideInset, end = ChatHeaderSideInset, top = 2.dp, bottom = 6.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (searchMode) {
@@ -845,7 +848,7 @@ fun ChatScreen(chatId: Long) {
                     } else if (selecting) {
                         ChatPillButton("Cancel", { selecting = false; selected.clear() })
                         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                            GlassBox(onClick = null, modifier = Modifier.height(ChatBarHeight)) {
+                            GlassBox(onClick = null, modifier = Modifier.height(ChatNavHeight)) {
                                 T("${selected.size} Selected", TgTheme.type.headline, c.text, modifier = Modifier.padding(horizontal = 18.dp))
                             }
                         }
@@ -854,10 +857,11 @@ fun ChatScreen(chatId: Long) {
                         ChatBackPill({ nav.pop() }, badge = backBadge)
                         Box(Modifier.weight(1f).padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
                             val (subtitle, active) = chatSubtitle(chat, repo)
-                            // Telegram-iOS ChatTitleComponent: semibold 17 title, regular 12 status, 14 pt side insets.
-                            val statusStyle = TgTheme.type.caption1.copy(fontSize = 12.sp, lineHeight = 14.sp)
-                            GlassBox(onClick = { nav.push(Route.Profile(chatId)) }, modifier = Modifier.height(ChatBarHeight)) {
-                                Column(Modifier.padding(horizontal = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            // Telegram-iOS ChatTitleView: semibold 17 title, regular 13 status, no gap between them, in a
+                            // 44 pt glass capsule that extends 12 pt past the text on both sides.
+                            val statusStyle = TgTheme.type.caption1.copy(fontSize = 13.sp, lineHeight = 16.sp)
+                            GlassBox(onClick = { nav.push(Route.Profile(chatId)) }, modifier = Modifier.height(ChatNavHeight)) {
+                                Column(Modifier.padding(horizontal = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         com.abtin.tglass.core.emoji.EmojiText(
                                             chat.title, TgTheme.type.headline.copy(fontSize = 17.sp, lineHeight = 20.sp), c.text,
@@ -873,8 +877,9 @@ fun ChatScreen(chatId: Long) {
                                 }
                             }
                         }
-                        Box(Modifier.size(ChatBarHeight).clip(CircleShape).fadeClickable { nav.push(Route.Profile(chatId)) }) {
-                            ChatAvatar(chat, repo, ChatBarHeight, showOnline = false)
+                        // ChatAvatarNavigationNode: 44 x 44 (the iPhone photos show the avatar filling the 44 pt circle).
+                        Box(Modifier.size(ChatNavHeight).clip(CircleShape).fadeClickable { nav.push(Route.Profile(chatId)) }) {
+                            ChatAvatar(chat, repo, ChatNavHeight, showOnline = false)
                         }
                     }
                 }
@@ -1290,7 +1295,9 @@ private fun ChatListItem(
             onInlineButton = { r, col, b -> actions.inlineButton(head, r, col, b) },
         )
     }
-    Spacer(Modifier.height(if (group.groupedBottom) 2.dp else 6.dp))
+    // Telegram-iOS ChatMessageItemBubbleLayoutConstants: defaultSpacing 2 + 1 px between separate bubbles, mergedSpacing
+    // 0 inside a group (there the bubble image's own border inset leaves a hairline; here 1 pt keeps the shapes apart).
+    Spacer(Modifier.height(if (group.groupedBottom) 1.dp else 2.5.dp))
 }
 
 fun groupFor(messages: List<Message>, idx: Int, isGroup: Boolean): BubbleGroup {
@@ -1579,7 +1586,7 @@ fun ChatPeek(chatId: Long, onOpen: () -> Unit) {
                 if (m.content is MessageContent.Service) {
                     ServicePill((m.content as MessageContent.Service).text)
                 } else {
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = if (group.groupedBottom) 1.dp else 3.dp)) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = if (group.groupedBottom) 0.5.dp else 1.25.dp)) {
                         if (m.outgoing) Spacer(Modifier.weight(1f))
                         MessageBubble(
                             m, group, senderNameFor(repo, m, group, isGroup), m.senderId,
@@ -1650,7 +1657,7 @@ private fun ChatSearchField(value: String, onValue: (String) -> Unit, modifier: 
         kotlinx.coroutines.delay(150)
         runCatching { focus.requestFocus() }
     }
-    GlassBox(onClick = null, shape = Capsule(), modifier = modifier.height(ChatBarHeight), contentAlignment = Alignment.CenterStart, style = com.abtin.tglass.core.glass.GlassStyle.Blur) {
+    GlassBox(onClick = null, shape = Capsule(), modifier = modifier.height(ChatNavHeight), contentAlignment = Alignment.CenterStart, style = com.abtin.tglass.core.glass.GlassStyle.Blur) {
         Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(TgIcons.IcSearch, c.secondaryText, 18.dp)
             Spacer(Modifier.width(6.dp))

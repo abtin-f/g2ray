@@ -549,7 +549,8 @@ internal fun PollMessageBody(m: Message, p: MessageContent.Poll, colors: BubbleC
                     if (reveal > 0f) {
                         T(
                             "${(pct * reveal).roundToInt()}%",
-                            TgTheme.type.footnote.copy(fontSize = 14.sp, lineHeight = 18.sp),
+                            // ChatMessagePollBubbleContentNode percentageFont: bold 14.5
+                            TgTheme.type.footnote.copy(fontSize = 14.5.sp, lineHeight = 18.sp),
                             colors.text, weight = FontWeight.Bold, maxLines = 1, align = TextAlign.End,
                             modifier = Modifier.padding(top = 10.dp, end = 6.dp).fillMaxWidth().graphicsLayer { alpha = reveal },
                         )
@@ -623,7 +624,7 @@ internal fun PollMessageBody(m: Message, p: MessageContent.Poll, colors: BubbleC
                     )
                 }
                 showResults && p.canGetVoters && !p.anonymous && total > 0 -> T(
-                    "View Results", TgTheme.type.body.copy(fontSize = 16.sp), colors.accent, weight = FontWeight.SemiBold, maxLines = 1,
+                    "View Results", TgTheme.type.body.copy(fontSize = 17.sp), colors.accent, weight = FontWeight.Normal, maxLines = 1,
                     modifier = Modifier.align(Alignment.Center).fadeClickable(onClick = actions.viewResults),
                 )
                 else -> T(

@@ -418,8 +418,8 @@ fun MessageBubble(
     val screenW = LocalConfiguration.current.screenWidthDp.dp
     val contentMax = maxWidth - TailWidth
     val textMax = contentMax - 22.dp
-    // Telegram-iOS media: at most ~70 % of the screen / 280 pt wide, never wider than the bubble allows.
-    val mediaMax = minOf(contentMax - 4.dp, screenW * 0.7f, 280.dp)
+    // Telegram-iOS ChatMessageItemImageLayoutConstants (compact): media fits 300 x 380 pt, never wider than the bubble allows.
+    val mediaMax = minOf(contentMax - 4.dp, screenW - 40.dp, 300.dp)
     val reactions = m.reactions
     val photos = album.filter { it.content is MessageContent.Photo }
     val isAlbumGrid = album.size > 1 && photos.size == album.size
@@ -567,10 +567,10 @@ fun MessageBubble(
 private fun bodyStyle(colors: BubbleColors): TextStyle =
     TgTheme.type.body.copy(color = colors.text, textDirection = TextDirection.Content)
 
-/** Fits a picture of [aspect] (width / height) into the media box like Telegram (min 170×90, crop beyond). */
+/** Fits a picture of [aspect] (width / height) into the media box like Telegram (max 300×380, min 170×90, crop beyond). */
 private fun mediaSize(aspect: Float, maxW: Dp): Pair<Dp, Dp> {
     val a = if (aspect.isNaN() || aspect <= 0f) 1f else aspect.coerceIn(0.4f, 3f)
-    val maxH = maxW * 1.15f
+    val maxH = maxW * (380f / 300f)
     var w = maxW
     var h = w / a
     if (h > maxH) {
@@ -1386,7 +1386,8 @@ private class ReactionsPolicy(private val limit: Dp) : MeasurePolicy {
 @Composable
 fun ServicePill(text: String, modifier: Modifier = Modifier) {
     val c = TgTheme.colors
-    Box(modifier.fillMaxWidth().padding(vertical = 5.dp), contentAlignment = Alignment.Center) {
+    // Telegram-iOS ChatMessageDateHeader: the row is 34 pt tall (timestampHeaderHeight) around a 22 pt pill.
+    Box(modifier.fillMaxWidth().padding(vertical = 6.dp), contentAlignment = Alignment.Center) {
         Box(
             Modifier
                 .widthIn(max = 300.dp)
