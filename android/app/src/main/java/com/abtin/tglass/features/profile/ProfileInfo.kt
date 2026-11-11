@@ -38,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.abtin.tglass.core.design.TgTheme
 import com.abtin.tglass.data.ProfileMusic
 import com.abtin.tglass.ui.components.Avatar
@@ -98,7 +99,8 @@ internal fun InfoRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                T(label, TgTheme.type.subheadline, palette.cardLabel, maxLines = 1)
+                // PeerInfoScreenLabeledValueItem: label regular 14, value regular 17.
+                T(label, TgTheme.type.subheadline.copy(fontSize = 14.sp, lineHeight = 18.sp), palette.cardLabel, maxLines = 1)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (leading != null) {
                         leading()

@@ -161,7 +161,7 @@ internal fun ProfileTabBar(
                                 .padding(horizontal = 14.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            T(tab.title, TgTheme.type.subheadline, if (sel) palette.tabSelected else palette.tab, weight = if (sel) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1)
+                            T(tab.title, TgTheme.type.subheadline, if (sel) palette.tabSelected else palette.tab, weight = FontWeight.Medium, maxLines = 1)
                             if (tab == ProfileTab.Gifts && giftIcons.isNotEmpty()) {
                                 Spacer(Modifier.width(3.dp))
                                 giftIcons.take(3).forEach { g -> GiftGlyph(g, 18.dp) }
