@@ -70,8 +70,17 @@ fun LottieIcon(
     playKey: Any? = null,
     play: Boolean = true,
     restAtEnd: Boolean = true,
+    /** Static drawable shown until the animation file is parsed (so the icon never starts out empty). */
+    @androidx.annotation.DrawableRes placeholder: Int? = null,
+    placeholderSize: Dp = size,
 ) {
     val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(res))
+    if (composition == null && placeholder != null) {
+        androidx.compose.foundation.layout.Box(modifier.size(size), contentAlignment = androidx.compose.ui.Alignment.Center) {
+            Icon(placeholder, tint, placeholderSize)
+        }
+        return
+    }
     val anim = rememberLottieAnimatable()
     val animations = LocalAppSettings.current.animations
     LaunchedEffect(composition, playKey, play) {

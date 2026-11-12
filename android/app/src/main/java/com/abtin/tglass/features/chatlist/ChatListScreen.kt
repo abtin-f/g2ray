@@ -276,7 +276,8 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
     val chats = repo.chatsInFolder(folder)
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val headerHeight = 48.dp
+    // ChatListNavigationBar: 3 + 44 pt controls, then 9 + 8 pt down to the 44 pt search field.
+    val headerHeight = 50.dp
     val storiesHeight = with(density) { storiesPx.toDp() }
     // Music / voice playing (global player): Telegram's top player bar under the header.
     val playerShown = !searching && com.abtin.tglass.features.chat.hasNowPlaying(repo, includeVideo = false)
@@ -298,7 +299,7 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
                 .fillMaxSize()
                 .nestedScroll(storiesConnection)
                 .layerBackdrop(backdrop),
-            contentPadding = PaddingValues(top = top + headerHeight + 4.dp + playerHeight + if (searching) 0.dp else storiesHeight, bottom = bottom + 112.dp),
+            contentPadding = PaddingValues(top = top + headerHeight + 10.dp + playerHeight + if (searching) 0.dp else storiesHeight, bottom = bottom + 112.dp),
         ) {
             if (searching) {
                 searchResults(repo, query, global, onOpen = { focus.clearFocus(); nav.push(Route.Chat(it)) })
@@ -381,13 +382,13 @@ fun ChatListScreen(backdrop: LayerBackdrop, tabBar: TabBarController) {
             }
         } else {
             Box(Modifier.fillMaxWidth()) {
-                ScrollEdgeBlur(top + headerHeight + 24.dp + storiesHeight + playerHeight)
+                ScrollEdgeBlur(top + headerHeight + 30.dp + storiesHeight + playerHeight)
                 Column(Modifier.fillMaxWidth().statusBarsPadding()) {
-                    Box(Modifier.fillMaxWidth().height(headerHeight).padding(horizontal = 12.dp)) {
+                    Box(Modifier.fillMaxWidth().height(headerHeight).padding(horizontal = 16.dp)) {
                         GlassTextButton(if (editing) "Done" else "Edit", {
                             editing = !editing
                             selected.clear()
-                        }, bold = editing, modifier = Modifier.align(Alignment.CenterStart))
+                        }, bold = true, modifier = Modifier.align(Alignment.CenterStart))
                         ChatsTitle(
                             storyUsers.take(3).map { it.id to it.name },
                             status = repo.connectionStatus,
@@ -484,17 +485,17 @@ private fun ChatsTitle(stories: List<Pair<Long, String>>, status: String?, colla
                     .padding(end = 8.dp)
             ) {
                 stories.forEachIndexed { i, (id, name) ->
-                    Box(Modifier.padding(start = (i * 14).dp).zIndex((stories.size - i).toFloat())) {
+                    Box(Modifier.padding(start = (i * 15).dp).zIndex((stories.size - i).toFloat())) {
                         Box(
                             Modifier
-                                .size(26.dp)
+                                .size(30.dp)
                                 .clip(CircleShape)
                                 .background(Brush.linearGradient(listOf(Color(0xFF34C76F), Color(0xFF3DA1FD))))
                                 .padding(1.5.dp)
                                 .clip(CircleShape)
                                 .background(c.background)
                                 .padding(1.5.dp)
-                        ) { Avatar(name, id, 20.dp) }
+                        ) { Avatar(name, id, 24.dp) }
                     }
                 }
             }
@@ -507,7 +508,7 @@ private fun ChatsTitle(stories: List<Pair<Long, String>>, status: String?, colla
             Spacer(Modifier.width(4.dp))
         }
         androidx.compose.animation.AnimatedContent(status, label = "chatsTitle") { st ->
-            if (st == null) T("Chats", TgTheme.type.headline, c.text)
+            if (st == null) T("Chats", TgTheme.type.headline, c.text, weight = FontWeight.SemiBold)
             else Row(Modifier.fadeClickable(onClick = onStatus), verticalAlignment = Alignment.CenterVertically) {
                 com.abtin.tglass.ui.components.ActivityIndicator(16.dp)
                 Spacer(Modifier.width(6.dp))
@@ -533,7 +534,7 @@ private fun ListSearchCapsule(onClick: () -> Unit) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(TgIcons.IcSearch, c.secondaryText, 20.dp)
             Spacer(Modifier.width(6.dp))
-            T("Search", TgTheme.type.body, c.secondaryText, maxLines = 1)
+            T("Search", TgTheme.type.body, c.secondaryText, weight = FontWeight.Medium, maxLines = 1)
         }
     }
 }
@@ -547,7 +548,7 @@ private fun FolderTabs(folders: List<String>, selected: Int, onSelect: (Int) -> 
     // that would draw the layer into itself and overflow the RenderThread stack (native crash). So it is the
     // translucent glass material (no backdrop sampling): fill + rim, like the strip over the black list on iOS.
     Box(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).height(40.dp)
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 4.dp).height(40.dp)
             .glass(shape = Capsule(), style = GlassStyle.Translucent, backdrop = null, shadow = false),
         contentAlignment = Alignment.CenterStart,
     ) {
@@ -569,14 +570,15 @@ private fun FolderTabs(folders: List<String>, selected: Int, onSelect: (Int) -> 
                         .padding(horizontal = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    T(f, TgTheme.type.subheadline, if (sel) c.text else c.secondaryText, weight = FontWeight.Medium, maxLines = 1)
+                    // iPhone photos: every folder title is semibold 15 in the primary colour; only the capsule marks the selection.
+                    T(f, TgTheme.type.subheadline, c.text, weight = FontWeight.SemiBold, maxLines = 1)
                     val count = unreadFor(i)
                     if (count > 0) {
                         Spacer(Modifier.width(5.dp))
                         Box(
-                            Modifier.height(17.dp).defaultMinSize(minWidth = 17.dp).clip(Capsule()).background(if (sel) c.accent else c.mutedBadge).padding(horizontal = 5.dp),
+                            Modifier.height(18.dp).defaultMinSize(minWidth = 18.dp).clip(Capsule()).background(c.accent).padding(horizontal = 5.5.dp),
                             contentAlignment = Alignment.Center,
-                        ) { T("$count", TgTheme.type.caption1.copy(fontSize = 12.sp, lineHeight = 14.sp), Color.White, weight = FontWeight.Medium) }
+                        ) { T("$count", TgTheme.type.caption1.copy(fontSize = 13.sp, lineHeight = 15.sp), Color.White, weight = FontWeight.SemiBold) }
                     }
                 }
             }

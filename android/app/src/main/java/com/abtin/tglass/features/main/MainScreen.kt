@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -129,10 +131,13 @@ fun MainScreen() {
                 // Only whether there is a badge matters for composing the overlay copy; the count itself is read in the overlay.
                 val hasUnread by remember(repo) { androidx.compose.runtime.derivedStateOf { unread > 0 } }
                 // Telegram-iOS TabBarComponent: 64pt capsule (56 + 2×4), then an 8pt gap and a search circle as tall as the bar.
+                val navInset = androidx.compose.foundation.layout.WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                val tabBarBottom = if (navInset > 30.dp) navInset + 6.dp else maxOf(navInset, 20.dp)
                 Row(
                     Modifier
-                        .navigationBarsPadding()
-                        .padding(start = 12.dp, end = 12.dp, bottom = 10.dp)
+                        // iPhone photos (440 pt): bar 18 pt from the sides and ~20 pt above the bottom edge, inside the
+                        // home-indicator area. Gesture navigation gets the same; a button bar keeps the bar above it.
+                        .padding(start = 18.dp, end = 18.dp, bottom = tabBarBottom)
                         .widthIn(max = 500.dp + 72.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -144,15 +149,15 @@ fun MainScreen() {
                         modifier = Modifier.weight(1f),
                         showOverlay = hasUnread,
                     ) {
-                        TabItem(TgAnimations.TabContacts, "Contacts", selected = tab == 0) { tab = 0 }
-                        TabItem(TgAnimations.TabCalls, "Calls", selected = tab == 1) { tab = 1 }
-                        TabItem(TgAnimations.TabChats, "Chats", selected = tab == 2, badge = { unread }) { tab = 2 }
+                        TabItem(TgAnimations.TabContacts, TgIcons.TabContacts, "Contacts", selected = tab == 0) { tab = 0 }
+                        TabItem(TgAnimations.TabCalls, TgIcons.TabCalls, "Calls", selected = tab == 1) { tab = 1 }
+                        TabItem(TgAnimations.TabChats, TgIcons.TabChats, "Chats", selected = tab == 2, badge = { unread }) { tab = 2 }
                         TabItem(
-                            TgAnimations.TabSettings, "Settings", selected = tab == 3,
+                            TgAnimations.TabSettings, TgIcons.TabSettings, "Settings", selected = tab == 3,
                             onLongClick = if (repo.isLive) ({ com.abtin.tglass.features.settings.showAccountSwitcher(repo, sheet) }) else null,
                         ) { tab = 3 }
                     }
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(10.dp))
                     GlassIconButton(
                         TgIcons.IcSearch,
                         onClick = { tab = 2; tabBar.searchRequests++ },
@@ -169,6 +174,7 @@ fun MainScreen() {
 @Composable
 private fun androidx.compose.foundation.layout.RowScope.TabItem(
     animation: Int,
+    staticIcon: Int,
     label: String,
     selected: Boolean,
     badge: () -> Int = { 0 },
@@ -180,17 +186,17 @@ private fun androidx.compose.foundation.layout.RowScope.TabItem(
     val overlay = layer == LiquidBottomTabLayer.Overlay
     LiquidBottomTab(onClick = onClick, onLongClick = onLongClick) {
         // The icon slot is shorter than the Lottie canvas: Telegram's tab animations leave ~25% empty margin
-        // around the glyph, so a 44dp canvas gives the ~24pt glyph of the iOS 26 tab bar.
-        Box(Modifier.size(width = 44.dp, height = 28.dp), contentAlignment = Alignment.Center) {
+        // around the glyph, so a 48dp canvas gives the ~26pt glyph of the iOS 26 tab bar.
+        Box(Modifier.size(width = 48.dp, height = 28.dp), contentAlignment = Alignment.Center) {
             if (!overlay) {
-                Box(Modifier.requiredSize(44.dp)) {
+                Box(Modifier.requiredSize(48.dp)) {
                     // Telegram-iOS tab icons are Lottie animations that play when the tab gets selected.
-                    LottieIcon(animation, c.text, 44.dp, playKey = if (selected) label else null, play = selected)
+                    LottieIcon(animation, c.text, 48.dp, playKey = if (selected) label else null, play = selected, placeholder = staticIcon, placeholderSize = 28.dp)
                 }
             } else if (badge() > 0) {
                 // Drawn above the selection pill so it stays red instead of being tinted blue.
                 // TabBarComponent: the badge starts 11.5 right of the item center, 2 below the top of the 56pt item.
-                TabBadge(badge(), Modifier.align(Alignment.TopStart).offset(x = 33.5.dp, y = (-5).dp).wrapContentSize(Alignment.TopStart, unbounded = true))
+                TabBadge(badge(), Modifier.align(Alignment.TopStart).offset(x = 35.5.dp, y = (-5).dp).wrapContentSize(Alignment.TopStart, unbounded = true))
             }
         }
         T(

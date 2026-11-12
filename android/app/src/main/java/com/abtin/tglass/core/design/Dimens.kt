@@ -19,7 +19,7 @@ object TgDimens {
     val NavTitleInset = 72.dp
 
     /** Round glass icon button / capsule glass text button height. */
-    val GlassButton = 40.dp
+    val GlassButton = 44.dp
     /** Larger glass pill (profile actions, media-viewer header). */
     val GlassPill = 44.dp
     /** Horizontal padding inside a text glass button. */
