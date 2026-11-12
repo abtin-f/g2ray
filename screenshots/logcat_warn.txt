@@ -1,0 +1,558 @@
+--------- beginning of main
+11-12 08:43:25.127  4569  4641 W Bugle   : TextClassifierLibManagerImpl: Reclaiming memory at level: 40
+--------- beginning of system
+11-12 08:43:25.149   521  1849 W ActivityTaskManager: Force removing ActivityRecord{8445e07 u0 com.abtin.tglass/.MainActivity t29 f}}: app died, no saved state
+11-12 08:43:25.163   521  1629 W AppSearchIcing: icing-search-engine.cc:283: Error: 5, Message: Document (com.google.android.googlequicksearchbox$OneSearchZeroStateGoogleSuggestions/default, zp) not found.
+11-12 08:43:25.167   521  1849 W ProcessStats: Tracking association SourceState{f2dd3b com.google.android.gms/10129 BTop #15110} whose proc state 2 is better than process ProcessState{d5a3e24 com.google.android.gms.persistent/10129 pkg=com.google.android.gms} proc state 4 (68 skipped)
+11-12 08:43:25.230   521  1849 W ActivityTaskManager: callingPackage for (uid=2000, pid=8268) has no WPC
+11-12 08:43:25.312   521  2410 W InputManager-JNI: Input channel object '2f94500 com.abtin.tglass/com.abtin.tglass.MainActivity (client)' was disposed without first being removed with the input manager!
+11-12 08:43:25.408   521   549 W ActivityManager: Slow operation: 94ms so far, now at startProcess: returned from zygote!
+11-12 08:43:25.409   521   549 W ActivityManager: Slow operation: 94ms so far, now at startProcess: done updating battery stats
+11-12 08:43:25.409   521   549 W ActivityManager: Slow operation: 94ms so far, now at startProcess: building log message
+11-12 08:43:25.409   521   549 W ActivityManager: Slow operation: 94ms so far, now at startProcess: starting to update pids map
+11-12 08:43:25.411   521   549 W ActivityManager: Slow operation: 96ms so far, now at startProcess: done updating pids map
+11-12 08:43:25.469  1652  2223 W CorpusConfigHelper: Invalid input from icing corpus JSON flag.
+11-12 08:43:25.469  1652  2223 W CorpusConfigHelper: android.util.MalformedJsonException: Use JsonReader.setLenient(true) to accept malformed JSON at line 123 column 2
+11-12 08:43:25.469  1652  2223 W CorpusConfigHelper: 	at android.util.JsonReader.syntaxError(JsonReader.java:1162)
+11-12 08:43:25.469  1652  2223 W CorpusConfigHelper: 	at android.util.JsonReader.checkLenient(JsonReader.java:840)
+11-12 08:43:25.469  1652  2223 W CorpusConfigHelper: 	at android.util.JsonReader.nextInArray(JsonReader.java:615)
+11-12 08:43:25.469  1652  2223 W CorpusConfigHelper: 	at android.util.JsonReader.peek(JsonReader.java:345)
+11-12 08:43:25.469  1652  2223 W CorpusConfigHelper: 	at android.util.JsonReader.hasNext(JsonReader.java:321)
+11-12 08:43:25.469  1652  2223 W CorpusConfigHelper: 	at com.google.android.apps.gsa.searchbox.c.b.b.k.c(PG:7)
+11-12 08:43:25.469  1652  2223 W CorpusConfigHelper: 	at com.google.android.apps.gsa.searchbox.c.b.b.k.<init>(PG:5)
+11-12 08:43:25.469  1652  2223 W CorpusConfigHelper: 	at com.google.android.apps.gsa.staticplugins.searchboxroot.features.n.a.c.<init>(PG:16)
+11-12 08:43:25.469  1652  2223 W CorpusConfigHelper: 	at com.google.android.apps.gsa.staticplugins.searchboxroot.b.a(PG:14)
+11-12 08:43:25.469  1652  2223 W CorpusConfigHelper: 	at com.google.android.apps.gsa.staticplugins.searchboxroot.x.<init>(PG:7)
+11-12 08:43:25.469  1652  2223 W CorpusConfigHelper: 	at com.google.android.apps.gsa.binaries.velvet.app.akd.b(PG:15)
+11-12 08:43:25.469  1652  2223 W CorpusConfigHelper: 	at dagger.a.e.b(PG:1)
+11-12 08:43:25.469  1652  2223 W CorpusConfigHelper: 	at com.google.android.apps.gsa.staticplugins.searchboxroot.a.a.a(PG:3)
+11-12 08:43:25.469  1652  2223 W CorpusConfigHelper: 	at com.google.android.apps.gsa.binaries.velvet.app.ok.f(Unknown Source:2541)
+11-12 08:43:25.469  1652  2223 W CorpusConfigHelper: 	at com.google.android.apps.gsa.binaries.velvet.app.ok.b(PG:1)
+11-12 08:43:25.469  1652  2223 W CorpusConfigHelper: 	at com.google.android.apps.gsa.search.core.service.g.a.c.a(PG:2)
+11-12 08:43:25.469  1652  2223 W CorpusConfigHelper: 	at com.google.android.libraries.gsa.k.a.f.a(PG:2)
+11-12 08:43:25.469  1652  2223 W CorpusConfigHelper: 	at com.google.common.util.concurrent.dx.a(PG:1)
+11-12 08:43:25.469  1652  2223 W CorpusConfigHelper: 	at com.google.common.util.concurrent.cv.run(PG:4)
+11-12 08:43:25.469  1652  2223 W CorpusConfigHelper: 	at com.google.common.util.concurrent.dz.run(PG:1)
+11-12 08:43:25.469  1652  2223 W CorpusConfigHelper: 	at com.google.android.libraries.i.ae.run(PG:1)
+11-12 08:43:25.469  1652  2223 W CorpusConfigHelper: 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+11-12 08:43:25.469  1652  2223 W CorpusConfigHelper: 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+11-12 08:43:25.469  1652  2223 W CorpusConfigHelper: 	at com.google.android.libraries.i.k.run(PG:2)
+11-12 08:43:25.469  1652  2223 W CorpusConfigHelper: 	at com.google.android.libraries.i.p.run(PG:4)
+11-12 08:43:25.469  1652  2223 W CorpusConfigHelper: 	at java.lang.Thread.run(Thread.java:1012)
+11-12 08:43:25.486  8272  8272 W om.abtin.tglass: Unexpected CPU variant for x86: x86_64.
+11-12 08:43:25.486  8272  8272 W om.abtin.tglass: Known variants: atom, sandybridge, silvermont, goldmont, goldmont-plus, tremont, kabylake, default
+11-12 08:43:25.550  8272  8272 W ziparchive: Unable to open '/data/app/~~fUa8l9RVN7qG0nGtLiODFw==/com.abtin.tglass-hFCcQVWINnU-iWJjWLlpTg==/base.dm': No such file or directory
+11-12 08:43:25.550  8272  8272 W ziparchive: Unable to open '/data/app/~~fUa8l9RVN7qG0nGtLiODFw==/com.abtin.tglass-hFCcQVWINnU-iWJjWLlpTg==/base.dm': No such file or directory
+11-12 08:43:25.572   521   822 W WindowManager: Exception thrown during dispatchAppVisibility Window{2f94500 u0 com.abtin.tglass/com.abtin.tglass.MainActivity EXITING}
+11-12 08:43:25.572   521   822 W WindowManager: android.os.DeadObjectException
+11-12 08:43:25.572   521   822 W WindowManager: 	at android.os.BinderProxy.transactNative(Native Method)
+11-12 08:43:25.572   521   822 W WindowManager: 	at android.os.BinderProxy.transact(BinderProxy.java:584)
+11-12 08:43:25.572   521   822 W WindowManager: 	at android.view.IWindow$Stub$Proxy.dispatchAppVisibility(IWindow.java:546)
+11-12 08:43:25.572   521   822 W WindowManager: 	at com.android.server.wm.WindowState.sendAppVisibilityToClients(WindowState.java:3271)
+11-12 08:43:25.572   521   822 W WindowManager: 	at com.android.server.wm.WindowContainer.sendAppVisibilityToClients(WindowContainer.java:1221)
+11-12 08:43:25.572   521   822 W WindowManager: 	at com.android.server.wm.WindowToken.setClientVisible(WindowToken.java:409)
+11-12 08:43:25.572   521   822 W WindowManager: 	at com.android.server.wm.ActivityRecord.setClientVisible(ActivityRecord.java:6946)
+11-12 08:43:25.572   521   822 W WindowManager: 	at com.android.server.wm.ActivityRecord.postApplyAnimation(ActivityRecord.java:5637)
+11-12 08:43:25.572   521   822 W WindowManager: 	at com.android.server.wm.ActivityRecord.commitVisibility(ActivityRecord.java:5580)
+11-12 08:43:25.572   521   822 W WindowManager: 	at com.android.server.wm.Transition.finishTransition(Transition.java:1151)
+11-12 08:43:25.572   521   822 W WindowManager: 	at com.android.server.wm.TransitionController.finishTransition(TransitionController.java:868)
+11-12 08:43:25.572   521   822 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.finishTransition(WindowOrganizerController.java:396)
+11-12 08:43:25.572   521   822 W WindowManager: 	at android.window.IWindowOrganizerController$Stub.onTransact(IWindowOrganizerController.java:286)
+11-12 08:43:25.572   521   822 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.onTransact(WindowOrganizerController.java:181)
+11-12 08:43:25.572   521   822 W WindowManager: 	at android.os.Binder.execTransactInternal(Binder.java:1339)
+11-12 08:43:25.572   521   822 W WindowManager: 	at android.os.Binder.execTransact(Binder.java:1275)
+11-12 08:43:25.579   521   541 W ActivityManager: setHasOverlayUi called on unknown pid: 8133
+11-12 08:43:25.600   400   400 E BpTransactionCompletedListener: Failed to transact (-32)
+11-12 08:43:25.985   521   531 W JavaBinder: BinderProxy is being destroyed but the application did not call unlinkToDeath to unlink all of its death recipients beforehand.  Releasing leaked death recipient: com.android.server.wm.ActivityRecord$$ExternalSyntheticLambda0
+11-12 08:43:26.319  8272  8272 W OpenGLRenderer: Unknown dataspace 0
+11-12 08:43:26.456  8272  8272 W om.abtin.tglass: Accessing hidden method Landroid/os/SystemProperties;->addChangeCallback(Ljava/lang/Runnable;)V (unsupported, reflection, allowed)
+11-12 08:43:27.328  8272  8291 W OpenGLRenderer: Failed to initialize 101010-2 format, error = EGL_SUCCESS
+11-12 08:43:28.519  8272  8310 E SurfaceSyncGroup: Failed to receive transaction ready in 1000ms. Marking SurfaceSyncGroup(wmsSync-VRI[MainActivity]#0) as ready
+11-12 08:43:28.526  8272  8310 E SurfaceSyncGroup: Failed to receive transaction ready in 1000ms. Marking SurfaceSyncGroup(VRI[MainActivity]#1) as ready
+11-12 08:43:28.532   521   538 W ziparchive: Unable to open '/data/app/~~fUa8l9RVN7qG0nGtLiODFw==/com.abtin.tglass-hFCcQVWINnU-iWJjWLlpTg==/base.dm': No such file or directory
+11-12 08:43:28.606   521  1849 W InputManager-JNI: Input channel object '1dae95 Splash Screen com.abtin.tglass (client)' was disposed without first being removed with the input manager!
+11-12 08:43:28.639   834   867 W Looper  : Slow delivery took 33ms wmshell.main h=android.os.Handler c=com.android.wm.shell.bubbles.BubbleController$BubblesImpl$$ExternalSyntheticLambda5@874b526 m=0
+11-12 08:43:28.833   834   867 W Looper  : Drained
+11-12 08:43:28.848  1652  2313 W SearchServiceCore: Abort, client detached.
+11-12 08:43:29.447   521  3533 E TaskPersister: File error accessing recents directory (directory doesn't exist?).
+11-12 08:43:30.350  8272  8295 W TGlassWatchdog: still blocked, 30 samples:
+11-12 08:43:30.350  8272  8295 W TGlassWatchdog:   26x HardwareRenderer.nSetStopped:-2 < HardwareRenderer.setStopped:525 < ViewRootImpl.performDraw:4676 < ViewRootImpl.performTraversals:3822 < ViewRootImpl.doTraversal:2465 || 
+11-12 08:43:30.350  8272  8295 W TGlassWatchdog:   1x LookaheadCapablePlaceable.isPlacingForAlignment$ui:127 < MeasurePassDelegate.onNodePlaced$ui:360 < InnerNodeCoordinator.onAfterPlaceAt:164 < InnerNodeCoordinator.placeAt-f8xVGno:153 < Placeable.access$placeAt-f8xVGno:36 || 
+11-12 08:43:30.350  8272  8295 W TGlassWatchdog:   1x MeasurePassDelegate.forEachChildAlignmentLinesOwner:834 < MeasurePassDelegate$layoutChildrenBlock$1.invoke:178 < MeasurePassDelegate$layoutChildrenBlock$1.invoke:176 < SnapshotStateObserver.observeReads:699 < MeasurePassDelegate.layoutChildren:960 || 
+11-12 08:43:30.350  8272  8295 W TGlassWatchdog:   1x LayoutNode.getPlaceOrder$ui:866 < LayoutNode.ZComparator$lambda$0:1550 < LayoutNode$$ExternalSyntheticLambda0.compare:0 < TimSort.countRunAndMakeAscending:355 < TimSort.sort:220 || NavigationKt.IOSNavHost$lambda$3$0$1$0:286 < NavigationKt.$r8$lambda$BIU0Te5EF-e4Zajawi0tl0azlPc:0 < NavigationKt$$ExternalSyntheticLambda1.invoke:0
+11-12 08:43:30.350  8272  8295 W TGlassWatchdog:   1x Layout.getDesiredWidth:229 < Layout.getDesiredWidth:218 < LayoutIntrinsics.getDesiredWidth:175 < LayoutIntrinsics.getDesiredWidth$default:172 < LayoutIntrinsics.computeMaxIntrinsicWidth:161 || 
+11-12 08:43:32.364  8272  8295 W TGlassWatchdog: main thread blocked 6101 ms, 50 samples:
+11-12 08:43:32.364  8272  8295 W TGlassWatchdog:   46x HardwareRenderer.nSetStopped:-2 < HardwareRenderer.setStopped:525 < ViewRootImpl.performDraw:4676 < ViewRootImpl.performTraversals:3822 < ViewRootImpl.doTraversal:2465 || 
+11-12 08:43:32.364  8272  8295 W TGlassWatchdog:   1x LookaheadCapablePlaceable.isPlacingForAlignment$ui:127 < MeasurePassDelegate.onNodePlaced$ui:360 < InnerNodeCoordinator.onAfterPlaceAt:164 < InnerNodeCoordinator.placeAt-f8xVGno:153 < Placeable.access$placeAt-f8xVGno:36 || 
+11-12 08:43:32.364  8272  8295 W TGlassWatchdog:   1x MeasurePassDelegate.forEachChildAlignmentLinesOwner:834 < MeasurePassDelegate$layoutChildrenBlock$1.invoke:178 < MeasurePassDelegate$layoutChildrenBlock$1.invoke:176 < SnapshotStateObserver.observeReads:699 < MeasurePassDelegate.layoutChildren:960 || 
+11-12 08:43:32.364  8272  8295 W TGlassWatchdog:   1x LayoutNode.getPlaceOrder$ui:866 < LayoutNode.ZComparator$lambda$0:1550 < LayoutNode$$ExternalSyntheticLambda0.compare:0 < TimSort.countRunAndMakeAscending:355 < TimSort.sort:220 || NavigationKt.IOSNavHost$lambda$3$0$1$0:286 < NavigationKt.$r8$lambda$BIU0Te5EF-e4Zajawi0tl0azlPc:0 < NavigationKt$$ExternalSyntheticLambda1.invoke:0
+11-12 08:43:32.364  8272  8295 W TGlassWatchdog:   1x Layout.getDesiredWidth:229 < Layout.getDesiredWidth:218 < LayoutIntrinsics.getDesiredWidth:175 < LayoutIntrinsics.getDesiredWidth$default:172 < LayoutIntrinsics.computeMaxIntrinsicWidth:161 || 
+11-12 08:43:33.905  2682  8329 W Settings: Setting airplane_mode_on has moved from android.provider.Settings.System to android.provider.Settings.Global, returning read-only value.
+11-12 08:43:38.863  4569  4641 W Bugle   : TextClassifierLibManagerImpl: Reclaiming memory at level: 40
+11-12 08:43:45.514  1652  2313 W A       : Queue length for executor EventBus is now 11. Perhaps some tasks are too long, or the pool is too small.
+11-12 08:43:50.642   521   548 W ProcessStats: Tracking association SourceState{dd8a1eb com.google.android.googlequicksearchbox:search/10132 BFgs #15146} whose proc state 4 is better than process ProcessState{f56ec85 com.google.android.gms/10129 pkg=com.google.android.gms} proc state 9 (60 skipped)
+11-12 08:43:50.680  1652  2205 E ApplicationPropertiesBu: Error when converting version: messages.android_20230529_03_RC01_alldpi.x86_64.phone
+11-12 08:43:50.680  1652  2205 E ApplicationPropertiesBu: java.lang.NumberFormatException: For input string: "messages"
+11-12 08:43:50.680  1652  2205 E ApplicationPropertiesBu: 	at java.lang.Long.parseLong(Long.java:751)
+11-12 08:43:50.680  1652  2205 E ApplicationPropertiesBu: 	at java.lang.Long.parseLong(Long.java:876)
+11-12 08:43:50.680  1652  2205 E ApplicationPropertiesBu: 	at com.google.android.apps.gsa.staticplugins.ad.h.c(PG:3)
+11-12 08:43:50.680  1652  2205 E ApplicationPropertiesBu: 	at com.google.android.apps.gsa.staticplugins.ad.h.g(PG:3)
+11-12 08:43:50.680  1652  2205 E ApplicationPropertiesBu: 	at com.google.android.apps.gsa.staticplugins.ad.h.d(PG:267)
+11-12 08:43:50.680  1652  2205 E ApplicationPropertiesBu: 	at com.google.android.apps.gsa.staticplugins.ad.h.a(PG:38)
+11-12 08:43:50.680  1652  2205 E ApplicationPropertiesBu: 	at com.google.android.apps.gsa.staticplugins.ad.p.a(PG:1)
+11-12 08:43:50.680  1652  2205 E ApplicationPropertiesBu: 	at com.google.android.libraries.gsa.k.a.f.a(PG:2)
+11-12 08:43:50.680  1652  2205 E ApplicationPropertiesBu: 	at com.google.common.util.concurrent.dx.a(PG:1)
+11-12 08:43:50.680  1652  2205 E ApplicationPropertiesBu: 	at com.google.common.util.concurrent.cv.run(PG:4)
+11-12 08:43:50.680  1652  2205 E ApplicationPropertiesBu: 	at com.google.common.util.concurrent.dz.run(PG:1)
+11-12 08:43:50.680  1652  2205 E ApplicationPropertiesBu: 	at com.google.android.libraries.i.ae.run(PG:1)
+11-12 08:43:50.680  1652  2205 E ApplicationPropertiesBu: 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+11-12 08:43:50.680  1652  2205 E ApplicationPropertiesBu: 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+11-12 08:43:50.680  1652  2205 E ApplicationPropertiesBu: 	at com.google.android.libraries.i.k.run(PG:2)
+11-12 08:43:50.680  1652  2205 E ApplicationPropertiesBu: 	at com.google.android.libraries.i.p.run(PG:4)
+11-12 08:43:50.680  1652  2205 E ApplicationPropertiesBu: 	at java.lang.Thread.run(Thread.java:1012)
+11-12 08:43:50.684  1652  2205 E ApplicationPropertiesBu: Date 2021-12-06T00:00:00Z is out of expected range.
+11-12 08:43:50.684  1652  2205 E ApplicationPropertiesBu: Date 2022-02-15T00:00:00Z is out of expected range.
+11-12 08:43:50.685  1652  2205 E ApplicationPropertiesBu: Date 2022-02-22T00:00:00Z is out of expected range.
+11-12 08:43:50.685  1652  2205 W A       : Exception while fetching versionCode for package[com.google.android.apps.tv.dreamx].
+11-12 08:43:50.685  1652  2205 W A       : android.content.pm.PackageManager$NameNotFoundException: com.google.android.apps.tv.dreamx
+11-12 08:43:50.685  1652  2205 W A       : 	at android.app.ApplicationPackageManager.getPackageInfoAsUser(ApplicationPackageManager.java:256)
+11-12 08:43:50.685  1652  2205 W A       : 	at android.app.ApplicationPackageManager.getPackageInfo(ApplicationPackageManager.java:216)
+11-12 08:43:50.685  1652  2205 W A       : 	at android.app.ApplicationPackageManager.getPackageInfo(ApplicationPackageManager.java:210)
+11-12 08:43:50.685  1652  2205 W A       : 	at com.google.android.apps.gsa.staticplugins.ad.h.d(PG:372)
+11-12 08:43:50.685  1652  2205 W A       : 	at com.google.android.apps.gsa.staticplugins.ad.h.a(PG:38)
+11-12 08:43:50.685  1652  2205 W A       : 	at com.google.android.apps.gsa.staticplugins.ad.p.a(PG:1)
+11-12 08:43:50.685  1652  2205 W A       : 	at com.google.android.libraries.gsa.k.a.f.a(PG:2)
+11-12 08:43:50.685  1652  2205 W A       : 	at com.google.common.util.concurrent.dx.a(PG:1)
+11-12 08:43:50.685  1652  2205 W A       : 	at com.google.common.util.concurrent.cv.run(PG:4)
+11-12 08:43:50.685  1652  2205 W A       : 	at com.google.common.util.concurrent.dz.run(PG:1)
+11-12 08:43:50.685  1652  2205 W A       : 	at com.google.android.libraries.i.ae.run(PG:1)
+11-12 08:43:50.685  1652  2205 W A       : 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+11-12 08:43:50.685  1652  2205 W A       : 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+11-12 08:43:50.685  1652  2205 W A       : 	at com.google.android.libraries.i.k.run(PG:2)
+11-12 08:43:50.685  1652  2205 W A       : 	at com.google.android.libraries.i.p.run(PG:4)
+11-12 08:43:50.685  1652  2205 W A       : 	at java.lang.Thread.run(Thread.java:1012)
+11-12 08:43:50.685  1652  2205 W A       : Failed to fetch versionCode for package[com.google.android.apps.tv.dreamx].
+11-12 08:43:50.685  1652  2205 W A       : Exception while fetching versionCode for package[com.google.android.apps.tv.launcherx].
+11-12 08:43:50.685  1652  2205 W A       : android.content.pm.PackageManager$NameNotFoundException: com.google.android.apps.tv.launcherx
+11-12 08:43:50.685  1652  2205 W A       : 	at android.app.ApplicationPackageManager.getPackageInfoAsUser(ApplicationPackageManager.java:256)
+11-12 08:43:50.685  1652  2205 W A       : 	at android.app.ApplicationPackageManager.getPackageInfo(ApplicationPackageManager.java:216)
+11-12 08:43:50.685  1652  2205 W A       : 	at android.app.ApplicationPackageManager.getPackageInfo(ApplicationPackageManager.java:210)
+11-12 08:43:50.685  1652  2205 W A       : 	at com.google.android.apps.gsa.staticplugins.ad.h.d(PG:372)
+11-12 08:43:50.685  1652  2205 W A       : 	at com.google.android.apps.gsa.staticplugins.ad.h.a(PG:38)
+11-12 08:43:50.685  1652  2205 W A       : 	at com.google.android.apps.gsa.staticplugins.ad.p.a(PG:1)
+11-12 08:43:50.685  1652  2205 W A       : 	at com.google.android.libraries.gsa.k.a.f.a(PG:2)
+11-12 08:43:50.685  1652  2205 W A       : 	at com.google.common.util.concurrent.dx.a(PG:1)
+11-12 08:43:50.685  1652  2205 W A       : 	at com.google.common.util.concurrent.cv.run(PG:4)
+11-12 08:43:50.685  1652  2205 W A       : 	at com.google.common.util.concurrent.dz.run(PG:1)
+11-12 08:43:50.685  1652  2205 W A       : 	at com.google.android.libraries.i.ae.run(PG:1)
+11-12 08:43:50.685  1652  2205 W A       : 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+11-12 08:43:50.685  1652  2205 W A       : 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+11-12 08:43:50.685  1652  2205 W A       : 	at com.google.android.libraries.i.k.run(PG:2)
+11-12 08:43:50.685  1652  2205 W A       : 	at com.google.android.libraries.i.p.run(PG:4)
+11-12 08:43:50.685  1652  2205 W A       : 	at java.lang.Thread.run(Thread.java:1012)
+11-12 08:43:50.685  1652  2205 W A       : Failed to fetch versionCode for package[com.google.android.apps.tv.launcherx].
+11-12 08:43:50.711  6073  7304 W TapAndPay: NfcAdapter is null while obtaining CardEmulation instance. [CONTEXT service_id=79 ]
+11-12 08:43:50.711  6073  7304 W TapAndPay: java.lang.NullPointerException: NfcAdapter is null
+11-12 08:43:50.711  6073  7304 W TapAndPay: 	at android.nfc.cardemulation.CardEmulation.getInstance(CardEmulation.java:152)
+11-12 08:43:50.711  6073  7304 W TapAndPay: 	at cdoy.<init>(:com.google.android.gms@231818047@23.18.18 (190800-535401451):0)
+11-12 08:43:50.711  6073  7304 W TapAndPay: 	at com.google.android.gms.tapandpay.hce.task.TapAndPayAidRegistrationTaskOperation.a(:com.google.android.gms@231818047@23.18.18 (190800-535401451):5)
+11-12 08:43:50.711  6073  7304 W TapAndPay: 	at com.google.android.gms.tapandpay.gcmtask.TapAndPayGcmTaskChimeraService.a(:com.google.android.gms@231818047@23.18.18 (190800-535401451):4)
+11-12 08:43:50.711  6073  7304 W TapAndPay: 	at avzs.call(:com.google.android.gms@231818047@23.18.18 (190800-535401451):4)
+11-12 08:43:50.711  6073  7304 W TapAndPay: 	at java.util.concurrent.FutureTask.run(FutureTask.java:264)
+11-12 08:43:50.711  6073  7304 W TapAndPay: 	at aced.c(:com.google.android.gms@231818047@23.18.18 (190800-535401451):6)
+11-12 08:43:50.711  6073  7304 W TapAndPay: 	at aced.run(:com.google.android.gms@231818047@23.18.18 (190800-535401451):7)
+11-12 08:43:50.711  6073  7304 W TapAndPay: 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+11-12 08:43:50.711  6073  7304 W TapAndPay: 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+11-12 08:43:50.711  6073  7304 W TapAndPay: 	at acjn.run(:com.google.android.gms@231818047@23.18.18 (190800-535401451):0)
+11-12 08:43:50.711  6073  7304 W TapAndPay: 	at java.lang.Thread.run(Thread.java:1012)
+11-12 08:43:50.737  6072  8391 W ZappDownloader: No successful module downloads for requested features [vision.ocr].
+11-12 08:43:50.740  6072  8391 W ChimeraConfigService: Retry attempt was throttled. [CONTEXT service_id=264 ]
+11-12 08:43:50.742  6072  8389 W Vision  : Request for optional module download of ocr failed. Request again.
+11-12 08:43:50.742  6072  8389 W Vision  : Would have logged:
+11-12 08:43:50.742  6072  8389 W Vision  : # dsae@37884fe7
+11-12 08:43:50.820  3216  3593 W libc    : Access denied finding property "persist.adb.tls_server.enable"
+11-12 08:43:50.820  3216  3593 W libc    : Access denied finding property "service.adb.tls.port"
+11-12 08:43:50.819  3216  3216 W binder:3216_4: type=1400 audit(0.0:56): avc:  denied  { read } for  name="u:object_r:system_adbd_prop:s0" dev="tmpfs" ino=292 scontext=u:r:gmscore_app:s0:c512,c768 tcontext=u:object_r:system_adbd_prop:s0 tclass=file permissive=0 app=com.google.android.gms
+11-12 08:43:50.819  3216  3216 W binder:3216_4: type=1400 audit(0.0:57): avc:  denied  { read } for  name="u:object_r:adbd_prop:s0" dev="tmpfs" ino=60 scontext=u:r:gmscore_app:s0:c512,c768 tcontext=u:object_r:adbd_prop:s0 tclass=file permissive=0 app=com.google.android.gms
+11-12 08:43:50.831  6073  6139 W GmsUrlRequestImpl: Content-Type header is overwritten.
+11-12 08:43:50.918  6073  6139 W GLSUser : [AppCertManager] Exception while requesting key: 
+11-12 08:43:50.918  6073  6139 W GLSUser : java.util.concurrent.ExecutionException: avvw: Parse Proto Exception.
+11-12 08:43:50.918  6073  6139 W GLSUser : 	at dlnv.s(:com.google.android.gms@231818047@23.18.18 (190800-535401451):3)
+11-12 08:43:50.918  6073  6139 W GLSUser : 	at dlnv.get(:com.google.android.gms@231818047@23.18.18 (190800-535401451):7)
+11-12 08:43:50.918  6073  6139 W GLSUser : 	at oub.b(:com.google.android.gms@231818047@23.18.18 (190800-535401451):78)
+11-12 08:43:50.918  6073  6139 W GLSUser : 	at otz.b(:com.google.android.gms@231818047@23.18.18 (190800-535401451):4)
+11-12 08:43:50.918  6073  6139 W GLSUser : 	at otu.a(:com.google.android.gms@231818047@23.18.18 (190800-535401451):0)
+11-12 08:43:50.918  6073  6139 W GLSUser : 	at otx.a(:com.google.android.gms@231818047@23.18.18 (190800-535401451):6)
+11-12 08:43:50.918  6073  6139 W GLSUser : 	at lzq.call(:com.google.android.gms@231818047@23.18.18 (190800-535401451):14)
+11-12 08:43:50.918  6073  6139 W GLSUser : 	at java.util.concurrent.FutureTask.run(FutureTask.java:264)
+11-12 08:43:50.918  6073  6139 W GLSUser : 	at aced.c(:com.google.android.gms@231818047@23.18.18 (190800-535401451):6)
+11-12 08:43:50.918  6073  6139 W GLSUser : 	at aced.run(:com.google.android.gms@231818047@23.18.18 (190800-535401451):7)
+11-12 08:43:50.918  6073  6139 W GLSUser : 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+11-12 08:43:50.918  6073  6139 W GLSUser : 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+11-12 08:43:50.918  6073  6139 W GLSUser : 	at acjn.run(:com.google.android.gms@231818047@23.18.18 (190800-535401451):0)
+11-12 08:43:50.918  6073  6139 W GLSUser : 	at java.lang.Thread.run(Thread.java:1012)
+11-12 08:43:50.918  6073  6139 W GLSUser : Caused by: avvw: Parse Proto Exception.
+11-12 08:43:50.918  6073  6139 W GLSUser : 	at avwn.f(:com.google.android.gms@231818047@23.18.18 (190800-535401451):5)
+11-12 08:43:50.918  6073  6139 W GLSUser : 	at avxk.onSucceeded(:com.google.android.gms@231818047@23.18.18 (190800-535401451):0)
+11-12 08:43:50.918  6073  6139 W GLSUser : 	at jf.onSucceeded(:com.google.android.gms.dynamite_cronetdynamite@231818047@23.18.18 (190800-0):0)
+11-12 08:43:50.918  6073  6139 W GLSUser : 	at ie.run(:com.google.android.gms.dynamite_cronetdynamite@231818047@23.18.18 (190800-0):4)
+11-12 08:43:50.918  6073  6139 W GLSUser : 	... 6 more
+11-12 08:43:50.918  6073  6139 W GLSUser : Caused by: dzfz: Protocol message contained an invalid tag (zero).
+11-12 08:43:50.918  6073  6139 W GLSUser : 	at dzdb.k(:com.google.android.gms@231818047@23.18.18 (190800-535401451):13)
+11-12 08:43:50.918  6073  6139 W GLSUser : 	at dzha.c(:com.google.android.gms@231818047@23.18.18 (190800-535401451):47)
+11-12 08:43:50.918  6073  6139 W GLSUser : 	at dzha.h(:com.google.android.gms@231818047@23.18.18 (190800-535401451):45)
+11-12 08:43:50.918  6073  6139 W GLSUser : 	at dzfd.A(:com.google.android.gms@231818047@23.18.18 (190800-535401451):2)
+11-12 08:43:50.918  6073  6139 W GLSUser : 	at dzex.f(:com.google.android.gms@231818047@23.18.18 (190800-535401451):0)
+11-12 08:43:50.918  6073  6139 W GLSUser : 	at dzcx.d(:com.google.android.gms@231818047@23.18.18 (190800-535401451):0)
+11-12 08:43:50.918  6073  6139 W GLSUser : 	at dzcx.c(:com.google.android.gms@231818047@23.18.18 (190800-535401451):0)
+11-12 08:43:50.918  6073  6139 W GLSUser : 	at dzcx.n(:com.google.android.gms@231818047@23.18.18 (190800-535401451):0)
+11-12 08:43:50.918  6073  6139 W GLSUser : 	at avwn.h(:com.google.android.gms@231818047@23.18.18 (190800-535401451):7)
+11-12 08:43:50.918  6073  6139 W GLSUser : 	at avwn.f(:com.google.android.gms@231818047@23.18.18 (190800-535401451):1)
+11-12 08:43:50.918  6073  6139 W GLSUser : 	... 9 more
+11-12 08:43:51.032  4569  4662 W Bugle   : TextClassifierLibManagerImpl: Reclaiming memory at level: 40
+11-12 08:43:51.056   521   822 W ActivityTaskManager: Force removing ActivityRecord{b035020 u0 com.abtin.tglass/.MainActivity t30 f}}: app died, no saved state
+11-12 08:43:51.073   521  1629 W AppSearchIcing: icing-search-engine.cc:283: Error: 5, Message: Document (com.google.android.googlequicksearchbox$OneSearchZeroStateGoogleSuggestions/default, zp) not found.
+11-12 08:43:51.087   521  2436 W InputManager-JNI: Input channel object 'b3bed62 com.abtin.tglass/com.abtin.tglass.MainActivity (client)' was disposed without first being removed with the input manager!
+11-12 08:43:51.194  1652  2223 W CorpusConfigHelper: Invalid input from icing corpus JSON flag.
+11-12 08:43:51.194  1652  2223 W CorpusConfigHelper: android.util.MalformedJsonException: Use JsonReader.setLenient(true) to accept malformed JSON at line 123 column 2
+11-12 08:43:51.194  1652  2223 W CorpusConfigHelper: 	at android.util.JsonReader.syntaxError(JsonReader.java:1162)
+11-12 08:43:51.194  1652  2223 W CorpusConfigHelper: 	at android.util.JsonReader.checkLenient(JsonReader.java:840)
+11-12 08:43:51.194  1652  2223 W CorpusConfigHelper: 	at android.util.JsonReader.nextInArray(JsonReader.java:615)
+11-12 08:43:51.194  1652  2223 W CorpusConfigHelper: 	at android.util.JsonReader.peek(JsonReader.java:345)
+11-12 08:43:51.194  1652  2223 W CorpusConfigHelper: 	at android.util.JsonReader.hasNext(JsonReader.java:321)
+11-12 08:43:51.194  1652  2223 W CorpusConfigHelper: 	at com.google.android.apps.gsa.searchbox.c.b.b.k.c(PG:7)
+11-12 08:43:51.194  1652  2223 W CorpusConfigHelper: 	at com.google.android.apps.gsa.searchbox.c.b.b.k.<init>(PG:5)
+11-12 08:43:51.194  1652  2223 W CorpusConfigHelper: 	at com.google.android.apps.gsa.staticplugins.searchboxroot.features.n.a.c.<init>(PG:16)
+11-12 08:43:51.194  1652  2223 W CorpusConfigHelper: 	at com.google.android.apps.gsa.staticplugins.searchboxroot.b.a(PG:14)
+11-12 08:43:51.194  1652  2223 W CorpusConfigHelper: 	at com.google.android.apps.gsa.staticplugins.searchboxroot.x.<init>(PG:7)
+11-12 08:43:51.194  1652  2223 W CorpusConfigHelper: 	at com.google.android.apps.gsa.binaries.velvet.app.akd.b(PG:15)
+11-12 08:43:51.194  1652  2223 W CorpusConfigHelper: 	at dagger.a.e.b(PG:1)
+11-12 08:43:51.194  1652  2223 W CorpusConfigHelper: 	at com.google.android.apps.gsa.staticplugins.searchboxroot.a.a.a(PG:3)
+11-12 08:43:51.194  1652  2223 W CorpusConfigHelper: 	at com.google.android.apps.gsa.binaries.velvet.app.ok.f(Unknown Source:2541)
+11-12 08:43:51.194  1652  2223 W CorpusConfigHelper: 	at com.google.android.apps.gsa.binaries.velvet.app.ok.b(PG:1)
+11-12 08:43:51.194  1652  2223 W CorpusConfigHelper: 	at com.google.android.apps.gsa.search.core.service.g.a.c.a(PG:2)
+11-12 08:43:51.194  1652  2223 W CorpusConfigHelper: 	at com.google.android.libraries.gsa.k.a.f.a(PG:2)
+11-12 08:43:51.194  1652  2223 W CorpusConfigHelper: 	at com.google.common.util.concurrent.dx.a(PG:1)
+11-12 08:43:51.194  1652  2223 W CorpusConfigHelper: 	at com.google.common.util.concurrent.cv.run(PG:4)
+11-12 08:43:51.194  1652  2223 W CorpusConfigHelper: 	at com.google.common.util.concurrent.dz.run(PG:1)
+11-12 08:43:51.194  1652  2223 W CorpusConfigHelper: 	at com.google.android.libraries.i.ae.run(PG:1)
+11-12 08:43:51.194  1652  2223 W CorpusConfigHelper: 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+11-12 08:43:51.194  1652  2223 W CorpusConfigHelper: 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+11-12 08:43:51.194  1652  2223 W CorpusConfigHelper: 	at com.google.android.libraries.i.k.run(PG:2)
+11-12 08:43:51.194  1652  2223 W CorpusConfigHelper: 	at com.google.android.libraries.i.p.run(PG:4)
+11-12 08:43:51.194  1652  2223 W CorpusConfigHelper: 	at java.lang.Thread.run(Thread.java:1012)
+11-12 08:43:51.195  1652  2313 W A       : Queue length for executor EventBus is now 11. Perhaps some tasks are too long, or the pool is too small.
+11-12 08:43:51.329   521  1228 W WindowManager: Exception thrown during dispatchAppVisibility Window{b3bed62 u0 com.abtin.tglass/com.abtin.tglass.MainActivity EXITING}
+11-12 08:43:51.329   521  1228 W WindowManager: android.os.DeadObjectException
+11-12 08:43:51.329   521  1228 W WindowManager: 	at android.os.BinderProxy.transactNative(Native Method)
+11-12 08:43:51.329   521  1228 W WindowManager: 	at android.os.BinderProxy.transact(BinderProxy.java:584)
+11-12 08:43:51.329   521  1228 W WindowManager: 	at android.view.IWindow$Stub$Proxy.dispatchAppVisibility(IWindow.java:546)
+11-12 08:43:51.329   521  1228 W WindowManager: 	at com.android.server.wm.WindowState.sendAppVisibilityToClients(WindowState.java:3271)
+11-12 08:43:51.329   521  1228 W WindowManager: 	at com.android.server.wm.WindowContainer.sendAppVisibilityToClients(WindowContainer.java:1221)
+11-12 08:43:51.329   521  1228 W WindowManager: 	at com.android.server.wm.WindowToken.setClientVisible(WindowToken.java:409)
+11-12 08:43:51.329   521  1228 W WindowManager: 	at com.android.server.wm.ActivityRecord.setClientVisible(ActivityRecord.java:6946)
+11-12 08:43:51.329   521  1228 W WindowManager: 	at com.android.server.wm.ActivityRecord.postApplyAnimation(ActivityRecord.java:5637)
+11-12 08:43:51.329   521  1228 W WindowManager: 	at com.android.server.wm.ActivityRecord.commitVisibility(ActivityRecord.java:5580)
+11-12 08:43:51.329   521  1228 W WindowManager: 	at com.android.server.wm.Transition.finishTransition(Transition.java:1151)
+11-12 08:43:51.329   521  1228 W WindowManager: 	at com.android.server.wm.TransitionController.finishTransition(TransitionController.java:868)
+11-12 08:43:51.329   521  1228 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.finishTransition(WindowOrganizerController.java:396)
+11-12 08:43:51.329   521  1228 W WindowManager: 	at android.window.IWindowOrganizerController$Stub.onTransact(IWindowOrganizerController.java:286)
+11-12 08:43:51.329   521  1228 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.onTransact(WindowOrganizerController.java:181)
+11-12 08:43:51.329   521  1228 W WindowManager: 	at android.os.Binder.execTransactInternal(Binder.java:1339)
+11-12 08:43:51.329   521  1228 W WindowManager: 	at android.os.Binder.execTransact(Binder.java:1275)
+11-12 08:43:51.331   521   541 W ActivityManager: setHasOverlayUi called on unknown pid: 8272
+11-12 08:43:51.335   521   822 W ActivityTaskManager: callingPackage for (uid=2000, pid=8423) has no WPC
+11-12 08:43:51.369   834   867 W Looper  : Slow dispatch took 55ms wmshell.main h=android.os.Handler c=com.android.wm.shell.transition.DefaultTransitionHandler$$ExternalSyntheticLambda0@2ba9544 m=0
+11-12 08:43:51.369   834   867 W Looper  : Slow delivery took 38ms wmshell.main h=android.os.Handler c=android.window.TaskOrganizer$1$$ExternalSyntheticLambda3@984762d m=0
+11-12 08:43:51.377   834   867 W Looper  : Drained
+11-12 08:43:51.422   400   400 E BpTransactionCompletedListener: Failed to transact (-32)
+11-12 08:43:51.522  8426  8426 W om.abtin.tglass: Unexpected CPU variant for x86: x86_64.
+11-12 08:43:51.522  8426  8426 W om.abtin.tglass: Known variants: atom, sandybridge, silvermont, goldmont, goldmont-plus, tremont, kabylake, default
+11-12 08:43:51.555   521  1813 W ActivityTaskManager: takeTaskSnapshot: taskId=31 not found or not visible
+11-12 08:43:51.760  8426  8426 W ziparchive: Unable to open '/data/app/~~fUa8l9RVN7qG0nGtLiODFw==/com.abtin.tglass-hFCcQVWINnU-iWJjWLlpTg==/base.dm': No such file or directory
+11-12 08:43:51.760  8426  8426 W ziparchive: Unable to open '/data/app/~~fUa8l9RVN7qG0nGtLiODFw==/com.abtin.tglass-hFCcQVWINnU-iWJjWLlpTg==/base.dm': No such file or directory
+11-12 08:43:52.228  1652  7796 W A       : Can't format flag AndroidGsaVelourJars__velour_birthdaydoodle_jar__name to integer.
+11-12 08:43:52.228  1652  7796 W A       : Can't format flag AndroidGsaVelourJars__velour_call_jar__name to integer.
+11-12 08:43:52.228  1652  7796 W A       : Can't format flag AndroidGsaVelourJars__velour_canvas_jar__name to integer.
+11-12 08:43:52.228  1652  7796 W A       : Can't format flag AndroidGsaVelourJars__velour_chkpkg_jar__name to integer.
+11-12 08:43:52.228  1652  7796 W A       : Can't format flag AndroidGsaVelourJars__velour_crashtest_jar__name to integer.
+11-12 08:43:52.228  1652  7796 W A       : Can't format flag AndroidGsaVelourJars__velour_dining_jar__name to integer.
+11-12 08:43:52.228  1652  7796 W A       : Can't format flag AndroidGsaVelourJars__velour_doodle_notifications_jar__name to integer.
+11-12 08:43:52.228  1652  7796 W A       : Can't format flag AndroidGsaVelourJars__velour_imageviewer_jar__name to integer.
+11-12 08:43:52.228  1652  7796 W A       : Can't format flag AndroidGsaVelourJars__velour_ipa_jar__name to integer.
+11-12 08:43:52.228  1652  7796 W A       : Can't format flag AndroidGsaVelourJars__velour_jslocation_jar__name to integer.
+11-12 08:43:52.228  1652  7796 W A       : Can't format flag AndroidGsaVelourJars__velour_localintent_jar__name to integer.
+11-12 08:43:52.228  1652  7796 W A       : Can't format flag AndroidGsaVelourJars__velour_messaging_jar__name to integer.
+11-12 08:43:52.228  1652  7796 W A       : Can't format flag AndroidGsaVelourJars__velour_nativesrp_activity_jar__name to integer.
+11-12 08:43:52.228  1652  7796 W A       : Can't format flag AndroidGsaVelourJars__velour_nativesrp_presenter_jar__name to integer.
+11-12 08:43:52.228  1652  7796 W A       : Can't format flag AndroidGsaVelourJars__velour_nowcontent_jar__name to integer.
+11-12 08:43:52.228  1652  7796 W A       : Can't format flag AndroidGsaVelourJars__velour_recents_activity_jar__name to integer.
+11-12 08:43:52.228  1652  7796 W A       : Can't format flag AndroidGsaVelourJars__velour_save_jar__name to integer.
+11-12 08:43:52.228  1652  7796 W A       : Can't format flag AndroidGsaVelourJars__velour_searchresults_activity_jar__name to integer.
+11-12 08:43:52.228  1652  7796 W A       : Can't format flag AndroidGsaVelourJars__velour_test_jar__name to integer.
+11-12 08:43:52.228  1652  7796 W A       : Can't format flag AndroidGsaVelourJars__velour_weather_jar__name to integer.
+11-12 08:43:52.228  1652  7796 W A       : Can't format flag bindle_flags__bloblobber_blob to integer.
+11-12 08:43:52.228  1652  7796 W A       : Can't format flag bindle_flags__velour_jar to integer.
+11-12 08:43:52.230  6073  6139 W BpBinder: Large outgoing transaction of 323996 bytes, interface descriptor , code 4
+11-12 08:43:52.230  6073  6278 W BpBinder: Large outgoing transaction of 323996 bytes, interface descriptor , code 4
+11-12 08:43:52.236  1652  2207 W A       : Can't format flag AndroidGsaVelourJars__velour_birthdaydoodle_jar__name to integer.
+11-12 08:43:52.239  1652  2207 W A       : Can't format flag AndroidGsaVelourJars__velour_call_jar__name to integer.
+11-12 08:43:52.239  1652  2207 W A       : Can't format flag AndroidGsaVelourJars__velour_canvas_jar__name to integer.
+11-12 08:43:52.240  1652  2207 W A       : Can't format flag AndroidGsaVelourJars__velour_chkpkg_jar__name to integer.
+11-12 08:43:52.241  1652  2207 W A       : Can't format flag AndroidGsaVelourJars__velour_crashtest_jar__name to integer.
+11-12 08:43:52.241  1652  2207 W A       : Can't format flag AndroidGsaVelourJars__velour_dining_jar__name to integer.
+11-12 08:43:52.241  1652  2207 W A       : Can't format flag AndroidGsaVelourJars__velour_doodle_notifications_jar__name to integer.
+11-12 08:43:52.241  1652  2207 W A       : Can't format flag AndroidGsaVelourJars__velour_imageviewer_jar__name to integer.
+11-12 08:43:52.247  1652  2207 W A       : Can't format flag AndroidGsaVelourJars__velour_ipa_jar__name to integer.
+11-12 08:43:52.247  1652  2207 W A       : Can't format flag AndroidGsaVelourJars__velour_jslocation_jar__name to integer.
+11-12 08:43:52.247  1652  2207 W A       : Can't format flag AndroidGsaVelourJars__velour_localintent_jar__name to integer.
+11-12 08:43:52.248  1652  2207 W A       : Can't format flag AndroidGsaVelourJars__velour_messaging_jar__name to integer.
+11-12 08:43:52.248  1652  2207 W A       : Can't format flag AndroidGsaVelourJars__velour_nativesrp_activity_jar__name to integer.
+11-12 08:43:52.248  1652  2207 W A       : Can't format flag AndroidGsaVelourJars__velour_nativesrp_presenter_jar__name to integer.
+11-12 08:43:52.248  1652  2207 W A       : Can't format flag AndroidGsaVelourJars__velour_nowcontent_jar__name to integer.
+11-12 08:43:52.248  1652  2207 W A       : Can't format flag AndroidGsaVelourJars__velour_recents_activity_jar__name to integer.
+11-12 08:43:52.248  1652  2207 W A       : Can't format flag AndroidGsaVelourJars__velour_save_jar__name to integer.
+11-12 08:43:52.248  1652  2207 W A       : Can't format flag AndroidGsaVelourJars__velour_searchresults_activity_jar__name to integer.
+11-12 08:43:52.248  1652  2207 W A       : Can't format flag AndroidGsaVelourJars__velour_test_jar__name to integer.
+11-12 08:43:52.248  1652  2207 W A       : Can't format flag AndroidGsaVelourJars__velour_weather_jar__name to integer.
+11-12 08:43:52.248  1652  2207 W A       : Can't format flag bindle_flags__bloblobber_blob to integer.
+11-12 08:43:52.248  1652  2207 W A       : Can't format flag bindle_flags__velour_jar to integer.
+11-12 08:43:52.287   521  1813 W JobScheduler: Job didn't exist in JobStore: f7d9fb4 #u0a132/-17 com.google.android.googlequicksearchbox/com.google.android.apps.gsa.tasks.BackgroundTasksJobService
+11-12 08:43:52.300  1652  2313 W A       : Root proto not found when parsing Uri agsa:/data?type=searchnow.TYPE_SEARCHNOW
+11-12 08:43:52.300  1652  2313 W A       : Root proto not found in extras.
+11-12 08:43:52.310  1652  2199 W CorpusConfigHelper: Invalid input from icing corpus JSON flag.
+11-12 08:43:52.310  1652  2199 W CorpusConfigHelper: android.util.MalformedJsonException: Use JsonReader.setLenient(true) to accept malformed JSON at line 123 column 2
+11-12 08:43:52.310  1652  2199 W CorpusConfigHelper: 	at android.util.JsonReader.syntaxError(JsonReader.java:1162)
+11-12 08:43:52.310  1652  2199 W CorpusConfigHelper: 	at android.util.JsonReader.checkLenient(JsonReader.java:840)
+11-12 08:43:52.310  1652  2199 W CorpusConfigHelper: 	at android.util.JsonReader.nextInArray(JsonReader.java:615)
+11-12 08:43:52.310  1652  2199 W CorpusConfigHelper: 	at android.util.JsonReader.peek(JsonReader.java:345)
+11-12 08:43:52.310  1652  2199 W CorpusConfigHelper: 	at android.util.JsonReader.hasNext(JsonReader.java:321)
+11-12 08:43:52.310  1652  2199 W CorpusConfigHelper: 	at com.google.android.apps.gsa.searchbox.c.b.b.k.c(PG:7)
+11-12 08:43:52.310  1652  2199 W CorpusConfigHelper: 	at com.google.android.apps.gsa.searchbox.c.b.b.j.a(Unknown Source:2)
+11-12 08:43:52.310  1652  2199 W CorpusConfigHelper: 	at com.google.android.apps.gsa.search.core.i.r.run(PG:5)
+11-12 08:43:52.310  1652  2199 W CorpusConfigHelper: 	at com.google.android.libraries.gsa.k.a.h.run(PG:2)
+11-12 08:43:52.310  1652  2199 W CorpusConfigHelper: 	at com.google.android.apps.gsa.shared.util.c.a.cf.b(PG:1)
+11-12 08:43:52.310  1652  2199 W CorpusConfigHelper: 	at com.google.android.apps.gsa.shared.util.c.a.ci.run(PG:1)
+11-12 08:43:52.310  1652  2199 W CorpusConfigHelper: 	at com.google.android.libraries.i.ae.run(PG:1)
+11-12 08:43:52.310  1652  2199 W CorpusConfigHelper: 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+11-12 08:43:52.310  1652  2199 W CorpusConfigHelper: 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+11-12 08:43:52.310  1652  2199 W CorpusConfigHelper: 	at com.google.android.libraries.i.k.run(PG:2)
+11-12 08:43:52.310  1652  2199 W CorpusConfigHelper: 	at com.google.android.libraries.i.p.run(PG:4)
+11-12 08:43:52.310  1652  2199 W CorpusConfigHelper: 	at java.lang.Thread.run(Thread.java:1012)
+11-12 08:43:52.315  1652  2205 W CorpusConfigHelper: Invalid input from icing corpus JSON flag.
+11-12 08:43:52.315  1652  2205 W CorpusConfigHelper: android.util.MalformedJsonException: Use JsonReader.setLenient(true) to accept malformed JSON at line 123 column 2
+11-12 08:43:52.315  1652  2205 W CorpusConfigHelper: 	at android.util.JsonReader.syntaxError(JsonReader.java:1162)
+11-12 08:43:52.315  1652  2205 W CorpusConfigHelper: 	at android.util.JsonReader.checkLenient(JsonReader.java:840)
+11-12 08:43:52.315  1652  2205 W CorpusConfigHelper: 	at android.util.JsonReader.nextInArray(JsonReader.java:615)
+11-12 08:43:52.315  1652  2205 W CorpusConfigHelper: 	at android.util.JsonReader.peek(JsonReader.java:345)
+11-12 08:43:52.315  1652  2205 W CorpusConfigHelper: 	at android.util.JsonReader.hasNext(JsonReader.java:321)
+11-12 08:43:52.315  1652  2205 W CorpusConfigHelper: 	at com.google.android.apps.gsa.searchbox.c.b.b.k.c(PG:7)
+11-12 08:43:52.315  1652  2205 W CorpusConfigHelper: 	at com.google.android.apps.gsa.searchbox.c.b.b.j.a(Unknown Source:2)
+11-12 08:43:52.315  1652  2205 W CorpusConfigHelper: 	at com.google.android.apps.gsa.search.core.i.r.run(PG:5)
+11-12 08:43:52.315  1652  2205 W CorpusConfigHelper: 	at com.google.android.libraries.gsa.k.a.h.run(PG:2)
+11-12 08:43:52.315  1652  2205 W CorpusConfigHelper: 	at com.google.android.apps.gsa.shared.util.c.a.cf.b(PG:1)
+11-12 08:43:52.315  1652  2205 W CorpusConfigHelper: 	at com.google.android.apps.gsa.shared.util.c.a.ci.run(PG:1)
+11-12 08:43:52.315  1652  2205 W CorpusConfigHelper: 	at com.google.android.libraries.i.ae.run(PG:1)
+11-12 08:43:52.315  1652  2205 W CorpusConfigHelper: 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+11-12 08:43:52.315  1652  2205 W CorpusConfigHelper: 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+11-12 08:43:52.315  1652  2205 W CorpusConfigHelper: 	at com.google.android.libraries.i.k.run(PG:2)
+11-12 08:43:52.315  1652  2205 W CorpusConfigHelper: 	at com.google.android.libraries.i.p.run(PG:4)
+11-12 08:43:52.315  1652  2205 W CorpusConfigHelper: 	at java.lang.Thread.run(Thread.java:1012)
+11-12 08:43:52.345   521  1849 W JobScheduler: Job didn't exist in JobStore: 6df5595 #u0a132/-189 com.google.android.googlequicksearchbox/com.google.android.apps.gsa.tasks.BackgroundTasksJobService
+11-12 08:43:52.381   521  1849 W JobScheduler: Job didn't exist in JobStore: 62f0320 #u0a132/-91 com.google.android.googlequicksearchbox/com.google.android.apps.gsa.tasks.BackgroundTasksJobService
+11-12 08:43:52.387   521  1813 W JobScheduler: Job didn't exist in JobStore: 63181a4 #u0a132/-151 com.google.android.googlequicksearchbox/com.google.android.apps.gsa.tasks.BackgroundTasksJobService
+11-12 08:43:52.431   521  1918 W JobScheduler: Job didn't exist in JobStore: 891af69 #u0a132/-43 com.google.android.googlequicksearchbox/com.google.android.apps.gsa.tasks.BackgroundTasksJobService
+11-12 08:43:52.492  8426  8426 W OpenGLRenderer: Unknown dataspace 0
+11-12 08:43:52.628  8426  8426 W om.abtin.tglass: Accessing hidden method Landroid/os/SystemProperties;->addChangeCallback(Ljava/lang/Runnable;)V (unsupported, reflection, allowed)
+11-12 08:43:53.663  8426  8449 W OpenGLRenderer: Failed to initialize 101010-2 format, error = EGL_SUCCESS
+11-12 08:43:54.839   521  3533 E TaskPersister: File error accessing recents directory (directory doesn't exist?).
+11-12 08:43:54.885  8426  8470 E SurfaceSyncGroup: Failed to receive transaction ready in 1000ms. Marking SurfaceSyncGroup(wmsSync-VRI[MainActivity]#0) as ready
+11-12 08:43:54.891  8426  8470 E SurfaceSyncGroup: Failed to receive transaction ready in 1000ms. Marking SurfaceSyncGroup(VRI[MainActivity]#1) as ready
+11-12 08:43:54.895   521   538 W ziparchive: Unable to open '/data/app/~~fUa8l9RVN7qG0nGtLiODFw==/com.abtin.tglass-hFCcQVWINnU-iWJjWLlpTg==/base.dm': No such file or directory
+11-12 08:43:54.994   521   822 W InputManager-JNI: Input channel object 'e9358b5 Splash Screen com.abtin.tglass (client)' was disposed without first being removed with the input manager!
+11-12 08:43:55.132  1652  2313 W SearchServiceCore: Abort, client detached.
+11-12 08:43:56.558  8426  8453 W TGlassWatchdog: still blocked, 30 samples:
+11-12 08:43:56.558  8426  8453 W TGlassWatchdog:   24x HardwareRenderer.nSetStopped:-2 < HardwareRenderer.setStopped:525 < ViewRootImpl.performDraw:4676 < ViewRootImpl.performTraversals:3822 < ViewRootImpl.doTraversal:2465 || 
+11-12 08:43:56.558  8426  8453 W TGlassWatchdog:   1x Object.<init>:56 < Number.<init>:59 < Long.<init>:1366 < Long.valueOf:1252 < ChatItem.getKey:1323 || ChatItem.getKey:1323 < ChatScreenKt.ChatMessageList__zuB_KE$lambda$1$0$0:1202 < ChatScreenKt.$r8$lambda$PUG9N0hvdZrFJjNoWc0TQsNJ_xM:0
+11-12 08:43:56.558  8426  8453 W TGlassWatchdog:   1x RecordingCanvas.drawRenderNode:180 < GraphicsLayerV29.draw:260 < GraphicsLayer.draw$ui_graphics:550 < GraphicsLayerKt.drawLayer:51 < GraphicsLayerOwnerLayer.drawLayer:254 || NavigationKt.IOSNavHost$lambda$3$0$1$0:286 < NavigationKt.$r8$lambda$BIU0Te5EF-e4Zajawi0tl0azlPc:0 < NavigationKt$$ExternalSyntheticLambda1.invoke:0
+11-12 08:43:56.558  8426  8453 W TGlassWatchdog:   1x Float.intBitsToFloat:-2 < MutableRect.translate-k-4lQ0M:244 < RectManager.boundingRectInRoot:467 < RectManager.insertOrUpdateTransformedNode:417 < RectManager.insertOrUpdateTransformedNodeSubhierarchy:395 || 
+11-12 08:43:56.558  8426  8453 W TGlassWatchdog:   1x RectList.insertBasedOnParentOffset:227 < RectManager.onLayoutPositionChanged:319 < MeasurePassDelegate.markNodeAndSubtreeAsPlaced:284 < MeasurePassDelegate.onNodePlaced$ui:368 < InnerNodeCoordinator.onAfterPlaceAt:164 || 
+11-12 08:43:56.558  8426  8453 W TGlassWatchdog:   1x HardwareRenderer.nSetSurface:-2 < HardwareRenderer.setSurface:340 < HardwareRenderer.setSurface:323 < ThreadedRenderer.setSurface:459 < ThreadedRenderer.initialize:410 || 
+11-12 08:43:56.558  8426  8453 W TGlassWatchdog:   1x LayoutNodeSubcompositionsState$Scope.getLayoutDirection:1343 < LazyLayoutMeasureScopeImpl.getLayoutDirection:2 < LazyListKt$rememberLazyListMeasurePolicy$1$1$measuredItemProvider$1.createItem-X9ElhV4:313 < LazyListMeasuredItemProvider.getAndMeasure-0kLqBqw:54 < LazyListMeasuredItemProvider.getAndMeasure-0kLqBqw$default:47 || 
+11-12 08:43:58.876  8426  8453 W TGlassWatchdog: main thread blocked 6441 ms, 53 samples:
+11-12 08:43:58.876  8426  8453 W TGlassWatchdog:   47x HardwareRenderer.nSetStopped:-2 < HardwareRenderer.setStopped:525 < ViewRootImpl.performDraw:4676 < ViewRootImpl.performTraversals:3822 < ViewRootImpl.doTraversal:2465 || 
+11-12 08:43:58.876  8426  8453 W TGlassWatchdog:   1x Object.<init>:56 < Number.<init>:59 < Long.<init>:1366 < Long.valueOf:1252 < ChatItem.getKey:1323 || ChatItem.getKey:1323 < ChatScreenKt.ChatMessageList__zuB_KE$lambda$1$0$0:1202 < ChatScreenKt.$r8$lambda$PUG9N0hvdZrFJjNoWc0TQsNJ_xM:0
+11-12 08:43:58.876  8426  8453 W TGlassWatchdog:   1x RecordingCanvas.drawRenderNode:180 < GraphicsLayerV29.draw:260 < GraphicsLayer.draw$ui_graphics:550 < GraphicsLayerKt.drawLayer:51 < GraphicsLayerOwnerLayer.drawLayer:254 || NavigationKt.IOSNavHost$lambda$3$0$1$0:286 < NavigationKt.$r8$lambda$BIU0Te5EF-e4Zajawi0tl0azlPc:0 < NavigationKt$$ExternalSyntheticLambda1.invoke:0
+11-12 08:43:58.876  8426  8453 W TGlassWatchdog:   1x Float.intBitsToFloat:-2 < MutableRect.translate-k-4lQ0M:244 < RectManager.boundingRectInRoot:467 < RectManager.insertOrUpdateTransformedNode:417 < RectManager.insertOrUpdateTransformedNodeSubhierarchy:395 || 
+11-12 08:43:58.876  8426  8453 W TGlassWatchdog:   1x RectList.insertBasedOnParentOffset:227 < RectManager.onLayoutPositionChanged:319 < MeasurePassDelegate.markNodeAndSubtreeAsPlaced:284 < MeasurePassDelegate.onNodePlaced$ui:368 < InnerNodeCoordinator.onAfterPlaceAt:164 || 
+11-12 08:43:58.876  8426  8453 W TGlassWatchdog:   1x HardwareRenderer.nSetSurface:-2 < HardwareRenderer.setSurface:340 < HardwareRenderer.setSurface:323 < ThreadedRenderer.setSurface:459 < ThreadedRenderer.initialize:410 || 
+11-12 08:43:58.876  8426  8453 W TGlassWatchdog:   1x LayoutNodeSubcompositionsState$Scope.getLayoutDirection:1343 < LazyLayoutMeasureScopeImpl.getLayoutDirection:2 < LazyListKt$rememberLazyListMeasurePolicy$1$1$measuredItemProvider$1.createItem-X9ElhV4:313 < LazyListMeasuredItemProvider.getAndMeasure-0kLqBqw:54 < LazyListMeasuredItemProvider.getAndMeasure-0kLqBqw$default:47 || 
+11-12 08:44:00.121   834   834 W PageIndicator: Total number of pages invalid: 0. Assuming 1 page.
+11-12 08:44:01.192   521  1813 W ProcessStats: Tracking association SourceState{d3875c3 com.abtin.tglass/10192 BTop #15281} whose proc state 2 is better than process ProcessState{d5a3e24 com.google.android.gms.persistent/10129 pkg=com.google.android.gms} proc state 4 (757 skipped)
+11-12 08:44:03.198  8426  8463 W om.abtin.tglass: Long monitor contention with owner DefaultDispatcher-worker-1 (8461) at android.graphics.Bitmap com.abtin.tglass.features.chat.PatternArt.mask(android.content.Context, int, int)(Wallpaper.kt:412) waiters=0 in android.graphics.Bitmap com.abtin.tglass.features.chat.PatternArt.mask(android.content.Context, int, int) for 3.849s
+11-12 08:44:04.994  4569  4640 W Bugle   : TextClassifierLibManagerImpl: Reclaiming memory at level: 40
+11-12 08:44:11.202  1652  2313 W A       : Queue length for executor EventBus is now 11. Perhaps some tasks are too long, or the pool is too small.
+11-12 08:44:17.092  4569  4640 W Bugle   : TextClassifierLibManagerImpl: Reclaiming memory at level: 40
+11-12 08:44:17.109   521  1813 W ActivityTaskManager: Force removing ActivityRecord{b9c6643 u0 com.abtin.tglass/.MainActivity t31 f}}: app died, no saved state
+11-12 08:44:17.112   521  1813 W ProcessStats: Tracking association SourceState{f9be5cd com.google.android.googlequicksearchbox:search/10132 BTop #15298} whose proc state 2 is better than process ProcessState{d5a3e24 com.google.android.gms.persistent/10129 pkg=com.google.android.gms} proc state 4 (0 skipped)
+11-12 08:44:17.162   521  1629 W AppSearchIcing: icing-search-engine.cc:283: Error: 5, Message: Document (com.google.android.googlequicksearchbox$OneSearchZeroStateGoogleSuggestions/default, zp) not found.
+11-12 08:44:17.256  1652  2223 W CorpusConfigHelper: Invalid input from icing corpus JSON flag.
+11-12 08:44:17.256  1652  2223 W CorpusConfigHelper: android.util.MalformedJsonException: Use JsonReader.setLenient(true) to accept malformed JSON at line 123 column 2
+11-12 08:44:17.256  1652  2223 W CorpusConfigHelper: 	at android.util.JsonReader.syntaxError(JsonReader.java:1162)
+11-12 08:44:17.256  1652  2223 W CorpusConfigHelper: 	at android.util.JsonReader.checkLenient(JsonReader.java:840)
+11-12 08:44:17.256  1652  2223 W CorpusConfigHelper: 	at android.util.JsonReader.nextInArray(JsonReader.java:615)
+11-12 08:44:17.256  1652  2223 W CorpusConfigHelper: 	at android.util.JsonReader.peek(JsonReader.java:345)
+11-12 08:44:17.256  1652  2223 W CorpusConfigHelper: 	at android.util.JsonReader.hasNext(JsonReader.java:321)
+11-12 08:44:17.256  1652  2223 W CorpusConfigHelper: 	at com.google.android.apps.gsa.searchbox.c.b.b.k.c(PG:7)
+11-12 08:44:17.256  1652  2223 W CorpusConfigHelper: 	at com.google.android.apps.gsa.searchbox.c.b.b.k.<init>(PG:5)
+11-12 08:44:17.256  1652  2223 W CorpusConfigHelper: 	at com.google.android.apps.gsa.staticplugins.searchboxroot.features.n.a.c.<init>(PG:16)
+11-12 08:44:17.256  1652  2223 W CorpusConfigHelper: 	at com.google.android.apps.gsa.staticplugins.searchboxroot.b.a(PG:14)
+11-12 08:44:17.256  1652  2223 W CorpusConfigHelper: 	at com.google.android.apps.gsa.staticplugins.searchboxroot.x.<init>(PG:7)
+11-12 08:44:17.256  1652  2223 W CorpusConfigHelper: 	at com.google.android.apps.gsa.binaries.velvet.app.akd.b(PG:15)
+11-12 08:44:17.256  1652  2223 W CorpusConfigHelper: 	at dagger.a.e.b(PG:1)
+11-12 08:44:17.256  1652  2223 W CorpusConfigHelper: 	at com.google.android.apps.gsa.staticplugins.searchboxroot.a.a.a(PG:3)
+11-12 08:44:17.256  1652  2223 W CorpusConfigHelper: 	at com.google.android.apps.gsa.binaries.velvet.app.ok.f(Unknown Source:2541)
+11-12 08:44:17.256  1652  2223 W CorpusConfigHelper: 	at com.google.android.apps.gsa.binaries.velvet.app.ok.b(PG:1)
+11-12 08:44:17.256  1652  2223 W CorpusConfigHelper: 	at com.google.android.apps.gsa.search.core.service.g.a.c.a(PG:2)
+11-12 08:44:17.256  1652  2223 W CorpusConfigHelper: 	at com.google.android.libraries.gsa.k.a.f.a(PG:2)
+11-12 08:44:17.256  1652  2223 W CorpusConfigHelper: 	at com.google.common.util.concurrent.dx.a(PG:1)
+11-12 08:44:17.256  1652  2223 W CorpusConfigHelper: 	at com.google.common.util.concurrent.cv.run(PG:4)
+11-12 08:44:17.256  1652  2223 W CorpusConfigHelper: 	at com.google.common.util.concurrent.dz.run(PG:1)
+11-12 08:44:17.256  1652  2223 W CorpusConfigHelper: 	at com.google.android.libraries.i.ae.run(PG:1)
+11-12 08:44:17.256  1652  2223 W CorpusConfigHelper: 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+11-12 08:44:17.256  1652  2223 W CorpusConfigHelper: 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+11-12 08:44:17.256  1652  2223 W CorpusConfigHelper: 	at com.google.android.libraries.i.k.run(PG:2)
+11-12 08:44:17.256  1652  2223 W CorpusConfigHelper: 	at com.google.android.libraries.i.p.run(PG:4)
+11-12 08:44:17.256  1652  2223 W CorpusConfigHelper: 	at java.lang.Thread.run(Thread.java:1012)
+11-12 08:44:17.290  1652  2313 W A       : Queue length for executor EventBus is now 11. Perhaps some tasks are too long, or the pool is too small.
+11-12 08:44:17.324   521  1848 W InputManager-JNI: Input channel object '6809861 com.abtin.tglass/com.abtin.tglass.MainActivity (client)' was disposed without first being removed with the input manager!
+11-12 08:44:17.333   521  2431 W ActivityTaskManager: callingPackage for (uid=2000, pid=8557) has no WPC
+11-12 08:44:17.467  8560  8560 W om.abtin.tglass: Unexpected CPU variant for x86: x86_64.
+11-12 08:44:17.467  8560  8560 W om.abtin.tglass: Known variants: atom, sandybridge, silvermont, goldmont, goldmont-plus, tremont, kabylake, default
+11-12 08:44:17.522  8560  8560 W ziparchive: Unable to open '/data/app/~~fUa8l9RVN7qG0nGtLiODFw==/com.abtin.tglass-hFCcQVWINnU-iWJjWLlpTg==/base.dm': No such file or directory
+11-12 08:44:17.525  8560  8560 W ziparchive: Unable to open '/data/app/~~fUa8l9RVN7qG0nGtLiODFw==/com.abtin.tglass-hFCcQVWINnU-iWJjWLlpTg==/base.dm': No such file or directory
+11-12 08:44:17.664   521   822 W WindowManager: Exception thrown during dispatchAppVisibility Window{6809861 u0 com.abtin.tglass/com.abtin.tglass.MainActivity EXITING}
+11-12 08:44:17.664   521   822 W WindowManager: android.os.DeadObjectException
+11-12 08:44:17.664   521   822 W WindowManager: 	at android.os.BinderProxy.transactNative(Native Method)
+11-12 08:44:17.664   521   822 W WindowManager: 	at android.os.BinderProxy.transact(BinderProxy.java:584)
+11-12 08:44:17.664   521   822 W WindowManager: 	at android.view.IWindow$Stub$Proxy.dispatchAppVisibility(IWindow.java:546)
+11-12 08:44:17.664   521   822 W WindowManager: 	at com.android.server.wm.WindowState.sendAppVisibilityToClients(WindowState.java:3271)
+11-12 08:44:17.664   521   822 W WindowManager: 	at com.android.server.wm.WindowContainer.sendAppVisibilityToClients(WindowContainer.java:1221)
+11-12 08:44:17.664   521   822 W WindowManager: 	at com.android.server.wm.WindowToken.setClientVisible(WindowToken.java:409)
+11-12 08:44:17.664   521   822 W WindowManager: 	at com.android.server.wm.ActivityRecord.setClientVisible(ActivityRecord.java:6946)
+11-12 08:44:17.664   521   822 W WindowManager: 	at com.android.server.wm.ActivityRecord.postApplyAnimation(ActivityRecord.java:5637)
+11-12 08:44:17.664   521   822 W WindowManager: 	at com.android.server.wm.ActivityRecord.commitVisibility(ActivityRecord.java:5580)
+11-12 08:44:17.664   521   822 W WindowManager: 	at com.android.server.wm.Transition.finishTransition(Transition.java:1151)
+11-12 08:44:17.664   521   822 W WindowManager: 	at com.android.server.wm.TransitionController.finishTransition(TransitionController.java:868)
+11-12 08:44:17.664   521   822 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.finishTransition(WindowOrganizerController.java:396)
+11-12 08:44:17.664   521   822 W WindowManager: 	at android.window.IWindowOrganizerController$Stub.onTransact(IWindowOrganizerController.java:286)
+11-12 08:44:17.664   521   822 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.onTransact(WindowOrganizerController.java:181)
+11-12 08:44:17.664   521   822 W WindowManager: 	at android.os.Binder.execTransactInternal(Binder.java:1339)
+11-12 08:44:17.664   521   822 W WindowManager: 	at android.os.Binder.execTransact(Binder.java:1275)
+11-12 08:44:17.668   521   541 W ActivityManager: setHasOverlayUi called on unknown pid: 8426
+11-12 08:44:17.668   834   867 W Looper  : Slow dispatch took 33ms wmshell.main h=android.os.Handler c=com.android.wm.shell.transition.DefaultTransitionHandler$$ExternalSyntheticLambda0@cf676c4 m=0
+11-12 08:44:17.745   400   400 E BpTransactionCompletedListener: Failed to transact (-32)
+11-12 08:44:18.229  8560  8560 W OpenGLRenderer: Unknown dataspace 0
+--------- beginning of kernel
+11-12 08:44:18.445     0     0 W healthd : battery l=100 v=5000 t=25.0 h=2 st=2 c=900000 fc=3000000 cc=10 chg=a
+11-12 08:44:18.360  8560  8560 W om.abtin.tglass: Accessing hidden method Landroid/os/SystemProperties;->addChangeCallback(Ljava/lang/Runnable;)V (unsupported, reflection, allowed)
+11-12 08:44:19.093  8560  8576 W OpenGLRenderer: Failed to initialize 101010-2 format, error = EGL_SUCCESS
+11-12 08:44:20.310  8560  8596 E SurfaceSyncGroup: Failed to receive transaction ready in 1000ms. Marking SurfaceSyncGroup(wmsSync-VRI[MainActivity]#0) as ready
+11-12 08:44:20.312  8560  8596 E SurfaceSyncGroup: Failed to receive transaction ready in 1000ms. Marking SurfaceSyncGroup(VRI[MainActivity]#1) as ready
+11-12 08:44:20.317   521   538 W ziparchive: Unable to open '/data/app/~~fUa8l9RVN7qG0nGtLiODFw==/com.abtin.tglass-hFCcQVWINnU-iWJjWLlpTg==/base.dm': No such file or directory
+11-12 08:44:20.374   521   822 W InputManager-JNI: Input channel object '46e0b92 Splash Screen com.abtin.tglass (client)' was disposed without first being removed with the input manager!
+11-12 08:44:20.583  1652  2313 W SearchServiceCore: Abort, client detached.
+11-12 08:44:21.576   521  3533 E TaskPersister: File error accessing recents directory (directory doesn't exist?).
+11-12 08:44:22.282  8560  8580 W TGlassWatchdog: still blocked, 30 samples:
+11-12 08:44:22.282  8560  8580 W TGlassWatchdog:   28x HardwareRenderer.nSetStopped:-2 < HardwareRenderer.setStopped:525 < ViewRootImpl.performDraw:4676 < ViewRootImpl.performTraversals:3822 < ViewRootImpl.doTraversal:2465 || 
+11-12 08:44:22.282  8560  8580 W TGlassWatchdog:   1x RectList.insertBasedOnParentOffset:227 < RectManager.onLayoutPositionChanged:319 < MeasurePassDelegate.markNodeAndSubtreeAsPlaced:284 < MeasurePassDelegate.onNodePlaced$ui:368 < InnerNodeCoordinator.onAfterPlaceAt:164 || 
+11-12 08:44:22.282  8560  8580 W TGlassWatchdog:   1x Float.floatToRawIntBits:-2 < Math.round:869 < BiasAlignment.align-KFBX0sM:289 < BoxKt.placeInBox:215 < BoxKt.access$placeInBox:1 || ChatListScreenKt.revealHeight$lambda$0$0:656 < ChatListScreenKt.$r8$lambda$WBaIJgbaWlovMazPC9flAKkI2jM:0 < ChatListScreenKt$$ExternalSyntheticLambda19.invoke:0
+11-12 08:44:22.786  8560  8580 W TGlassWatchdog: main thread blocked 4609 ms, 35 samples:
+11-12 08:44:22.786  8560  8580 W TGlassWatchdog:   33x HardwareRenderer.nSetStopped:-2 < HardwareRenderer.setStopped:525 < ViewRootImpl.performDraw:4676 < ViewRootImpl.performTraversals:3822 < ViewRootImpl.doTraversal:2465 || 
+11-12 08:44:22.786  8560  8580 W TGlassWatchdog:   1x RectList.insertBasedOnParentOffset:227 < RectManager.onLayoutPositionChanged:319 < MeasurePassDelegate.markNodeAndSubtreeAsPlaced:284 < MeasurePassDelegate.onNodePlaced$ui:368 < InnerNodeCoordinator.onAfterPlaceAt:164 || 
+11-12 08:44:22.786  8560  8580 W TGlassWatchdog:   1x Float.floatToRawIntBits:-2 < Math.round:869 < BiasAlignment.align-KFBX0sM:289 < BoxKt.placeInBox:215 < BoxKt.access$placeInBox:1 || ChatListScreenKt.revealHeight$lambda$0$0:656 < ChatListScreenKt.$r8$lambda$WBaIJgbaWlovMazPC9flAKkI2jM:0 < ChatListScreenKt$$ExternalSyntheticLambda19.invoke:0
+11-12 08:44:30.386  4569  4647 W Bugle   : TextClassifierLibManagerImpl: Reclaiming memory at level: 40
+11-12 08:44:36.911  1019  1274 W BtGatt.ScanManager: Moving filtered scan client to downgraded scan (scannerId 1)
+11-12 08:44:37.266  1652  2313 W A       : Queue length for executor EventBus is now 11. Perhaps some tasks are too long, or the pool is too small.
+11-12 08:44:42.526  4569  4641 W Bugle   : TextClassifierLibManagerImpl: Reclaiming memory at level: 40
+11-12 08:44:42.549   521  2431 W ActivityTaskManager: Force removing ActivityRecord{f3743e1 u0 com.abtin.tglass/.MainActivity t32 f}}: app died, no saved state
+11-12 08:44:42.557   521  2431 W ProcessStats: Tracking association SourceState{f2dd3b com.google.android.gms/10129 BTop #15354} whose proc state 2 is better than process ProcessState{d5a3e24 com.google.android.gms.persistent/10129 pkg=com.google.android.gms} proc state 4 (81 skipped)
+11-12 08:44:42.571   521  1629 W AppSearchIcing: icing-search-engine.cc:283: Error: 5, Message: Document (com.google.android.googlequicksearchbox$OneSearchZeroStateGoogleSuggestions/default, zp) not found.
+11-12 08:44:42.628   521  1813 W InputManager-JNI: Input channel object '9bfbba8 com.abtin.tglass/com.abtin.tglass.MainActivity (client)' was disposed without first being removed with the input manager!
+11-12 08:44:42.664   521  2415 W ActivityTaskManager: callingPackage for (uid=2000, pid=8683) has no WPC
+11-12 08:44:42.726  1652  2313 W A       : Queue length for executor EventBus is now 11. Perhaps some tasks are too long, or the pool is too small.
+11-12 08:44:42.743  1652  2225 W CorpusConfigHelper: Invalid input from icing corpus JSON flag.
+11-12 08:44:42.743  1652  2225 W CorpusConfigHelper: android.util.MalformedJsonException: Use JsonReader.setLenient(true) to accept malformed JSON at line 123 column 2
+11-12 08:44:42.743  1652  2225 W CorpusConfigHelper: 	at android.util.JsonReader.syntaxError(JsonReader.java:1162)
+11-12 08:44:42.743  1652  2225 W CorpusConfigHelper: 	at android.util.JsonReader.checkLenient(JsonReader.java:840)
+11-12 08:44:42.743  1652  2225 W CorpusConfigHelper: 	at android.util.JsonReader.nextInArray(JsonReader.java:615)
+11-12 08:44:42.743  1652  2225 W CorpusConfigHelper: 	at android.util.JsonReader.peek(JsonReader.java:345)
+11-12 08:44:42.743  1652  2225 W CorpusConfigHelper: 	at android.util.JsonReader.hasNext(JsonReader.java:321)
+11-12 08:44:42.743  1652  2225 W CorpusConfigHelper: 	at com.google.android.apps.gsa.searchbox.c.b.b.k.c(PG:7)
+11-12 08:44:42.743  1652  2225 W CorpusConfigHelper: 	at com.google.android.apps.gsa.searchbox.c.b.b.k.<init>(PG:5)
+11-12 08:44:42.743  1652  2225 W CorpusConfigHelper: 	at com.google.android.apps.gsa.staticplugins.searchboxroot.features.n.a.c.<init>(PG:16)
+11-12 08:44:42.743  1652  2225 W CorpusConfigHelper: 	at com.google.android.apps.gsa.staticplugins.searchboxroot.b.a(PG:14)
+11-12 08:44:42.743  1652  2225 W CorpusConfigHelper: 	at com.google.android.apps.gsa.staticplugins.searchboxroot.x.<init>(PG:7)
+11-12 08:44:42.743  1652  2225 W CorpusConfigHelper: 	at com.google.android.apps.gsa.binaries.velvet.app.akd.b(PG:15)
+11-12 08:44:42.743  1652  2225 W CorpusConfigHelper: 	at dagger.a.e.b(PG:1)
+11-12 08:44:42.743  1652  2225 W CorpusConfigHelper: 	at com.google.android.apps.gsa.staticplugins.searchboxroot.a.a.a(PG:3)
+11-12 08:44:42.743  1652  2225 W CorpusConfigHelper: 	at com.google.android.apps.gsa.binaries.velvet.app.ok.f(Unknown Source:2541)
+11-12 08:44:42.743  1652  2225 W CorpusConfigHelper: 	at com.google.android.apps.gsa.binaries.velvet.app.ok.b(PG:1)
+11-12 08:44:42.743  1652  2225 W CorpusConfigHelper: 	at com.google.android.apps.gsa.search.core.service.g.a.c.a(PG:2)
+11-12 08:44:42.743  1652  2225 W CorpusConfigHelper: 	at com.google.android.libraries.gsa.k.a.f.a(PG:2)
+11-12 08:44:42.743  1652  2225 W CorpusConfigHelper: 	at com.google.common.util.concurrent.dx.a(PG:1)
+11-12 08:44:42.743  1652  2225 W CorpusConfigHelper: 	at com.google.common.util.concurrent.cv.run(PG:4)
+11-12 08:44:42.743  1652  2225 W CorpusConfigHelper: 	at com.google.common.util.concurrent.dz.run(PG:1)
+11-12 08:44:42.743  1652  2225 W CorpusConfigHelper: 	at com.google.android.libraries.i.ae.run(PG:1)
+11-12 08:44:42.743  1652  2225 W CorpusConfigHelper: 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+11-12 08:44:42.743  1652  2225 W CorpusConfigHelper: 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+11-12 08:44:42.743  1652  2225 W CorpusConfigHelper: 	at com.google.android.libraries.i.k.run(PG:2)
+11-12 08:44:42.743  1652  2225 W CorpusConfigHelper: 	at com.google.android.libraries.i.p.run(PG:4)
+11-12 08:44:42.743  1652  2225 W CorpusConfigHelper: 	at java.lang.Thread.run(Thread.java:1012)
+11-12 08:44:42.890  8686  8686 W om.abtin.tglass: Unexpected CPU variant for x86: x86_64.
+11-12 08:44:42.890  8686  8686 W om.abtin.tglass: Known variants: atom, sandybridge, silvermont, goldmont, goldmont-plus, tremont, kabylake, default
+11-12 08:44:42.997  8686  8686 W ziparchive: Unable to open '/data/app/~~fUa8l9RVN7qG0nGtLiODFw==/com.abtin.tglass-hFCcQVWINnU-iWJjWLlpTg==/base.dm': No such file or directory
+11-12 08:44:42.997  8686  8686 W ziparchive: Unable to open '/data/app/~~fUa8l9RVN7qG0nGtLiODFw==/com.abtin.tglass-hFCcQVWINnU-iWJjWLlpTg==/base.dm': No such file or directory
+11-12 08:44:43.099   521  1813 W WindowManager: Exception thrown during dispatchAppVisibility Window{9bfbba8 u0 com.abtin.tglass/com.abtin.tglass.MainActivity EXITING}
+11-12 08:44:43.099   521  1813 W WindowManager: android.os.DeadObjectException
+11-12 08:44:43.099   521  1813 W WindowManager: 	at android.os.BinderProxy.transactNative(Native Method)
+11-12 08:44:43.099   521  1813 W WindowManager: 	at android.os.BinderProxy.transact(BinderProxy.java:584)
+11-12 08:44:43.099   521  1813 W WindowManager: 	at android.view.IWindow$Stub$Proxy.dispatchAppVisibility(IWindow.java:546)
+11-12 08:44:43.099   521  1813 W WindowManager: 	at com.android.server.wm.WindowState.sendAppVisibilityToClients(WindowState.java:3271)
+11-12 08:44:43.099   521  1813 W WindowManager: 	at com.android.server.wm.WindowContainer.sendAppVisibilityToClients(WindowContainer.java:1221)
+11-12 08:44:43.099   521  1813 W WindowManager: 	at com.android.server.wm.WindowToken.setClientVisible(WindowToken.java:409)
+11-12 08:44:43.099   521  1813 W WindowManager: 	at com.android.server.wm.ActivityRecord.setClientVisible(ActivityRecord.java:6946)
+11-12 08:44:43.099   521  1813 W WindowManager: 	at com.android.server.wm.ActivityRecord.postApplyAnimation(ActivityRecord.java:5637)
+11-12 08:44:43.099   521  1813 W WindowManager: 	at com.android.server.wm.ActivityRecord.commitVisibility(ActivityRecord.java:5580)
+11-12 08:44:43.099   521  1813 W WindowManager: 	at com.android.server.wm.Transition.finishTransition(Transition.java:1151)
+11-12 08:44:43.099   521  1813 W WindowManager: 	at com.android.server.wm.TransitionController.finishTransition(TransitionController.java:868)
+11-12 08:44:43.099   521  1813 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.finishTransition(WindowOrganizerController.java:396)
+11-12 08:44:43.099   521  1813 W WindowManager: 	at android.window.IWindowOrganizerController$Stub.onTransact(IWindowOrganizerController.java:286)
+11-12 08:44:43.099   521  1813 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.onTransact(WindowOrganizerController.java:181)
+11-12 08:44:43.099   521  1813 W WindowManager: 	at android.os.Binder.execTransactInternal(Binder.java:1339)
+11-12 08:44:43.099   521  1813 W WindowManager: 	at android.os.Binder.execTransact(Binder.java:1275)
+11-12 08:44:43.128   521   541 W ActivityManager: setHasOverlayUi called on unknown pid: 8560
+11-12 08:44:43.172   400   400 E BpTransactionCompletedListener: Failed to transact (-32)
+11-12 08:44:43.206   834   867 W Looper  : Slow dispatch took 112ms wmshell.main h=android.os.Handler c=com.android.wm.shell.transition.DefaultTransitionHandler$$ExternalSyntheticLambda0@e98e251 m=0
+11-12 08:44:43.218   834   867 W Looper  : Slow delivery took 86ms wmshell.main h=android.os.Handler c=android.window.TaskOrganizer$1$$ExternalSyntheticLambda3@7b33ab6 m=0
+11-12 08:44:43.218   834   867 W Looper  : Drained
+11-12 08:44:43.768  8686  8686 W OpenGLRenderer: Unknown dataspace 0
+11-12 08:44:43.905  8686  8686 W om.abtin.tglass: Accessing hidden method Landroid/os/SystemProperties;->addChangeCallback(Ljava/lang/Runnable;)V (unsupported, reflection, allowed)
+11-12 08:44:44.569  8686  8705 W OpenGLRenderer: Failed to initialize 101010-2 format, error = EGL_SUCCESS
+11-12 08:44:45.681  8686  8725 E SurfaceSyncGroup: Failed to receive transaction ready in 1000ms. Marking SurfaceSyncGroup(wmsSync-VRI[MainActivity]#0) as ready
+11-12 08:44:45.687  8686  8725 E SurfaceSyncGroup: Failed to receive transaction ready in 1000ms. Marking SurfaceSyncGroup(VRI[MainActivity]#1) as ready
+11-12 08:44:45.691   521   538 W ziparchive: Unable to open '/data/app/~~fUa8l9RVN7qG0nGtLiODFw==/com.abtin.tglass-hFCcQVWINnU-iWJjWLlpTg==/base.dm': No such file or directory
+11-12 08:44:45.842   521  2415 W InputManager-JNI: Input channel object '85ecdf8 Splash Screen com.abtin.tglass (client)' was disposed without first being removed with the input manager!
+11-12 08:44:46.136  1652  2313 W SearchServiceCore: Abort, client detached.
+11-12 08:44:46.709   521  3533 E TaskPersister: File error accessing recents directory (directory doesn't exist?).
+11-12 08:44:47.823  8686  8709 W TGlassWatchdog: still blocked, 30 samples:
+11-12 08:44:47.823  8686  8709 W TGlassWatchdog:   29x HardwareRenderer.nSetStopped:-2 < HardwareRenderer.setStopped:525 < ViewRootImpl.performDraw:4676 < ViewRootImpl.performTraversals:3822 < ViewRootImpl.doTraversal:2465 || 
+11-12 08:44:47.823  8686  8709 W TGlassWatchdog:   1x Arrays$ArrayList.get:4210 < AndroidShader_androidKt.makeTransparentColors:132 < AndroidShader_androidKt.ActualLinearGradientShader-VjE6UOU:45 < ShaderKt.LinearGradientShader-VjE6UOU:73 < LinearGradient.createShader-uvyYCjk:491 || NavigationKt.IOSNavHost$lambda$3$0$1$0:286 < NavigationKt.$r8$lambda$BIU0Te5EF-e4Zajawi0tl0azlPc:0 < NavigationKt$$ExternalSyntheticLambda1.invoke:0
+11-12 08:44:49.133  8686  8709 W TGlassWatchdog: main thread blocked 5419 ms, 43 samples:
+11-12 08:44:49.133  8686  8709 W TGlassWatchdog:   42x HardwareRenderer.nSetStopped:-2 < HardwareRenderer.setStopped:525 < ViewRootImpl.performDraw:4676 < ViewRootImpl.performTraversals:3822 < ViewRootImpl.doTraversal:2465 || 
+11-12 08:44:49.133  8686  8709 W TGlassWatchdog:   1x Arrays$ArrayList.get:4210 < AndroidShader_androidKt.makeTransparentColors:132 < AndroidShader_androidKt.ActualLinearGradientShader-VjE6UOU:45 < ShaderKt.LinearGradientShader-VjE6UOU:73 < LinearGradient.createShader-uvyYCjk:491 || NavigationKt.IOSNavHost$lambda$3$0$1$0:286 < NavigationKt.$r8$lambda$BIU0Te5EF-e4Zajawi0tl0azlPc:0 < NavigationKt$$ExternalSyntheticLambda1.invoke:0
+11-12 08:44:52.896   521  2436 W ProcessStats: Tracking association SourceState{d3875c3 com.abtin.tglass/10192 BTop #15405} whose proc state 2 is better than process ProcessState{d5a3e24 com.google.android.gms.persistent/10129 pkg=com.google.android.gms} proc state 4 (205 skipped)
+11-12 08:44:55.754  4569  4662 W Bugle   : TextClassifierLibManagerImpl: Reclaiming memory at level: 40
+11-12 08:45:00.048   834   834 W PageIndicator: Total number of pages invalid: 0. Assuming 1 page.
+11-12 08:45:02.902  1652  2313 W A       : Queue length for executor EventBus is now 11. Perhaps some tasks are too long, or the pool is too small.
+11-12 08:45:07.934  4569  4662 W Bugle   : TextClassifierLibManagerImpl: Reclaiming memory at level: 40
