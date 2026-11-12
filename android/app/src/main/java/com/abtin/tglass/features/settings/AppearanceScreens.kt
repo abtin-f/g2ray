@@ -175,19 +175,19 @@ internal fun LazyListScope.appearancePage() {
         val s = LocalAppSettings.current
         val c = TgTheme.colors
         // Only the label follows the finger; the whole app is re-laid out once, when it lifts (as with Text Size).
-        var scale by remember { mutableFloatStateOf((s.uiScale * 20f).roundToInt() / 20f) }
-        Section(header = "Interface Scale", footer = "Adjusts the size of everything. If buttons look too big, lower it.") {
+        var scale by remember { mutableFloatStateOf((s.uiScale * 100f).roundToInt() / 100f) }
+        Section(header = "Interface Scale", footer = "100% is the standard Android size (same as Telegram for Android). Adjusts everything in 1% steps.") {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                T("80%", TgTheme.type.footnote, c.secondaryText)
+                T("70%", TgTheme.type.footnote, c.secondaryText)
                 IOSSlider(
-                    scale, { scale = it }, 0.8f..1.2f, Modifier.weight(1f).padding(horizontal = 12.dp), steps = 7,
+                    scale, { scale = (it * 100f).roundToInt() / 100f }, 0.7f..1.3f, Modifier.weight(1f).padding(horizontal = 12.dp),
                     onValueChangeFinished = {
-                        val v = (scale * 20f).roundToInt() / 20f
+                        val v = (scale * 100f).roundToInt() / 100f
                         scale = v
                         if (v != s.uiScale) s.updateUiScale(v)
                     },
                 )
-                T("120%", TgTheme.type.footnote, c.secondaryText)
+                T("130%", TgTheme.type.footnote, c.secondaryText)
             }
             Separator(startPadding = 16.dp)
             Cell(

@@ -513,8 +513,8 @@ class AppSettings(context: Context) {
         private set
     var textScale by mutableFloatStateOf(prefs.getFloat("textScale", 1f))
         private set
-    /** Interface Scale multiplier on top of the automatic fit to the iPhone's 440-point width (see [ProvideUiScale]). */
-    var uiScale by mutableFloatStateOf(prefs.getFloat("uiScale", 1f))
+    /** Interface Scale multiplier on the phone's own density (see [ProvideUiScale]); 1 = standard Android size. */
+    var uiScale by mutableFloatStateOf(prefs.getFloat("uiScale2", 1f))
         private set
     var bubbleRadius by mutableFloatStateOf(prefs.getFloat("bubbleRadius", 16f))
         private set
@@ -695,7 +695,7 @@ class AppSettings(context: Context) {
     fun updateAnimations(v: Boolean) { animations = v; prefs.edit().putBoolean("anim", v).apply() }
     fun updateGhostRead(v: Boolean) { ghostRead = v; prefs.edit().putBoolean("ghostRead", v).apply() }
     fun updatePerfOverlay(v: Boolean) { perfOverlay = v; prefs.edit().putBoolean("perfOverlay", v).apply() }
-    fun updateUiScale(v: Float) { uiScale = v; prefs.edit().putFloat("uiScale", v).apply() }
+    fun updateUiScale(v: Float) { uiScale = v; prefs.edit().putFloat("uiScale2", v).apply() }
     fun updateTextScale(v: Float) { textScale = v; prefs.edit().putFloat("textScale", v).apply() }
     fun updateBubbleRadius(v: Float) { bubbleRadius = v; prefs.edit().putFloat("bubbleRadius", v).apply() }
     fun updateLoggedIn(v: Boolean) { loggedIn = v; prefs.edit().putBoolean("loggedIn", v).apply() }
@@ -717,22 +717,16 @@ private val LocalTgTypography = staticCompositionLocalOf { typography(1f) }
 val LocalThemeState = staticCompositionLocalOf { ThemeState(ColorTheme.Classic, autoNightTriggered = false, nightShowing = false) }
 
 /**
- * Width of the iPhone the design is compared with: the owner's reference photos are from a 440 pt wide iPhone
- * (Pro Max; avatar 60 pt = 13.5 % of the width), so iOS source constants in points keep their on-screen proportion.
- */
-private const val ReferenceWidthDp = 440f
-
-/**
- * Every dp in the app is an iOS point on the 440 pt wide iPhone. Android phones are 360–430 dp wide at whatever
- * "Display size" the owner picked, so the same dp looks too big on a narrow / zoomed phone. This scales the
- * density so the layout is always [ReferenceWidthDp] dp wide (times the user's Interface Scale), and keeps the
- * system font scale inside a sane range so a huge system font cannot blow the controls up.
+ * Every dp in the app is a real Android dp, exactly like Telegram for Android: 100 % is the phone's own density, so
+ * icons, rows and text have the physical size the owner is used to. Interface Scale multiplies it in 1 % steps.
+ * (Stretching the layout to a fixed 393 / 440 dp width made everything too big or too small on real phones.)
+ * The system font scale is kept inside a sane range so a huge system font cannot blow the controls up.
  */
 @Composable
 fun ProvideUiScale(userScale: Float, content: @Composable () -> Unit) {
     val cfg = LocalConfiguration.current
     val density = LocalDensity.current
-    val k = if (cfg.screenWidthDp >= 600) userScale else (cfg.screenWidthDp / ReferenceWidthDp * userScale).coerceIn(0.75f, 1.3f)
+    val k = userScale.coerceIn(0.7f, 1.3f)
     val d = remember(density.density, density.fontScale, k) { Density(density.density * k, density.fontScale.coerceIn(0.85f, 1.1f)) }
     val c = remember(cfg, k) {
         android.content.res.Configuration(cfg).apply {
